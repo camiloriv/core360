@@ -166,4 +166,31 @@ router.get("/encuestas", (req, res) => {
     });
 });
 
+// 🔹 DESTINATARIOS HISTÓRICOS POR EMPRESA
+router.get("/reuniones/destinatarios/:empresa_id", (req, res) => {
+    const { empresa_id } = req.params;
+
+    const sql = `
+        SELECT DISTINCT enviado_a 
+        FROM reuniones 
+        WHERE empresa_id = ? AND enviado_a IS NOT NULL AND enviado_a != ''
+    `;
+
+    db.query(sql, [empresa_id], (err, result) => {
+        if (err) return res.status(500).json({ ok: false, error: err });
+
+        // Procesamos para obtener correos individuales (en caso de que haya varios por celda)
+        const destinatarios = new Set();
+        result.forEach(row => {
+            row.enviado_a.split(',').forEach(email => {
+                if (email.trim()) {
+                    destinatarios.add(email.trim());
+                }
+            });
+        });
+
+        res.json({ ok: true, data: Array.from(destinatarios) });
+    });
+});
+
 module.exports = router;

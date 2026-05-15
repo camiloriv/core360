@@ -221,3 +221,30 @@ exports.crearReunion = async (req, res) => {
         return res.status(500).json({ error: "Error interno al crear la reunión" });
     }
 };
+
+// 🔹 OBTENER DESTINATARIOS POR EMPRESA (Para Autocompletado)
+exports.obtenerDestinatarios = async (req, res) => {
+    const { empresa_id } = req.query;
+    
+    if (!empresa_id) {
+        return res.status(400).json({ error: "empresa_id es requerido" });
+    }
+
+    const sql = `
+        SELECT DISTINCT enviado_a 
+        FROM reuniones 
+        WHERE empresa_id = ? 
+        AND enviado_a IS NOT NULL 
+        AND enviado_a != ''
+        ORDER BY enviado_a ASC
+    `;
+
+    try {
+        const [result] = await db.query(sql, [empresa_id]);
+        res.json(result.map(r => r.enviado_a));
+    } catch (err) {
+        console.error("Error en obtenerDestinatarios:", err);
+        res.status(500).json({ error: "Error en la BD" });
+    }
+};
+

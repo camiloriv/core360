@@ -17,6 +17,8 @@ import SelectTipoReunion from "../form/fields/SelectTipoReunion";
 import FileUpload from "../form/fields/FileUpload";
 import MinutaEditor from "../form/fields/MinutaEditor";
 import SelectLugar from "../form/fields/SelectLugar";
+import AutocompleteInput from "../form/fields/AutocompleteInput";
+
 
 function ReunionesForm({ onSuccess }) {
   const {
@@ -31,8 +33,10 @@ function ReunionesForm({ onSuccess }) {
     ejecutivas,
     empresas,
     setEmpresas,
-    templates
-  } = useReunionesData(form.jefatura_id);
+    templates,
+    destinatarios
+  } = useReunionesData(form.jefatura_id, form.empresa_id);
+
 
   const {
     submit,
@@ -125,8 +129,14 @@ function ReunionesForm({ onSuccess }) {
             <input value={form.motivo_reu || ""} onChange={(e) => setField("motivo_reu", e.target.value)} />
           </FormSection>
           <FormSection label={<>ENVIAR A <span style={{ color: 'red' }}>*</span></>} full>
-            <input value={form.enviado_a || ""} onChange={(e) => setField("enviado_a", e.target.value)} />
+            <AutocompleteInput 
+              value={form.enviado_a || ""} 
+              suggestions={destinatarios} 
+              onChange={(e) => setField("enviado_a", e.target.value)} 
+              placeholder="Nombre del destinatario..."
+            />
           </FormSection>
+
           <FormSection label={<>PARTICIPANTES <span style={{ color: 'red' }}>*</span></>} full>
             <input value={form.participantes || ""} onChange={(e) => setField("participantes", e.target.value)} />
           </FormSection>

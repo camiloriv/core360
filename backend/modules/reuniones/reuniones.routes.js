@@ -23,6 +23,8 @@ const upload = multer({
 // 🔹 RUTAS
 router.get("/", reunionesController.listarReuniones);
 router.get("/stats", reunionesController.obtenerStats);
+router.get("/destinatarios", reunionesController.obtenerDestinatarios);
 router.post("/", upload.array("archivos"), reunionesController.crearReunion);
 
 module.exports = router;
+

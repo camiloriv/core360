@@ -62,6 +62,28 @@ function ReunionesForm({ onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 🔹 VALIDACIÓN DETALLADA
+    const missingFields = [];
+    if (!form.jefatura_id) missingFields.push("Jefatura");
+    if (!form.ejecutiva_id) missingFields.push("Ejecutiva");
+    if (!form.empresa_id) missingFields.push("Empresa");
+    if (!form.tipo_reu) missingFields.push("Tipo de Reunión");
+    if (!form.motivo_reu) missingFields.push("Motivo");
+    if (!form.enviado_a) missingFields.push("Enviar a");
+    if (!form.participantes) missingFields.push("Participantes");
+    if (!form.fecha_reu) missingFields.push("Fecha");
+    if (!form.hora) missingFields.push("Hora");
+    if (!form.lugar) missingFields.push("Lugar");
+
+    if (missingFields.length > 0) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Campos Incompletos",
+        html: `<div style="text-align: left;">Por favor completa los siguientes campos obligatorios:<br><br><b>${missingFields.join(", ")}</b></div>`,
+        confirmButtonColor: "#3085d6"
+      });
+    }
+
     try {
       const res = await submit();
       Swal.fire({
@@ -70,11 +92,12 @@ function ReunionesForm({ onSuccess }) {
         text: `Reunión creada: ${res.data.id_reunion}`,
         confirmButtonColor: "#3085d6"
       });
-    } catch {
+    } catch (error) {
+      console.error(error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Hubo un problema al crear la reunión",
+        text: "Hubo un problema al crear la reunión. Por favor verifica los datos.",
         confirmButtonColor: "#d33"
       });
     }
@@ -93,34 +116,35 @@ function ReunionesForm({ onSuccess }) {
         </div>
 
         <div className="grid">
-          <SelectJefatura value={form.jefatura_id} jefaturas={jefaturas} onChange={handleJefaturaChange} />
-          <SelectEjecutiva value={form.ejecutiva_id} ejecutivas={filteredEjecutivas} onChange={handleEjecutivaChange} />
-          <SelectEmpresa value={form.empresa_id} empresas={empresas} onChange={(e) => setField("empresa_id", e.target.value)} />
-          <SelectTipoReunion value={form.tipo_reu} onChange={(e) => setField("tipo_reu", e.target.value)} detalle={form.tipo_reu_detalle} onDetalleChange={(e) => setField("tipo_reu_detalle", e.target.value)} />
+          <SelectJefatura value={form.jefatura_id} jefaturas={jefaturas} onChange={handleJefaturaChange} required />
+          <SelectEjecutiva value={form.ejecutiva_id} ejecutivas={filteredEjecutivas} onChange={handleEjecutivaChange} required />
+          <SelectEmpresa value={form.empresa_id} empresas={empresas} onChange={(e) => setField("empresa_id", e.target.value)} required />
+          <SelectTipoReunion value={form.tipo_reu} onChange={(e) => setField("tipo_reu", e.target.value)} detalle={form.tipo_reu_detalle} onDetalleChange={(e) => setField("tipo_reu_detalle", e.target.value)} required />
           
-          <FormSection label="MOTIVO">
+          <FormSection label={<>MOTIVO <span style={{ color: 'red' }}>*</span></>}>
             <input value={form.motivo_reu || ""} onChange={(e) => setField("motivo_reu", e.target.value)} />
           </FormSection>
-          <FormSection label="ENVIAR A" full>
+          <FormSection label={<>ENVIAR A <span style={{ color: 'red' }}>*</span></>} full>
             <input value={form.enviado_a || ""} onChange={(e) => setField("enviado_a", e.target.value)} />
           </FormSection>
-          <FormSection label="PARTICIPANTES" full>
+          <FormSection label={<>PARTICIPANTES <span style={{ color: 'red' }}>*</span></>} full>
             <input value={form.participantes || ""} onChange={(e) => setField("participantes", e.target.value)} />
           </FormSection>
-          <FormSection label="FECHA">
+          <FormSection label={<>FECHA <span style={{ color: 'red' }}>*</span></>}>
             <input type="date" value={form.fecha_reu || ""} onChange={(e) => setField("fecha_reu", e.target.value)} />
           </FormSection>
-          <FormSection label="HORA">
+          <FormSection label={<>HORA <span style={{ color: 'red' }}>*</span></>}>
             <input type="time" value={form.hora || ""} onChange={(e) => setField("hora", e.target.value)} />
           </FormSection>
           
-          <SelectLugar label="LUGAR" name="lugar" opciones={["Microsoft Teams", "Google Meet", "Zoom", "Presencial"]} form={form} setField={setField} />
+          <SelectLugar label={<>LUGAR <span style={{ color: 'red' }}>*</span></>} name="lugar" opciones={["Microsoft Teams", "Google Meet", "Zoom", "Presencial"]} form={form} setField={setField} />
           <MinutaEditor form={form} setForm={setField} />
           <FileUpload archivos={form.archivos} setFiles={setFiles} />
           
           <FormSection label="DOCUMENTOS ADJUNTOS" full>
             <input value={form.documentos_adjuntos || ""} onChange={(e) => setField("documentos_adjuntos", e.target.value)} />
           </FormSection>
+
 
           <div className="field full" style={{ marginTop: '10px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: form.programar_encuesta ? '15px' : '0' }}>

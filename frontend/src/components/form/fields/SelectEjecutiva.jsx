@@ -1,9 +1,11 @@
 import { capitalizar } from "../../../utils/textUtils";
 
-function SelectEjecutiva({ value, ejecutivas = [], onChange }) {
+function SelectEjecutiva({ value, ejecutivas = [], onChange, required }) {
   return (
     <div className="field">
-      <label>EJECUTIVA</label>
+      <label>
+        EJECUTIVA {required && <span style={{ color: 'red' }}>*</span>}
+      </label>
 
       <select
         name="ejecutiva_id"

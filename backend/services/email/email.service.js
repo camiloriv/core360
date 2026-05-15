@@ -97,6 +97,8 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
       ...adjuntosArchivos // 🔥 AQUÍ SE AGREGAN LOS ARCHIVOS
     ];
 
+
+
     if (finalFirmaPath) {
       baseAttachments.push({
         filename: "firma.png",

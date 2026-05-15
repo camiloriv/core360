@@ -1,10 +1,12 @@
-function SelectTipoReunion({ value, onChange, detalle, onDetalleChange }) {
+function SelectTipoReunion({ value, onChange, detalle, onDetalleChange, required }) {
 
   const esOtro = value === "Otros";
 
   return (
     <div className="field">
-      <label>TIPO REUNIÓN</label>
+      <label>
+        TIPO REUNIÓN {required && <span style={{ color: 'red' }}>*</span>}
+      </label>
 
       <select
         value={value || ""}

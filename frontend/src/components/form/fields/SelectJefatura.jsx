@@ -1,9 +1,11 @@
 import { capitalizar } from "../../../utils/textUtils";
 
-function SelectJefatura({ value, jefaturas = [], onChange }) {
+function SelectJefatura({ value, jefaturas = [], onChange, required }) {
   return (
     <div className="field">
-      <label>JEFATURA</label>
+      <label>
+        JEFATURA {required && <span style={{ color: 'red' }}>*</span>}
+      </label>
 
       <select
         name="jefatura_id"

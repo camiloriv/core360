@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 
-function SelectEmpresa({ value, empresas = [], onChange }) {
+function SelectEmpresa({ value, empresas = [], onChange, required }) {
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
@@ -33,7 +34,9 @@ function SelectEmpresa({ value, empresas = [], onChange }) {
 
   return (
     <div className="field full" ref={dropdownRef} style={{ position: "relative" }}>
-      <label>EMPRESA</label>
+      <label>
+        EMPRESA {required && <span style={{ color: 'red' }}>*</span>}
+      </label>
       <input
         type="text"
         placeholder="Seleccione o busque una empresa..."

@@ -426,11 +426,13 @@ function MinutaEditor({ form, setForm }) {
       <style>
         .preview-container { font-family: 'Inter', 'Segoe UI', sans-serif; color: #1e293b; line-height: 1.6; padding: 40px; background: white; }
         .preview-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; margin-bottom: 24px; }
-        .preview-title { font-size: 28px; font-weight: 800; color: #0f172a; margin: 0 0 12px 0; display: inline-block; border-bottom: 3px solid #2563eb; padding-bottom: 4px; }
-        .preview-info-item { font-size: 14px; margin-bottom: 6px; color: #475569; }
-        .preview-info-label { font-weight: 700; color: #334155; }
-        .preview-info-value { color: #64748b; }
-        .preview-section-label { font-size: 12px; font-weight: 800; color: #2563eb; text-transform: uppercase; margin: 32px 0 12px 0; letter-spacing: 1px; }
+        .preview-title { font-size: 28px; font-weight: 800; color: #1e3a8a; margin: 0 0 12px 0; display: inline-block; border-bottom: 3px solid #3498db; padding-bottom: 4px; }
+        .preview-info-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+
+        .preview-info-table td { padding: 4px 0; font-size: 14px; border-bottom: 1px dashed #e2e8f0; }
+        .preview-info-label { font-weight: 700; color: #1e3a8a; width: 110px; }
+        .preview-info-value { color: #475569; }
+        .preview-section-label { font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 32px 0 12px 0; letter-spacing: 1px; }
         .preview-content-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 60px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
         .preview-content-box table { border-collapse: collapse; width: auto !important; min-width: 300px; margin: 15px 0; border: 1px solid #cbd5e1 !important; }
@@ -440,33 +442,46 @@ function MinutaEditor({ form, setForm }) {
         .preview-content-box ul, .preview-content-box ol { padding-left: 20px; margin-bottom: 12px; }
         .preview-content-box li { margin-bottom: 6px; }
       </style>
-      <div class="preview-container">
-        <!-- BLOQUE CABECERA -->
-        <div class="preview-card">
-          <h1 class="preview-title">Minuta de Reunión</h1>
-          <div style="margin-top: 15px;">
-            ${form.participantes ? `<div class="preview-info-item"><span class="preview-info-label">Participantes:</span> <span class="preview-info-value">${form.participantes}</span></div>` : ''}
-            <div class="preview-info-item">
-              ${form.fecha_reu ? `<span class="preview-info-label">Fecha:</span> <span class="preview-info-value">${form.fecha_reu}</span>` : ''}
-              ${form.fecha_reu && form.hora ? `<span style="margin: 0 8px; color: #cbd5e1;">|</span>` : ''}
-              ${form.hora ? `<span class="preview-info-label">Hora:</span> <span class="preview-info-value">${form.hora}</span>` : ''}
+      <div class="preview-container" style="display: flex; justify-content: flex-start; width: 100%;">
+        <div style="width: 100%; max-width: 800px;">
+          <!-- BLOQUE CABECERA -->
+          <div class="preview-card" style="text-align: left;">
+            <h1 class="preview-title">Minuta de Reunión</h1>
+            <div>
+              <table class="preview-info-table">
+                <tr>
+                  <td class="preview-info-label">Participantes:</td>
+                  <td class="preview-info-value">${form.participantes || ""}</td>
+                </tr>
+                <tr>
+                  <td class="preview-info-label">Fecha:</td>
+                  <td class="preview-info-value">${form.fecha_reu || ""}</td>
+                </tr>
+                <tr>
+                  <td class="preview-info-label">Hora:</td>
+                  <td class="preview-info-value">${form.hora || ""}</td>
+                </tr>
+                <tr>
+                  <td class="preview-info-label">Lugar:</td>
+                  <td class="preview-info-value">${form.lugar || ""}</td>
+                </tr>
+              </table>
             </div>
-            ${form.lugar ? `<div class="preview-info-item"><span class="preview-info-label">Lugar:</span> <span class="preview-info-value">${form.lugar}</span></div>` : ''}
           </div>
-        </div>
 
-        ${form.motivo_reu ? `
-          <div class="preview-section-label">Objetivo de la Reunión:</div>
-          <div class="preview-content-box">
-            ${form.motivo_reu}
+          ${form.motivo_reu ? `
+            <div class="preview-section-label">Objetivo de la Reunión:</div>
+            <div class="preview-content-box">
+              ${form.motivo_reu}
+            </div>
+          ` : ''}
+
+          <!-- BLOQUE TEMAS -->
+          <div class="preview-section-label">Temas Tratados:</div>
+          <div class="preview-content-box" style="margin-bottom: 20px;">
+            ${editor.getHTML() || '<p style="color:#94a3b8">Sin contenido...</p>'}
           </div>
-        ` : ''}
 
-        <!-- BLOQUE TEMAS -->
-        <div class="preview-section-label">Temas Tratados:</div>
-        <div class="preview-content-box" style="margin-bottom: 20px;">
-          ${editor.getHTML() || '<p style="color:#94a3b8">Sin contenido...</p>'}
-        </div>
 
         <!-- BLOQUE ADJUNTOS -->
         <div class="preview-section-label">Adjuntos:</div>
@@ -569,8 +584,14 @@ function MinutaEditor({ form, setForm }) {
         </div>
       </div>
       {showPreviewModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
-          <div style={{ background: 'white', width: '100%', maxWidth: '900px', maxHeight: '90vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div 
+          onClick={() => setShowPreviewModal(false)}
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px', cursor: 'pointer' }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'white', width: '100%', maxWidth: '900px', maxHeight: '90vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'default' }}
+          >
             <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>Vista Previa del Correo</h3>
               <button onClick={() => setShowPreviewModal(false)} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar Vista</button>
@@ -581,6 +602,7 @@ function MinutaEditor({ form, setForm }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }

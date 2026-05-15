@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    /* Estilos automáticos solicitados (Naranja y Centrado) */
+    .minuta-content table {
+      border-collapse: collapse;
+      width: auto !important;
+      max-width: 100% !important;
+      margin: 15px 0;
+      border: 2px solid #000000 !important;
+    }
+
+    /* Forzamos primera fila naranja */
+    .minuta-content table tr:first-child td,
+    .minuta-content table tr:first-child th {
+      background-color: #e67e22 !important;
+      color: #000000 !important;
+      font-weight: bold !important;
+      text-align: center !important;
+      border: 1px solid #000000 !important;
+    }
+
+    .minuta-content td,
+    .minuta-content th {
+      border: 1px solid #000000 !important;
+      padding: 2px 8px !important;
+      color: #000000 !important;
+      vertical-align: middle;
+      line-height: 1.2 !important;
+    }
+
+    .minuta-content p {
+      margin: 0 0 10px 0;
+      text-align: inherit;
+    }
+
+    blockquote {
+      border-left: 4px solid #3498db;
+      margin: 10px 0;
+      padding: 10px 15px;
+      color: #555;
+      background-color: #f9fafb;
+    }
+  </style>
+</head>
+
+<body style="margin:0; padding:0; font-family:Segoe UI, Arial, sans-serif; background:#f4f6f9;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;">
+    <tr>
+      <td height="20"></td>
+    </tr>
+    <tr>
+      <td align="center">
+        <!-- CONTENEDOR PRINCIPAL -->
+        <table width="800" cellpadding="0" cellspacing="0"
+          style="background:#ffffff; border:1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+
+          <!-- BANNER HEADER -->
+          <tr>
+            <td align="center" style="background-color: #ffffff; border-bottom: 2px solid #e2e8f0;">
+              <img src="cid:banner-header" width="800"
+                style="display:block; border:0; width:100%; max-width:800px; height:auto;">
+            </td>
+          </tr>
+
+          <!-- INFO CABECERA -->
+          <tr>
+            <td style="padding: 30px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0"
+                style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 25px;">
+                    <h2
+                      style="margin:0 0 15px 0; color:#1e293b; font-size: 24px; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; display: inline-block;">
+                      Minuta de Reunión
+                    </h2>
+                    <table width="100%" cellpadding="0" cellspacing="0"
+                      style="font-size: 14px; color: #475569; line-height: 1.2;">
+                      <tr>
+                        <td style="padding: 2px 0;"><b>Participantes:</b> {{participantes}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 2px 0;"><b>Fecha:</b> {{fecha}} | <b>Hora:</b> {{hora}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 2px 0;"><b>Lugar:</b> {{lugar}}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- SECCIÓN OBJETIVO -->
+          <tr>
+            <td style="padding: 0 40px 25px 40px;">
+              <p
+                style="font-weight:bold; color:#3b82f6; text-transform:uppercase; font-size:12px; margin: 0 0 8px 0; letter-spacing: 1px;">
+                Objetivo de la Reunión:
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius: 4px;">
+                <tr>
+                  <td style="padding: 20px; color: #334155; font-size: 15px; line-height: 1.2;">
+                    {{motivo}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- SECCIÓN TEMAS (MINUTA) -->
+          <tr>
+            <td style="padding: 0 40px 25px 40px;">
+              <p
+                style="font-weight:bold; color:#3b82f6; text-transform:uppercase; font-size:12px; margin: 0 0 8px 0; letter-spacing: 1px;">
+                Temas Tratados:
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius: 4px;">
+                <tr>
+                  <td class="minuta-content" style="padding: 20px; color: #334155; font-size: 15px; line-height: 1.2;">
+                    {{minuta}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- SECCIÓN ADJUNTOS -->
+          <tr>
+            <td style="padding: 0 40px 30px 40px;">
+              <p
+                style="font-weight:bold; color:#3b82f6; text-transform:uppercase; font-size:12px; margin: 0 0 8px 0; letter-spacing: 1px;">
+                Documentos Adjuntos:
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius: 4px;">
+                <tr>
+                  <td style="padding: 15px 20px; color: #475569; font-size: 14px;">
+                    {{documentos_adjuntos}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- BANNER FOOTER -->
+          <tr>
+            <td align="center" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <img src="cid:banner-footer" width="800"
+                style="display:block; border:0; width:100%; max-width:800px; height:auto;">
+            </td>
+          </tr>
+
+          <!-- FIRMA -->
+          <tr>
+            <td style="padding: 40px; background: #ffffff; text-align: left;">
+              <div style="color: #475569; font-size: 14px; margin-bottom: 10px;">Atentamente,</div>
+              <img src="cid:firma" alt="Firma {{ejecutiva}}" style="display: block; width: 100%; max-width: 800px; height: auto; border: 0;">
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td height="40"></td>
+    </tr>
+  </table>
+</body>
+
+</html>

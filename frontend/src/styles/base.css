@@ -1,0 +1,12 @@
+@import "./variables.css";
+
+* {
+
+  box-sizing: border-box;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f9;
+}

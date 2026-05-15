@@ -1,0 +1,68 @@
+/* CSS DE MARKDOWNHELPPANEL */
+
+/* BOTÓN */
+.help-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* PANEL */
+.help-panel {
+  position: fixed;
+  top: 0;
+  right: -350px;
+  width: 350px;
+  height: 100%;
+  background: #111827;
+  color: white;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+}
+
+.help-panel.open {
+  right: 0;
+}
+
+/* HEADER */
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px;
+  background: #1f2937;
+  border-bottom: 1px solid #374151;
+}
+
+/* CONTENT */
+.help-content {
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.help-content section {
+  margin-bottom: 20px;
+}
+
+.help-content h4 {
+  margin-bottom: 5px;
+}
+
+/* CODE BLOCK */
+pre {
+  background: #1f2937;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  overflow-x: auto;
+}

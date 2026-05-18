@@ -32,7 +32,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 | **Base de Datos** | MySQL | Almacenamiento relacional. |
 | **Gráficos** | Recharts | Visualización de KPIs y analíticas. |
 | **Estilos** | CSS Moderno | Diseño responsivo y animaciones. |
-| **Editor** | React Quill | Edición de minutas en formato enriquecido. |
+| **Editor** | TipTap | Edición de minutas en formato enriquecido. |
 | **Comunicaciones** | Nodemailer | Envío automatizado de correos. |
 
 ---
@@ -46,7 +46,8 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 │   ├── /encuestas       # Gestión de preguntas, respuestas y envíos
 │   ├── /reuniones       # Creación de minutas y actas
 │   ├── /empresas        # Directorio de clientes/empresas
-│   └── /ejecutivas      # Gestión de personal ejecutivo
+│   ├── /ejecutivas      # Gestión de personal ejecutivo
+│   └── /auth            # Autenticación y gestión de usuarios centralizada
 ├── /database            # Conexión y configuración de BD
 ├── /router              # Definición de rutas globales
 ├── app.js               # Configuración de Express y Middlewares
@@ -59,7 +60,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 ├── /src
 │   ├── /components      # Componentes reutilizables (formularios, layouts)
 │   ├── /pages           # Vistas principales de la aplicación
-│   ├── /styles          # Sistema de diseño y hojas de estilo CSS
+│   ├── /styles          # Sistema de diseño con variables CSS estandarizadas
 │   ├── /services        # Clientes de API (Axios)
 │   └── App.jsx          # Componente raíz y rutas
 └── vite.config.js       # Configuración de empaquetado
@@ -75,7 +76,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 - Exportación y filtrado por ejecutiva o empresa.
 
 ### 2. Control de Reuniones (Minutas)
-- Editor de texto enriquecido para redactar actas de reuniones.
+- Editor de texto enriquecido (TipTap) para redactar actas de reuniones.
 - Registro de compromisos y acuerdos.
 - Flujo de trabajo de seguimiento automatizado.
 
@@ -84,11 +85,16 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 - Gráficos de radar para análisis multidimensional de desempeño.
 - Rankings de ejecutivas basados en feedback de clientes.
 
+### 4. Sistema de Autenticación y RBAC
+- Gestión centralizada de usuarios con roles definidos (ej. admin, jefatura).
+- Rutas protegidas y control de acceso basado en permisos.
+
 ---
 
 ## 🗄️ Esquema de Base de Datos
 
 ### Entidades Principales
+- **`usuarios`**: Gestión centralizada de credenciales y roles (RBAC).
 - **`empresas`**: Registro de clientes.
 - **`ejecutivas`**: Personal responsable de cuentas.
 - **`reuniones`**: Actas, participantes y archivos adjuntos.
@@ -100,6 +106,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite**.
 ### Ejemplo de Datos
 | Tabla | Ejemplo de Dato |
 | :--- | :--- |
+| **Usuarios** | `{ id: 1, email: "admin@core360.com", permisos: "admin" }` |
 | **Empresas** | `{ id: 1, nombre: "Empresa Alpha" }` |
 | **Ejecutivas** | `{ id: 5, nombre: "Claudia Martínez" }` |
 | **Preguntas** | `{ texto: "¿Calidad del servicio?", tipo: "opcion_multiple" }` |
@@ -145,7 +152,7 @@ El backend requiere las siguientes configuraciones:
 ---
 
 ## 🎨 Guía de Estilo
-El proyecto utiliza un sistema de diseño propio definido en `frontend/src/styles/base.css`. Se prioriza:
-- **Colores:** Paletas armoniosas (Dark mode opcional).
-- **Tipografía:** Google Fonts (Inter/Outfit).
-- **Interacciones:** Micro-animaciones en botones y transiciones de página suaves.
+El proyecto utiliza un sistema de diseño propio basado en **Variables CSS estandarizadas** (`frontend/src/styles/variables.css`). Se prioriza:
+- **Colores:** Paletas armoniosas, controladas globalmente vía variables CSS (ej. `--primary-color`, `--bg-body`).
+- **Tipografía:** Google Fonts (`--font-main`, `--font-mono`).
+- **Interacciones:** Micro-animaciones en botones y transiciones de página suaves, promoviendo una experiencia fluida y consistente en todas las vistas.

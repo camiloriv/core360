@@ -52,12 +52,14 @@ export default function GestionEjecutivas() {
       html: `
         <input id="swal-input1" class="swal2-input" placeholder="Nombre" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <input id="swal-input2" class="swal2-input" placeholder="Correo" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
+        <input id="swal-input-pass" class="swal2-input" placeholder="Contraseña de acceso" type="text" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
       `,
       focusConfirm: false,
       preConfirm: () => {
         return {
           nombre: document.getElementById("swal-input1").value,
-          correo: document.getElementById("swal-input2").value
+          correo: document.getElementById("swal-input2").value,
+          contrasena: document.getElementById("swal-input-pass").value
         };
       }
     });
@@ -80,12 +82,14 @@ export default function GestionEjecutivas() {
       html: `
         <input id="swal-input1" class="swal2-input" placeholder="Nombre" value="${jefatura.nombre}" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <input id="swal-input2" class="swal2-input" placeholder="Correo" value="${jefatura.correo || ''}" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
+        <input id="swal-input-pass" class="swal2-input" placeholder="Nueva Contraseña (opcional)" type="text" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
       `,
       focusConfirm: false,
       preConfirm: () => {
         return {
           nombre: document.getElementById("swal-input1").value,
-          correo: document.getElementById("swal-input2").value
+          correo: document.getElementById("swal-input2").value,
+          contrasena: document.getElementById("swal-input-pass").value
         };
       }
     });
@@ -108,6 +112,7 @@ export default function GestionEjecutivas() {
       html: `
         <input id="swal-input1" class="swal2-input" placeholder="Nombre" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <input id="swal-input2" class="swal2-input" placeholder="Correo" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
+        <input id="swal-input-pass" class="swal2-input" placeholder="Contraseña de acceso" type="text" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <select id="swal-input3" class="swal2-select" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
           <option value="">Sin jefatura</option>
           ${jefaturas.map(j => `<option value="${j.id}">${j.nombre}</option>`).join("")}
@@ -118,6 +123,7 @@ export default function GestionEjecutivas() {
         return {
           nombre: document.getElementById("swal-input1").value,
           correo: document.getElementById("swal-input2").value,
+          contrasena: document.getElementById("swal-input-pass").value,
           jefatura_id: document.getElementById("swal-input3").value || null
         };
       }
@@ -141,6 +147,7 @@ export default function GestionEjecutivas() {
       html: `
         <input id="swal-input1" class="swal2-input" placeholder="Nombre" value="${ejecutiva.nombre}" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <input id="swal-input2" class="swal2-input" placeholder="Correo" value="${ejecutiva.correo || ''}" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
+        <input id="swal-input-pass" class="swal2-input" placeholder="Nueva Contraseña (opcional)" type="text" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
         <select id="swal-input3" class="swal2-select" style="width: 80%; box-sizing: border-box; display: block; margin: 15px auto;">
           <option value="">Sin jefatura</option>
           ${jefaturas.map(j => `<option value="${j.id}" ${ejecutiva.jefatura_id === j.id ? 'selected' : ''}>${j.nombre}</option>`).join("")}
@@ -151,6 +158,7 @@ export default function GestionEjecutivas() {
         return {
           nombre: document.getElementById("swal-input1").value,
           correo: document.getElementById("swal-input2").value,
+          contrasena: document.getElementById("swal-input-pass").value,
           jefatura_id: document.getElementById("swal-input3").value || null
         };
       }
@@ -236,7 +244,7 @@ export default function GestionEjecutivas() {
 
   return (
     <div className="container">
-      <h1 style={{ fontSize: "2rem", marginBottom: "30px", color: "#1e293b" }}>Gestión de Personal</h1>
+      <h1 style={{ fontSize: "2rem", marginBottom: "30px", color: "var(--text-main)" }}>Gestión de Personal</h1>
 
       {/* SECCIÓN SUPERIOR: Jefaturas y Ejecutivas */}
       <div style={{ display: "flex", flexDirection: "column", gap: "30px", marginBottom: "30px" }}>
@@ -256,7 +264,7 @@ export default function GestionEjecutivas() {
             </h2>
             <button 
               onClick={(e) => { e.stopPropagation(); crearJefatura(); }} 
-              style={{ background: "#3b82f6", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
+              style={{ background: "var(--secondary-color)", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
             >
               + Añadir
             </button>
@@ -278,7 +286,7 @@ export default function GestionEjecutivas() {
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{j.nombre}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{j.correo}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                        <button onClick={() => editarJefatura(j)} style={{ color: "#3b82f6", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar</button>
+                        <button onClick={() => editarJefatura(j)} style={{ color: "var(--secondary-color)", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar</button>
                       </td>
                     </tr>
                   ))}
@@ -303,7 +311,7 @@ export default function GestionEjecutivas() {
             </h2>
             <button 
               onClick={(e) => { e.stopPropagation(); crearEjecutiva(); }} 
-              style={{ background: "#3b82f6", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
+              style={{ background: "var(--secondary-color)", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
             >
               + Añadir
             </button>
@@ -327,7 +335,7 @@ export default function GestionEjecutivas() {
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{e.correo}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{e.jefatura_nombre || "-"}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                        <button onClick={() => editarEjecutiva(e)} style={{ color: "#3b82f6", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar</button>
+                        <button onClick={() => editarEjecutiva(e)} style={{ color: "var(--secondary-color)", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar</button>
                         <button onClick={() => eliminarEjecutiva(e.id)} style={{ color: "red", background: "none", border: "none", cursor: "pointer", fontSize: "12px" }}>Eliminar</button>
                       </td>
                     </tr>
@@ -360,11 +368,11 @@ export default function GestionEjecutivas() {
             {/* FILTROS INTEGRADOS */}
             <div style={{ 
               display: "flex", gap: "20px", alignItems: "center", 
-              padding: "15px", background: "#f1f5f9", borderRadius: "8px", 
+              padding: "15px", background: "var(--bg-muted)", borderRadius: "8px", 
               marginBottom: "20px" 
             }}>
               <div style={{ flex: 1 }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "5px" }}>Filtrar por Jefatura:</label>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--text-muted)", marginBottom: "5px" }}>Filtrar por Jefatura:</label>
                 <select 
                   style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", outline: "none", fontSize: "13px" }}
                   value={filtroJefatura} 
@@ -393,7 +401,7 @@ export default function GestionEjecutivas() {
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{emp.nombre}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>{emp.jefatura_nombre || "-"}</td>
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                        <button onClick={() => editarEmpresa(emp)} style={{ color: "#3b82f6", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar Jefatura</button>
+                        <button onClick={() => editarEmpresa(emp)} style={{ color: "var(--secondary-color)", background: "none", border: "none", cursor: "pointer", marginRight: "10px", fontSize: "12px" }}>Editar Jefatura</button>
                       </td>
                     </tr>
                   ))}

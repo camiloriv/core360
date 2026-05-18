@@ -1,6 +1,5 @@
-
+import { useEffect } from "react";
 import Swal from "sweetalert2";
-
 
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
@@ -10,8 +9,6 @@ import FormSection from "../form/core/FormSection";
 import FormActions from "../form/core/FormActions";
 
 // fields
-import SelectJefatura from "../form/fields/SelectJefatura";
-import SelectEjecutiva from "../form/fields/SelectEjecutiva";
 import SelectEmpresa from "../form/fields/SelectEmpresa";
 import SelectTipoReunion from "../form/fields/SelectTipoReunion";
 import FileUpload from "../form/fields/FileUpload";
@@ -19,8 +16,9 @@ import MinutaEditor from "../form/fields/MinutaEditor";
 import SelectLugar from "../form/fields/SelectLugar";
 import AutocompleteInput from "../form/fields/AutocompleteInput";
 
-
 function ReunionesForm({ onSuccess }) {
+  const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+
   const {
     form,
     setField,
@@ -29,14 +27,20 @@ function ReunionesForm({ onSuccess }) {
   } = useReunionesForm();
 
   const {
-    jefaturas,
-    ejecutivas,
     empresas,
     setEmpresas,
     templates,
     destinatarios
-  } = useReunionesData(form.jefatura_id, form.empresa_id);
+  } = useReunionesData(user, form.empresa_id);
 
+  // Initialize jefatura_id, ejecutiva_id and enviado_por from user
+  useEffect(() => {
+    if (!form.jefatura_id && !form.ejecutiva_id) {
+      setField("jefatura_id", user.jefatura_id || user.id);
+      setField("ejecutiva_id", user.id);
+      setField("enviado_por", user.nombre);
+    }
+  }, [user, form.jefatura_id, form.ejecutiva_id, setField]);
 
   const {
     submit,
@@ -48,28 +52,11 @@ function ReunionesForm({ onSuccess }) {
     setEmpresas
   });
 
-  const handleJefaturaChange = (e) => {
-    const val = e.target.value;
-    setField("jefatura_id", val);
-    setField("ejecutiva_id", "");
-    setField("enviado_por", "");
-    setField("empresa_id", "");
-  };
-
-  const handleEjecutivaChange = (e) => {
-    const val = e.target.value;
-    setField("ejecutiva_id", val);
-    const ej = ejecutivas.find(x => x.id === parseInt(val));
-    setField("enviado_por", ej ? ej.nombre : "");
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];
-    if (!form.jefatura_id) missingFields.push("Jefatura");
-    if (!form.ejecutiva_id) missingFields.push("Ejecutiva");
     if (!form.empresa_id) missingFields.push("Empresa");
     if (!form.tipo_reu) missingFields.push("Tipo de Reunión");
     if (!form.motivo_reu) missingFields.push("Motivo");
@@ -107,10 +94,6 @@ function ReunionesForm({ onSuccess }) {
     }
   };
 
-  const filteredEjecutivas = ejecutivas.filter(e => 
-    !form.jefatura_id || e.jefatura_id === parseInt(form.jefatura_id)
-  );
-
   return (
     <div className="container" style={{ position: 'relative' }}>
       <form onSubmit={handleSubmit}>
@@ -120,8 +103,6 @@ function ReunionesForm({ onSuccess }) {
         </div>
 
         <div className="grid">
-          <SelectJefatura value={form.jefatura_id} jefaturas={jefaturas} onChange={handleJefaturaChange} required />
-          <SelectEjecutiva value={form.ejecutiva_id} ejecutivas={filteredEjecutivas} onChange={handleEjecutivaChange} required />
           <SelectEmpresa value={form.empresa_id} empresas={empresas} onChange={(e) => setField("empresa_id", e.target.value)} required />
           <SelectTipoReunion value={form.tipo_reu} onChange={(e) => setField("tipo_reu", e.target.value)} detalle={form.tipo_reu_detalle} onDetalleChange={(e) => setField("tipo_reu_detalle", e.target.value)} required />
           
@@ -155,17 +136,16 @@ function ReunionesForm({ onSuccess }) {
             <input value={form.documentos_adjuntos || ""} onChange={(e) => setField("documentos_adjuntos", e.target.value)} />
           </FormSection>
 
-
-          <div className="field full" style={{ marginTop: '10px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+          <div className="field full" style={{ marginTop: '10px', padding: '15px', background: 'var(--bg-muted)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: form.programar_encuesta ? '15px' : '0' }}>
               <input type="checkbox" checked={form.programar_encuesta} onChange={(e) => setField("programar_encuesta", e.target.checked)} style={{ width: '18px', height: '18px' }} />
-              <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#0369a1' }}>PROGRAMAR ENVÍO DE ENCUESTA</span>
+              <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--info-color)' }}>PROGRAMAR ENVÍO DE ENCUESTA</span>
             </label>
             {form.programar_encuesta && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <span style={{ fontSize: '12px', color: '#075985', fontWeight: 'bold' }}>TIPO DE ENCUESTA:</span>
-                  <select value={form.encuesta_tipo} onChange={(e) => setField("encuesta_tipo", e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #7dd3fc' }} >
+                  <span style={{ fontSize: '12px', color: 'var(--info-color)', fontWeight: 'bold' }}>TIPO DE ENCUESTA:</span>
+                  <select value={form.encuesta_tipo} onChange={(e) => setField("encuesta_tipo", e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)' }} >
                     <option value="">Seleccionar tipo</option>
                     {templates.map(t => (
                       <option key={t.id} value={t.nombre}>{t.nombre.charAt(0).toUpperCase() + t.nombre.slice(1)}</option>
@@ -173,8 +153,8 @@ function ReunionesForm({ onSuccess }) {
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <span style={{ fontSize: '12px', color: '#075985', fontWeight: 'bold' }}>FECHA Y HORA DE ENVÍO:</span>
-                  <input type="datetime-local" value={form.encuesta_programada_para} onChange={(e) => setField("encuesta_programada_para", e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #7dd3fc' }} />
+                  <span style={{ fontSize: '12px', color: 'var(--info-color)', fontWeight: 'bold' }}>FECHA Y HORA DE ENVÍO:</span>
+                  <input type="datetime-local" value={form.encuesta_programada_para} onChange={(e) => setField("encuesta_programada_para", e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
                 </div>
               </div>
             )}

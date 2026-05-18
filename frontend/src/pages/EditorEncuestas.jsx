@@ -314,7 +314,7 @@ export default function EditorEncuestas() {
                         </div>
 
                         <div style={{ flex: 1, overflowY: 'auto', marginBottom: '20px', paddingRight: '5px' }}>
-                            {loading ? <p style={{ textAlign: 'center', fontSize: '13px', color: '#64748b' }}>Cargando...</p> : (
+                            {loading ? <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>Cargando...</p> : (
                                 <div style={styles.list}>
                                     {templates
                                         .filter(t => showInactives ? !t.activo : t.activo)
@@ -324,14 +324,14 @@ export default function EditorEncuestas() {
                                                 onClick={() => handleSelectTemplate(t)}
                                                 style={{
                                                     ...styles.listItem,
-                                                    background: selectedTemplate?.id === t.id ? '#eff6ff' : '#fff',
-                                                    borderColor: selectedTemplate?.id === t.id ? '#3b82f6' : '#e2e8f0',
+                                                    background: selectedTemplate?.id === t.id ? 'var(--bg-muted)' : 'var(--bg-container)',
+                                                    borderColor: selectedTemplate?.id === t.id ? 'var(--secondary-color)' : 'var(--border-color)',
                                                     padding: '15px'
                                                 }}
                                             >
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '14px' }}>{t.nombre}</div>
-                                                    <div style={{ fontSize: '10px', color: t.activo ? '#10b981' : '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>
+                                                    <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '14px' }}>{t.nombre}</div>
+                                                    <div style={{ fontSize: '10px', color: t.activo ? 'var(--success-color)' : 'var(--danger-color)', fontWeight: 'bold', marginTop: '4px' }}>
                                                         {t.activo ? '● ACTIVO' : '● INACTIVO'}
                                                     </div>
                                                 </div>
@@ -339,7 +339,7 @@ export default function EditorEncuestas() {
                                             </div>
                                         ))}
                                     {templates.filter(t => showInactives ? !t.activo : t.activo).length === 0 && !loading && (
-                                        <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>
+                                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-light)', fontSize: '13px' }}>
                                             No hay templates {showInactives ? 'inactivos' : 'activos'}.
                                         </div>
                                     )}
@@ -354,8 +354,8 @@ export default function EditorEncuestas() {
                                 padding: '12px',
                                 borderRadius: '10px',
                                 border: '1px solid #e2e8f0',
-                                background: showInactives ? '#f1f5f9' : '#fff',
-                                color: showInactives ? '#3b82f6' : '#64748b',
+                                background: showInactives ? 'var(--bg-muted)' : 'var(--bg-container)',
+                                color: showInactives ? 'var(--secondary-color)' : 'var(--text-muted)',
                                 fontSize: '12px',
                                 fontWeight: 'bold',
                                 cursor: 'pointer',
@@ -372,8 +372,8 @@ export default function EditorEncuestas() {
                             <div className="fade">
                                 <div style={styles.mainHeader}>
                                     <div>
-                                        <h2 style={{ margin: 0, fontSize: '20px', color: '#1e293b' }}>Estructura: {selectedTemplate.nombre}</h2>
-                                        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>{preguntas.length} preguntas vinculadas</p>
+                                        <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-main)' }}>Estructura: {selectedTemplate.nombre}</h2>
+                                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>{preguntas.length} preguntas vinculadas</p>
                                     </div>
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <button onClick={handleSelectFromLibrary} style={styles.btnSecondary}>🔍 Biblioteca Maestro</button>
@@ -394,7 +394,7 @@ export default function EditorEncuestas() {
                                         </thead>
                                         <tbody>
                                             {preguntas.length === 0 ? (
-                                                <tr><td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Template vacío.</td></tr>
+                                                <tr><td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>Template vacío.</td></tr>
                                             ) : preguntas.map(p => (
                                                 <tr key={p.assignment_id || p.id} style={styles.tr}>
                                                     <td style={styles.tdCell}>{p.orden}</td>
@@ -404,17 +404,17 @@ export default function EditorEncuestas() {
                                                     </td>
                                                     <td style={styles.tdCell}>
                                                         <span style={styles.dimensionBadge}>{p.dimension_nombre || 'General'}</span>
-                                                        {p.subdimension && <div style={{ fontSize: '10px', color: '#64748b' }}>{p.subdimension}</div>}
+                                                        {p.subdimension && <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{p.subdimension}</div>}
                                                     </td>
                                                     <td style={styles.tdCell}>
                                                         <span style={styles.typeBadge}>{p.tipo.toUpperCase()}</span>
-                                                        {p.tipo === 'escala' && <div style={{ fontSize: '10px', color: '#64748b' }}>Rango: 1-{p.escala || 10}</div>}
-                                                        {p.es_nps === 1 && <div style={{ fontSize: '10px', color: '#3b82f6', fontWeight: 'bold' }}>NPS KPI</div>}
+                                                        {p.tipo === 'escala' && <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rango: 1-{p.escala || 10}</div>}
+                                                        {p.es_nps === 1 && <div style={{ fontSize: '10px', color: 'var(--secondary-color)', fontWeight: 'bold' }}>NPS KPI</div>}
                                                     </td>
                                                     <td style={styles.tdCell}>
                                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                                                             <button onClick={() => handleEditPregunta(p)} style={styles.btnIcon}>✏️</button>
-                                                            <button onClick={() => handleEliminarPregunta(p)} style={{ ...styles.btnIcon, color: '#ef4444' }}>🗑️</button>
+                                                            <button onClick={() => handleEliminarPregunta(p)} style={{ ...styles.btnIcon, color: 'var(--danger-color)' }}>🗑️</button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -426,8 +426,8 @@ export default function EditorEncuestas() {
                         ) : (
                             <div style={styles.emptyState}>
                                 <div style={{ fontSize: '64px', marginBottom: '20px' }}>📋</div>
-                                <h3 style={{ color: '#1e293b' }}>Selecciona un template</h3>
-                                <p style={{ color: '#64748b' }}>Configura las dimensiones y preguntas de tus encuestas.</p>
+                                <h3 style={{ color: 'var(--text-main)' }}>Selecciona un template</h3>
+                                <p style={{ color: 'var(--text-muted)' }}>Configura las dimensiones y preguntas de tus encuestas.</p>
                             </div>
                         )}
                     </main>
@@ -441,27 +441,27 @@ const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', padding: '40px 20px' },
     container: { maxWidth: '1300px', margin: '0 auto' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' },
-    title: { margin: 0, fontSize: '26px', fontWeight: 'bold', color: '#1e293b' },
-    subtitle: { margin: 0, color: '#64748b', fontSize: '14px' },
+    title: { margin: 0, fontSize: '26px', fontWeight: 'bold', color: 'var(--text-main)' },
+    subtitle: { margin: 0, color: 'var(--text-muted)', fontSize: '14px' },
     layout: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: '30px', alignItems: 'start' },
-    sidebar: { background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' },
-    sectionTitle: { fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' },
+    sidebar: { background: 'var(--bg-container)', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' },
+    sectionTitle: { fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' },
     list: { display: 'flex', flexDirection: 'column', gap: '12px' },
     listItem: { padding: '15px', borderRadius: '12px', cursor: 'pointer', border: '1.5px solid #f1f5f9', display: 'flex', alignItems: 'center', transition: 'all 0.2s ease' },
     main: { minHeight: '600px' },
     mainHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' },
-    tableCard: { background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' },
+    tableCard: { background: 'var(--bg-container)', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' },
     table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
     th: { background: '#f8fafc', borderBottom: '1.5px solid #f1f5f9' },
-    thCell: { padding: '15px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.02em' },
+    thCell: { padding: '15px', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.02em' },
     tdCell: { padding: '18px 15px', borderBottom: '1px solid #f1f5f9', fontSize: '14px' },
     tr: { transition: 'background 0.2s', '&:hover': { background: '#fcfdfe' } },
-    dimensionBadge: { background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
-    typeBadge: { background: '#eff6ff', color: '#3b82f6', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
-    btnPrimary: { background: '#3b82f6', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
-    btnSecondary: { background: '#fff', color: '#475569', border: '1.5px solid #e2e8f0', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
-    btnOutline: { background: 'transparent', color: '#3b82f6', border: '1.5px solid #3b82f6', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
+    dimensionBadge: { background: 'var(--bg-muted)', color: 'var(--text-muted)', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
+    typeBadge: { background: 'var(--bg-muted)', color: 'var(--secondary-color)', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
+    btnPrimary: { background: 'var(--secondary-color)', color: 'var(--bg-container)', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
+    btnSecondary: { background: 'var(--bg-container)', color: 'var(--text-muted)', border: '1.5px solid #e2e8f0', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
+    btnOutline: { background: 'transparent', color: 'var(--secondary-color)', border: '1.5px solid #3b82f6', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s ease' },
     btnIcon: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', opacity: 0.7, '&:hover': { opacity: 1 } },
     btnIconSmall: { background: '#f8fafc', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '8px', borderRadius: '8px', transition: 'all 0.2s ease' },
-    emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '500px', color: '#94a3b8', background: '#fff', borderRadius: '16px', border: '2px dashed #e2e8f0' }
+    emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '500px', color: 'var(--text-light)', background: 'var(--bg-container)', borderRadius: '16px', border: '2px dashed #e2e8f0' }
 };

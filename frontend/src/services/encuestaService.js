@@ -22,7 +22,12 @@ export const responderEncuesta = async (data) => {
   return res.data;
 };
 
-export const enviarCorreoEncuesta = async (email, url, encuesta_id) => {
-  const res = await axios.post(`${API}/enviar-correo`, { email, url, encuesta_id });
+export const enviarCorreoEncuesta = async (email, url, encuestaId, userNombre) => {
+  const res = await axios.post(`${API}/enviar-correo`, { 
+    email, 
+    url, 
+    encuesta_id: encuestaId, 
+    user_nombre: userNombre 
+  });
   return res.data;
 };

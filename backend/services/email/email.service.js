@@ -59,7 +59,12 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
 
     // 🔹 7. Firma dinámica
     const nombreRaw = data.ejecutiva || data.enviado_por || "default";
-    const nombreNormalizado = nombreRaw.toLowerCase().trim().replace(/\s+/g, "_");
+    const nombreNormalizado = nombreRaw
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_");
 
     // Buscamos primero .jpg, luego .png
     const firmaPathJpg = path.join(__dirname, `../../assets/firmas/${nombreNormalizado}.jpg`);
@@ -128,13 +133,52 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
   }
 };
 
-const enviarCorreoEncuesta = async (to, url, bcc) => {
+const enviarCorreoEncuesta = async (to, url, bcc, user_nombre) => {
   try {
     const banner = {
       filename: "banner-header.png",
       path: path.join(__dirname, "../../assets/images/banner-header.png"),
       cid: "banner-header"
     };
+
+    const footer = {
+      filename: "banner-footer.png",
+      path: path.join(__dirname, "../../assets/images/banner-footer.png"),
+      cid: "banner-footer"
+    };
+
+    // 🔹 Firma dinámica
+    const nombreRaw = user_nombre || "default";
+    const nombreNormalizado = nombreRaw
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_");
+
+    const firmaPathJpg = path.join(__dirname, `../../assets/firmas/${nombreNormalizado}.jpg`);
+    const firmaPathPng = path.join(__dirname, `../../assets/firmas/${nombreNormalizado}.png`);
+    const defaultPath = path.join(__dirname, "../../assets/firmas/default.png");
+
+    let finalFirmaPath = null;
+    if (fs.existsSync(firmaPathJpg)) {
+      finalFirmaPath = firmaPathJpg;
+    } else if (fs.existsSync(firmaPathPng)) {
+      finalFirmaPath = firmaPathPng;
+    } else if (fs.existsSync(defaultPath)) {
+      finalFirmaPath = defaultPath;
+    }
+
+    const baseAttachments = [banner, footer];
+    let firmaHtml = "";
+    if (finalFirmaPath) {
+      baseAttachments.push({
+        filename: "firma.png",
+        path: finalFirmaPath,
+        cid: "firma"
+      });
+      firmaHtml = `<div style="margin-top: 20px;"><img src="cid:firma" style="display:block; border:0; max-width: 300px; height:auto;"></div>`;
+    }
 
     const html = `
 <!DOCTYPE html>
@@ -174,6 +218,8 @@ const enviarCorreoEncuesta = async (to, url, bcc) => {
                   Ir a la Encuesta
                 </a>
               </div>
+              
+              ${firmaHtml}
             </td>
           </tr>
 
@@ -182,6 +228,7 @@ const enviarCorreoEncuesta = async (to, url, bcc) => {
             <td style="padding: 30px; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="color:#64748b; font-size:14px; margin:0 0 5px 0;">Agradecemos de antemano su tiempo y colaboración.</p>
               <p style="color:#64748b; font-size:14px; margin:0;">Su opinión es fundamental para seguir mejorando nuestros servicios.</p>
+              <img src="cid:banner-footer" width="800" style="display:block; border:0; width:100%; max-width:800px; height:auto; margin-top: 15px;">
             </td>
           </tr>
 
@@ -200,7 +247,7 @@ const enviarCorreoEncuesta = async (to, url, bcc) => {
       ...(bcc && { bcc }),
       subject: "[Encuesta OTIC Proforma] - Tu opinión es muy importante para nosotros",
       html,
-      attachments: [banner]
+      attachments: baseAttachments
     });
 
     console.log("✅ Correo de encuesta enviado:", info.messageId);

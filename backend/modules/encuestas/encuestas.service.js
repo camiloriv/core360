@@ -74,7 +74,7 @@ const obtenerEncuestaPorToken = async (token) => {
       IF(e.estado = 'completada', 1, 0) AS completada
     FROM encuestas e
     LEFT JOIN empresas emp ON emp.id = e.empresa_id
-    LEFT JOIN ejecutivas ej ON ej.id = e.ejecutiva_id
+    LEFT JOIN usuarios ej ON ej.id = e.ejecutiva_id
     LEFT JOIN encuesta_templates t ON t.id = e.template_id
     WHERE e.token = ? AND e.activo = 1
     `,
@@ -216,8 +216,8 @@ const obtenerTodasLasRespuestas = async () => {
     FROM encuestas e
     JOIN encuesta_templates t ON e.template_id = t.id
     LEFT JOIN empresas emp ON e.empresa_id = emp.id
-    LEFT JOIN ejecutivas ej ON e.ejecutiva_id = ej.id
-    LEFT JOIN jefaturas j ON emp.jefatura_id = j.id
+    LEFT JOIN usuarios ej ON e.ejecutiva_id = ej.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
     ORDER BY e.fecha_creacion DESC
   `;
   const [result] = await db.query(sql);
@@ -254,8 +254,8 @@ const obtenerCorreosBcc = async (id) => {
   const sql = `
     SELECT e.correo as ejecutiva_correo, j.correo as jefatura_correo
     FROM encuestas enc
-    JOIN ejecutivas e ON enc.ejecutiva_id = e.id
-    LEFT JOIN jefaturas j ON e.jefatura_id = j.id
+    JOIN usuarios e ON enc.ejecutiva_id = e.id
+    LEFT JOIN usuarios j ON e.jefatura_id = j.id
     WHERE enc.id = ?
   `;
   const [rows] = await db.query(sql, [id]);

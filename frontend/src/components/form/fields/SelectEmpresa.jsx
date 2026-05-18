@@ -75,7 +75,7 @@ function SelectEmpresa({ value, empresas = [], onChange, required }) {
               padding: "8px 12px",
               cursor: "pointer",
               fontSize: "13px",
-              color: "#94a3b8",
+              color: "var(--text-light)",
               fontStyle: "italic",
               borderBottom: "1px solid #f1f5f9"
             }}
@@ -86,7 +86,7 @@ function SelectEmpresa({ value, empresas = [], onChange, required }) {
           </li>
 
           {filteredEmpresas.length === 0 ? (
-            <li style={{ padding: "8px 12px", color: "#64748b", fontSize: "13px" }}>No se encontraron coincidencias</li>
+            <li style={{ padding: "8px 12px", color: "var(--text-muted)", fontSize: "13px" }}>No se encontraron coincidencias</li>
           ) : (
             filteredEmpresas.map((emp) => (
               <li
@@ -100,7 +100,7 @@ function SelectEmpresa({ value, empresas = [], onChange, required }) {
                   borderBottom: "1px solid #f1f5f9",
                   transition: "background-color 0.1s"
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = "#f1f5f9"}
+                onMouseOver={(e) => e.target.style.backgroundColor = "var(--bg-muted)"}
                 onMouseOut={(e) => e.target.style.backgroundColor = "transparent"}
               >
                 {emp.nombre}

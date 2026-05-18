@@ -13,8 +13,8 @@ const checkAndSendScheduledEmails = async () => {
                 j.correo as jefatura_correo
             FROM reuniones r
             JOIN empresas emp ON r.empresa_id = emp.id
-            JOIN ejecutivas e ON r.ejecutiva_id = e.id
-            LEFT JOIN jefaturas j ON e.jefatura_id = j.id
+            JOIN usuarios e ON r.ejecutiva_id = e.id
+            LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE r.programar_encuesta = 1 
             AND r.encuesta_estado_envio = 'pendiente' 
             AND r.encuesta_programada_para <= NOW()

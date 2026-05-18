@@ -1,18 +1,18 @@
 /* Estilo Base Agoras */
 .encuesta-page {
-  font-family: "Segoe UI", Roboto, Arial, sans-serif;
-  background-color: #f4f6f9;
+  font-family: var(--font-main);
+  background-color: var(--bg-body);
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  color: #333;
+  color: var(--text-main);
 }
 
 /* Header Agoras */
 .agoras-header {
-  background-color: #ffffff;
-  border-top: 4px solid #1e3a8a;
-  border-bottom: 1px solid #e2e8f0;
+  background-color: var(--bg-container);
+  border-top: 4px solid var(--primary-color);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -24,7 +24,7 @@
   font-size: 24px;
   font-weight: 300;
   letter-spacing: 2px;
-  color: #1e40af;
+  color: var(--primary-color);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -37,13 +37,13 @@
 .cek-logo {
   font-size: 16px;
   font-weight: bold;
-  color: #0f172a;
+  color: var(--text-main);
   text-align: right;
   line-height: 1.2;
 }
 
 .cek-logo span {
-  color: #0ea5e9;
+  color: var(--info-color);
   font-size: 24px;
   font-weight: 900;
   margin-right: 10px;
@@ -55,9 +55,9 @@
   max-width: 1300px;
   width: 95%;
   margin: 40px auto;
-  background: #ffffff;
+  background: var(--bg-container);
   padding: 40px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
@@ -70,16 +70,16 @@
 .title {
   font-size: 18px;
   font-weight: 600;
-  color: #1e3a8a;
+  color: var(--primary-color);
   margin-bottom: 5px;
-  border-bottom: 2px solid #3b82f6;
+  border-bottom: 2px solid var(--secondary-color);
   padding-bottom: 8px;
   display: inline-block;
 }
 
 .subtitle {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-muted);
   margin-bottom: 25px;
   margin-top: 10px;
   text-transform: uppercase;
@@ -88,7 +88,7 @@
 
 /* Progress Bar */
 .progress-bar {
-  background: #f1f5f9;
+  background: var(--bg-muted);
   height: 6px;
   border-radius: 3px;
   margin-bottom: 30px;
@@ -96,7 +96,7 @@
 }
 
 .progress-fill {
-  background: #3b82f6;
+  background: var(--secondary-color);
   height: 100%;
   transition: width 0.3s ease;
 }
@@ -110,7 +110,7 @@ label {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-muted);
   margin-bottom: 6px;
   text-transform: uppercase;
 }
@@ -121,10 +121,10 @@ textarea {
   width: 100%;
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-input);
   font-size: 13px;
   color: #334155;
-  background-color: #ffffff;
+  background-color: var(--bg-container);
   transition: border-color 0.2s;
   box-sizing: border-box;
   /* ensure padding doesn't overflow */
@@ -134,8 +134,8 @@ input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px #3b82f6;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 1px var(--secondary-color);
 }
 
 /* Pregunta actual */
@@ -149,7 +149,7 @@ textarea:focus {
 .pregunta>p {
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-main);
   margin-bottom: 18px;
   line-height: 1.4;
 }
@@ -168,13 +168,13 @@ textarea:focus {
   margin: 0;
   font-size: 12px;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 8px 16px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-input);
   border-radius: 24px;
   transition: all 0.2s ease-in-out;
-  background: #ffffff;
+  background: var(--bg-container);
   flex: 1 1 auto;
   min-width: 48px;
   text-align: center;
@@ -183,15 +183,15 @@ textarea:focus {
 }
 
 .radio-option:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #1e293b;
+  background: var(--bg-muted);
+  border-color: var(--text-light);
+  color: var(--text-main);
 }
 
 .radio-option.selected {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #ffffff;
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--bg-container);
   box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
 }
 
@@ -228,7 +228,7 @@ textarea:focus {
   font-size: 32px;
   cursor: pointer;
   transition: 0.2s;
-  color: #cbd5e1;
+  color: var(--border-input);
 }
 
 .rating span:hover {
@@ -240,12 +240,12 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   margin-top: 40px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-color);
   padding-top: 20px;
 }
 
 button {
-  background: #3b82f6;
+  background: var(--secondary-color);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -258,22 +258,22 @@ button {
 }
 
 button:hover {
-  background: #2563eb;
+  background: var(--primary-hover);
 }
 
 button:disabled {
-  background: #cbd5e1;
+  background: var(--border-input);
   cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border-input);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #e2e8f0;
+  background: var(--border-color);
 }
 
 /* Utils */
@@ -298,7 +298,7 @@ button:disabled {
   padding: 15px;
   background: #f8fafc;
   border-radius: 4px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   font-size: 13px;
 }
 
@@ -327,34 +327,34 @@ button:disabled {
 
 .editor-preview textarea {
   height: 280px;
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .preview-mini {
-  background: #ffffff;
+  background: var(--bg-container);
   border: 1px solid #e1e1e1;
   padding: 15px;
   border-radius: 5px;
   height: 280px;
   overflow-y: auto;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-main);
   font-size: 16px;
-  color: #333333;
+  color: var(--text-main);
   line-height: 1.5;
 }
 
 .preview-mini hr {
   margin: 20px 0;
   border: none;
-  border-top: 2px solid #ccc;
+  border-top: 2px solid var(--border-input);
 }
 
 .preview-mini blockquote {
   border-left: 4px solid #3498db;
   margin: 10px 0;
   padding: 10px 15px;
-  color: #555;
-  background-color: #f9fafb;
+  color: var(--text-muted);
+  background-color: var(--bg-muted);
   border-radius: 4px;
 }
 
@@ -362,8 +362,8 @@ button:disabled {
   background-color: #f0f0f0;
   padding: 2px 4px;
   border-radius: 4px;
-  font-family: monospace, Consolas, Courier New;
-  color: #c7254e;
+  font-family: var(--font-mono);
+  color: var(--danger-color);
 }
 
 .preview-mini pre {
@@ -372,7 +372,7 @@ button:disabled {
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
-  font-family: monospace, Consolas, Courier New;
+  font-family: var(--font-mono);
 }
 
 .preview-mini pre code {
@@ -412,7 +412,7 @@ button:disabled {
 /* Forzamos que la PRIMERA FILA sea siempre el encabezado naranja */
 .ql-editor table tr:first-child td,
 .ql-editor table tr:first-child th {
-  background-color: #e67e22 !important;
+  background-color: var(--accent-color) !important;
   /* Naranja solicitado */
   color: #000000 !important;
   font-weight: bold !important;
@@ -426,5 +426,5 @@ button:disabled {
   padding: 8px 15px;
   color: #000000;
   text-align: center !important;
-  background-color: #ffffff;
+  background-color: var(--bg-container);
 }

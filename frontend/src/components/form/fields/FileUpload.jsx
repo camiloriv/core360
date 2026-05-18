@@ -109,7 +109,7 @@ function FileUpload({ archivos = [], setFiles }) {
                 </svg>
                 <span>
                   {file.name} 
-                  <span style={{ color: "#9ca3af", fontSize: "11px", marginLeft: "6px" }}>
+                  <span style={{ color: "var(--text-light)", fontSize: "11px", marginLeft: "6px" }}>
                     ({formatBytes(file.size)})
                   </span>
                 </span>

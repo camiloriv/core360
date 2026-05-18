@@ -9,10 +9,11 @@
 
 ## 🚀 Características Principales
 
-*   **Gestión de Minutas:** Editor enriquecido (TipTap/Quill) para actas de reuniones con seguimiento de compromisos.
+*   **Gestión de Minutas:** Editor enriquecido (TipTap) para actas de reuniones con seguimiento de compromisos.
 *   **Sistema de Encuestas Dinámico:** Biblioteca de preguntas y envío automatizado de encuestas de satisfacción.
 *   **Dashboards Estratégicos:** Visualización de datos con Recharts (Gráficos Radar, NPS, Tasa de Respuesta).
 *   **Estructura Jerárquica:** Filtrado avanzado por Jefaturas, Ejecutivas y Empresas.
+*   **Autenticación y RBAC:** Gestión centralizada de usuarios con roles y permisos específicos.
 *   **Automatización:** Envío de correos electrónicos y gestión de adjuntos.
 
 ## 🏗️ Arquitectura
@@ -27,7 +28,7 @@ Ubicado en `/backend`, construido con **Node.js** y **Express**.
 
 ### Frontend (SPA)
 Ubicado en `/frontend`, desarrollado con **React 19** y **Vite**.
-*   **UI/UX:** Diseño premium con CSS vanilla y micro-animaciones.
+*   **UI/UX:** Diseño premium con variables CSS estandarizadas globalmente y micro-animaciones.
 *   **Estado:** React Hooks y Context API.
 
 ## 🛠️ Instalación y Configuración

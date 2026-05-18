@@ -96,7 +96,7 @@ const SurveyRow = ({ r, onToggleStatus, onResend, onShowDetail }) => (
             >
               {r.activo === 1 ? '🚫 Anular' : '✅ Activar'}
             </button>
-            <button onClick={() => onResend(r)} style={{ ...styles.btnAction, background: '#dbeafe', color: '#1e40af' }}>
+            <button onClick={() => onResend(r)} style={{ ...styles.btnAction, background: '#dbeafe', color: 'var(--primary-color)' }}>
               🔄 Reenviar
             </button>
           </div>
@@ -256,8 +256,8 @@ export default function DashboardEncuestas() {
         btn.onclick = () => {
           const input = document.getElementById('swal-link');
           input.select(); document.execCommand('copy');
-          btn.innerText = '¡Copiado!'; btn.style.background = '#10b981';
-          setTimeout(() => { btn.innerText = 'Copiar'; btn.style.background = '#3b82f6'; }, 2000);
+          btn.innerText = '¡Copiado!'; btn.style.background = 'var(--success-color)';
+          setTimeout(() => { btn.innerText = 'Copiar'; btn.style.background = 'var(--secondary-color)'; }, 2000);
         };
       },
       preConfirm: () => {
@@ -287,7 +287,7 @@ export default function DashboardEncuestas() {
     Swal.fire({
       title: `<span style="font-size: 18px;">Respuestas - ${encuesta.empresa || 'S/E'}</span>`,
       html: `<div style="max-height: 400px; overflow-y: auto; padding-right: 10px;">${html}</div>`,
-      confirmButtonText: 'Cerrar', confirmButtonColor: '#3b82f6', width: '500px'
+      confirmButtonText: 'Cerrar', confirmButtonColor: 'var(--secondary-color)', width: '500px'
     });
   };
 
@@ -311,11 +311,11 @@ export default function DashboardEncuestas() {
         />
 
         <div style={styles.kpiGrid}>
-          <KpiCard title="Creadas" value={stats.creadas} sub="Total" color="#1e3a8a" />
-          <KpiCard title="Respondidas" value={stats.respondidas} sub="Completadas" color="#10b981" />
-          <KpiCard title="Pendientes" value={stats.pendientes} sub="Por responder" color="#f59e0b" />
-          <KpiCard title="Activas" value={stats.activas} sub="Links hábiles" color="#3b82f6" />
-          <KpiCard title="Inactivas" value={stats.inactivas} sub="Links anulados" color="#ef4444" />
+          <KpiCard title="Creadas" value={stats.creadas} sub="Total" color="var(--primary-color)" />
+          <KpiCard title="Respondidas" value={stats.respondidas} sub="Completadas" color="var(--success-color)" />
+          <KpiCard title="Pendientes" value={stats.pendientes} sub="Por responder" color="var(--warning-color)" />
+          <KpiCard title="Activas" value={stats.activas} sub="Links hábiles" color="var(--secondary-color)" />
+          <KpiCard title="Inactivas" value={stats.inactivas} sub="Links anulados" color="var(--danger-color)" />
         </div>
 
         {loading ? <p>Cargando datos...</p> : (
@@ -325,10 +325,10 @@ export default function DashboardEncuestas() {
                 <h3 style={styles.sectionTitle}>Desempeño por Dimensión (DB)</h3>
                 <ResponsiveContainer width="100%" height={320}>
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={dimensionData}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="subject" tick={{fill: '#64748b', fontSize: 11, fontWeight: 'bold'}} />
+                    <PolarGrid stroke="var(--border-color)" />
+                    <PolarAngleAxis dataKey="subject" tick={{fill: 'var(--text-muted)', fontSize: 11, fontWeight: 'bold'}} />
                     <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{fontSize: 10}} />
-                    <Radar name="Promedio" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.4} />
+                    <Radar name="Promedio" dataKey="A" stroke="var(--secondary-color)" fill="var(--secondary-color)" fillOpacity={0.4} />
                     <Tooltip />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -338,13 +338,13 @@ export default function DashboardEncuestas() {
                 <h3 style={styles.sectionTitle}>Ranking NPS por Jefatura</h3>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart data={rankingData} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="var(--bg-muted)" />
                     <XAxis type="number" domain={[-100, 100]} hide />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 'bold'}} width={90} />
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: 'var(--text-muted)', fontWeight: 'bold'}} width={90} />
                     <Tooltip cursor={{fill: '#f8fafc'}} />
                     <Bar dataKey="nps" radius={[0, 4, 4, 0]} barSize={20}>
                       {rankingData.map((e, i) => (
-                        <Cell key={i} fill={e.nps > 50 ? '#10b981' : e.nps > 0 ? '#3b82f6' : '#ef4444'} />
+                        <Cell key={i} fill={e.nps > 50 ? 'var(--success-color)' : e.nps > 0 ? 'var(--secondary-color)' : 'var(--danger-color)'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -354,7 +354,7 @@ export default function DashboardEncuestas() {
 
             <div style={styles.tableCard}>
               <div style={styles.tableHeader}>
-                <h3 style={{ margin: 0, fontSize: '14px', color: '#1e293b', textTransform: 'uppercase' }}>Detalle de Respuestas con Preguntas Reales</h3>
+                <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--text-main)', textTransform: 'uppercase' }}>Detalle de Respuestas con Preguntas Reales</h3>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={styles.table}>
@@ -408,7 +408,7 @@ export default function DashboardEncuestas() {
                             <div style={styles.ejecutivaName}>{p.ejecutiva_nombre}</div>
                           </td>
                           <td style={styles.tdCell}>
-                            <div style={{ fontWeight: 'bold', color: '#1e40af' }}>{new Date(p.encuesta_programada_para).toLocaleString()}</div>
+                            <div style={{ fontWeight: 'bold', color: 'var(--primary-color)' }}>{new Date(p.encuesta_programada_para).toLocaleString()}</div>
                           </td>
                           <td style={styles.tdCell}>
                             <span style={{ 
@@ -423,7 +423,7 @@ export default function DashboardEncuestas() {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>No hay encuestas programadas para el futuro.</div>
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>No hay encuestas programadas para el futuro.</div>
                 )}
               </div>
             </div>

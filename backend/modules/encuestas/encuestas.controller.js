@@ -64,7 +64,7 @@ const emailService = require("../../services/email/email.service");
 // 🔹 Enviar correo con link de encuesta
 const enviarCorreo = async (req, res) => {
   try {
-    const { email, url, encuesta_id } = req.body;
+    const { email, url, encuesta_id, user_nombre } = req.body;
     if (!email || !url) {
       return res.status(400).json({ error: "Email y URL son requeridos" });
     }
@@ -74,7 +74,7 @@ const enviarCorreo = async (req, res) => {
       bcc = await service.obtenerCorreosBcc(encuesta_id);
     }
 
-    const enviado = await emailService.enviarCorreoEncuesta(email, url, bcc);
+    const enviado = await emailService.enviarCorreoEncuesta(email, url, bcc, user_nombre);
     if (enviado) {
       // Si se envió, registrar el correo en la tabla encuestas
       if (encuesta_id) {

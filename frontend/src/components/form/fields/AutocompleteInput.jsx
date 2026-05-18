@@ -77,7 +77,7 @@ function AutocompleteInput({ value, suggestions = [], onChange, placeholder, req
                 borderBottom: "1px solid #f1f5f9",
                 transition: "background-color 0.1s"
               }}
-              onMouseOver={(e) => e.target.style.backgroundColor = "#f1f5f9"}
+              onMouseOver={(e) => e.target.style.backgroundColor = "var(--bg-muted)"}
               onMouseOut={(e) => e.target.style.backgroundColor = "transparent"}
             >
               {s}

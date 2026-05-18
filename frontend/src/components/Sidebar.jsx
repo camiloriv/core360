@@ -3,8 +3,9 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 const Sidebar = () => {
   const location = useLocation();
+  const user = JSON.parse(localStorage.getItem('usuario') || '{}');
 
-  const menuItems = [
+  let menuItems = [
     {
       path: '/', label: 'Inicio', title: 'Inicio',
       icon: (
@@ -71,8 +72,27 @@ const Sidebar = () => {
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
         </svg>
       )
+    },
+    {
+      path: '/gestion-usuarios', label: 'Usuarios', title: 'Gestión de Usuarios',
+      icon: (
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+      )
     }
   ];
+
+  if (user.permisos !== 'admin') {
+    menuItems = menuItems.filter(item => item.path !== '/gestion-usuarios');
+  }
+
+  if (user.permisos !== 'jefatura' && user.permisos !== 'admin') {
+    menuItems = menuItems.filter(item => !['/editor-encuestas', '/gestion-ejecutivas'].includes(item.path));
+  }
 
   useEffect(() => {
     const currentItem = menuItems.find(item => item.path === location.pathname);
@@ -83,7 +103,9 @@ const Sidebar = () => {
 
   return (
     <div style={styles.sidebar}>
-
+      <div style={styles.logoContainer}>
+        <img src="/icono_negativo.PNG" alt="Core360 Logo" style={styles.logo} />
+      </div>
 
       <nav style={styles.nav} className="sidebar-nav">
         {menuItems.map((item) => (
@@ -93,7 +115,7 @@ const Sidebar = () => {
             style={({ isActive }) => ({
               ...styles.navLink,
               backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-              color: isActive ? '#fff' : '#94a3b8',
+              color: isActive ? 'var(--bg-container)' : 'var(--text-light)',
               borderLeft: isActive ? '4px solid #3b82f6' : '4px solid transparent',
             })}
           >
@@ -104,6 +126,20 @@ const Sidebar = () => {
       </nav>
 
       <div style={styles.footer}>
+        {user.nombre && (
+          <div style={{ color: 'var(--border-input)', fontSize: '11px', marginBottom: '12px', fontWeight: '600', textAlign: 'center', lineHeight: '1.2' }}>
+            {user.nombre}
+          </div>
+        )}
+        <button 
+          onClick={() => {
+            localStorage.removeItem('usuario');
+            window.location.href = '/login';
+          }}
+          style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '10px', width: '100%' }}
+        >
+          Cerrar Sesión
+        </button>
         <div style={styles.version}>v2.5</div>
       </div>
     </div>
@@ -122,6 +158,19 @@ const styles = {
     top: 0,
     zIndex: 1000,
     boxShadow: '4px 0 10px rgba(0,0,0,0.1)',
+  },
+  logoContainer: {
+    padding: '20px 10px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    marginBottom: '10px'
+  },
+  logo: {
+    width: '50px',
+    height: 'auto',
+    objectFit: 'contain'
   },
   nav: {
     padding: '5px 0',
@@ -159,7 +208,7 @@ const styles = {
   },
   version: {
     fontSize: '9px',
-    color: '#64748b',
+    color: 'var(--text-muted)',
     fontWeight: 'bold',
   }
 };

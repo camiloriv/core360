@@ -2,7 +2,7 @@
   margin-top: 25px;
   width: 100%;
   padding: 12px;
-  background: #2563eb;
+  background: var(--primary-hover);
   color: white;
   border: none;
   border-radius: 8px;
@@ -12,11 +12,11 @@
 }
 
 .btn:hover {
-  background: #1d4ed8;
+  background: var(--primary-hover);
 }
 
 .btn:disabled {
-  background: #9ca3af;
+  background: var(--text-light);
   cursor: not-allowed;
 }
 
@@ -30,56 +30,56 @@
 
 .editor-preview textarea {
   height: 280px;
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 /* PREVIEW MINI (Estilo igual al correo final) */
 .preview-mini {
-  background: #ffffff;
-  border: 1px solid #e1e1e1;
+  background: var(--bg-container);
+  border: 1px solid var(--border-color);
   padding: 15px;
   border-radius: 5px;
   height: 280px;
   overflow-y: auto;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-main);
   font-size: 16px;
-  color: #333333;
+  color: var(--text-main);
   line-height: 1.5;
 }
 
 .preview-mini hr {
   margin: 20px 0;
   border: none;
-  border-top: 2px solid #ccc;
+  border-top: 2px solid var(--border-input);
 }
 
 /* FILE UPLOAD STYLES */
 .file-upload-zone {
-  border: 2px dashed #d1d5db;
+  border: 2px dashed var(--border-input);
   border-radius: 8px;
   padding: 25px;
   text-align: center;
-  background-color: #f9fafb;
+  background-color: var(--bg-muted);
   cursor: pointer;
   transition: all 0.2s ease;
   margin-top: 5px;
 }
 
 .file-upload-zone:hover, .file-upload-zone.dragover {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
+  border-color: var(--secondary-color);
+  background-color: var(--bg-muted);
 }
 
 .file-upload-zone .upload-icon {
   font-size: 28px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 10px;
   display: block;
 }
 
 .file-upload-zone p {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -94,12 +94,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-container);
+  border: 1px solid var(--border-color);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
-  color: #374151;
+  color: var(--text-main);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -110,7 +110,7 @@
 }
 
 .file-upload-item-name svg {
-  color: #6b7280;
+  color: var(--text-muted);
   width: 16px;
   height: 16px;
 }
@@ -118,7 +118,7 @@
 .btn-remove-file {
   background: transparent;
   border: none;
-  color: #ef4444;
+  color: var(--danger-color);
   cursor: pointer;
   font-weight: bold;
   padding: 4px;
@@ -130,5 +130,5 @@
 }
 
 .btn-remove-file:hover {
-  background: #fee2e2;
+  background: rgba(239, 68, 68, 0.1);
 }

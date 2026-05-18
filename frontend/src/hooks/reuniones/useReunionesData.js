@@ -1,29 +1,31 @@
 import { useEffect, useState } from "react";
-import { getEjecutivas, getEmpresas, getJefaturas, getDestinatarios } from "../../services/reunionesService";
+import { getDestinatarios } from "../../services/reunionesService";
 import { obtenerTemplates } from "../../services/encuestaService";
+import { getEmpresas, getEmpresasByJefatura, getEmpresasByEjecutiva } from "../../services/dataService";
 
-export default function useReunionesData(jefatura_id, empresa_id) {
-  const [jefaturas, setJefaturas] = useState([]);
-  const [ejecutivas, setEjecutivas] = useState([]);
+export default function useReunionesData(user, empresa_id) {
   const [empresas, setEmpresas] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [destinatarios, setDestinatarios] = useState([]);
 
   useEffect(() => {
-    getJefaturas().then(res => setJefaturas(res.data));
-    getEjecutivas().then(res => setEjecutivas(res.data));
     obtenerTemplates().then(setTemplates);
   }, []);
 
   useEffect(() => {
-    if (!jefatura_id) {
+    if (!user || !user.permisos) {
       setEmpresas([]);
       return;
     }
 
-    // Usar la jefatura_id para obtener empresas
-    getEmpresas(jefatura_id).then(res => setEmpresas(res.data));
-  }, [jefatura_id]);
+    if (user.permisos === "admin") {
+      getEmpresas().then(setEmpresas);
+    } else if (user.permisos === "jefatura") {
+      getEmpresasByJefatura(user.id).then(setEmpresas);
+    } else if (user.jefatura_id) {
+      getEmpresasByJefatura(user.jefatura_id).then(setEmpresas);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!empresa_id) {
@@ -35,8 +37,6 @@ export default function useReunionesData(jefatura_id, empresa_id) {
   }, [empresa_id]);
 
   return {
-    jefaturas,
-    ejecutivas,
     empresas,
     setEmpresas,
     templates,

@@ -1,0 +1,11 @@
+{
+  "watch": ["./modules", "./router", "./database", "./config", "./services", "index.js", "app.js"],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules",
+    "assets/*",
+    "scratch/*",
+    "*.log",
+    ".git"
+  ]
+}

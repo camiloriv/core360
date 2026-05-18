@@ -46,8 +46,8 @@ export default function SeguimientoEmpresas() {
   return (
     <div className="container">
       <div style={{ marginBottom: "30px" }}>
-        <h1 style={{ fontSize: "2rem", color: "#1e293b", fontWeight: "bold" }}>Seguimiento de Cobertura</h1>
-        <p style={{ color: "#64748b" }}>Estado de reuniones por empresa y jefatura</p>
+        <h1 style={{ fontSize: "2rem", color: "var(--text-main)", fontWeight: "bold" }}>Seguimiento de Cobertura</h1>
+        <p style={{ color: "var(--text-muted)" }}>Estado de reuniones por empresa y jefatura</p>
       </div>
 
       {/* FILTRO JEFATURA Y CONTADOR ALINEADOS */}
@@ -63,7 +63,7 @@ export default function SeguimientoEmpresas() {
         gap: "40px"
       }}>
         <div style={{ flexShrink: 0 }}>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#64748b", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>
             Seleccionar Jefatura
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
@@ -77,8 +77,8 @@ export default function SeguimientoEmpresas() {
                 fontWeight: "bold",
                 fontSize: "13px",
                 transition: "all 0.2s",
-                background: filtroJefatura === "" ? "#3b82f6" : "#f1f5f9",
-                color: filtroJefatura === "" ? "white" : "#64748b"
+                background: filtroJefatura === "" ? "var(--secondary-color)" : "var(--bg-muted)",
+                color: filtroJefatura === "" ? "white" : "var(--text-muted)"
               }}
             >
               TODAS
@@ -95,8 +95,8 @@ export default function SeguimientoEmpresas() {
                   fontWeight: "bold",
                   fontSize: "13px",
                   transition: "all 0.2s",
-                  background: filtroJefatura === j.id.toString() ? "#3b82f6" : "#f1f5f9",
-                  color: filtroJefatura === j.id.toString() ? "white" : "#64748b"
+                  background: filtroJefatura === j.id.toString() ? "var(--secondary-color)" : "var(--bg-muted)",
+                  color: filtroJefatura === j.id.toString() ? "white" : "var(--text-muted)"
                 }}
               >
                 {j.nombre.toUpperCase()}
@@ -107,23 +107,23 @@ export default function SeguimientoEmpresas() {
 
         {/* CONTADOR DE AVANCE ABARCANDO EL ESPACIO RESTANTE */}
         <div style={{ flex: 1, textAlign: "right" }}>
-          <div style={{ fontSize: "11px", fontWeight: "bold", color: "#94a3b8", textTransform: "uppercase", marginBottom: "8px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "bold", color: "var(--text-light)", textTransform: "uppercase", marginBottom: "8px" }}>
             Avance de Cobertura
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "15px", justifyContent: "flex-end" }}>
-            <div style={{ fontSize: "28px", fontWeight: "bold", color: "#3b82f6" }}>
+            <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--secondary-color)" }}>
               {porcentajeAvance}%
             </div>
-            <div style={{ flex: 1, maxWidth: "400px", height: "10px", background: "#f1f5f9", borderRadius: "10px", overflow: "hidden" }}>
+            <div style={{ flex: 1, maxWidth: "400px", height: "10px", background: "var(--bg-muted)", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ 
                 width: `${porcentajeAvance}%`, 
                 height: "100%", 
-                background: "#3b82f6", 
+                background: "var(--secondary-color)", 
                 transition: "width 0.5s ease" 
               }}></div>
             </div>
           </div>
-          <div style={{ fontSize: "11px", color: "#cbd5e1", marginTop: "5px" }}>
+          <div style={{ fontSize: "11px", color: "var(--border-input)", marginTop: "5px" }}>
             {totalGestionadas} de {totalEmpresas} empresas listas
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function SeguimientoEmpresas() {
       </div>
 
       {empresasFiltradas.length === 0 && (
-        <div style={{ textAlign: "center", padding: "100px", color: "#94a3b8" }}>
+        <div style={{ textAlign: "center", padding: "100px", color: "var(--text-light)" }}>
           No hay empresas asignadas a esta jefatura.
         </div>
       )}

@@ -5,7 +5,7 @@ exports.listarEmpresas = async (req, res) => {
     const [rows] = await db.query(`
       SELECT e.*, j.nombre as jefatura_nombre 
       FROM empresas e 
-      LEFT JOIN jefaturas j ON e.jefatura_id = j.id
+      LEFT JOIN usuarios j ON e.jefatura_id = j.id
       ORDER BY e.nombre ASC
     `);
     res.json(rows);
@@ -20,7 +20,7 @@ exports.obtenerEmpresasPorEjecutiva = async (req, res) => {
     const [rows] = await db.query(
       `SELECT emp.* 
        FROM empresas emp
-       JOIN ejecutivas e ON emp.jefatura_id = e.jefatura_id
+       JOIN usuarios e ON emp.jefatura_id = e.jefatura_id
        WHERE e.id = ?
        ORDER BY emp.nombre ASC`,
       [id_ejecutiva]

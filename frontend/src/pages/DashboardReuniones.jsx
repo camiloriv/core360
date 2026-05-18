@@ -9,13 +9,13 @@ import SearchableFilter from "../components/form/fields/SearchableFilter";
 import KpiCard from "../components/dashboard/KpiCard";
 
 const TYPE_COLORS = {
-  'Inducción': '#3b82f6', // Azul
-  'Resolver dudas': '#64748b', // Gris
-  'Implementación TI': '#10b981', // Verde
+  'Inducción': 'var(--secondary-color)', // Azul
+  'Resolver dudas': 'var(--text-muted)', // Gris
+  'Implementación TI': 'var(--success-color)', // Verde
   'Negativos/Aportes': '#800000', // Burdeo
 };
 
-const getMeetingColor = (type) => TYPE_COLORS[type] || '#94a3b8'; // Default gris claro
+const getMeetingColor = (type) => TYPE_COLORS[type] || 'var(--text-light)'; // Default gris claro
 
 export default function DashboardReuniones() {
   const [reuniones, setReuniones] = useState([]);
@@ -198,7 +198,7 @@ export default function DashboardReuniones() {
           marginBottom: '30px' 
         }}>
           <div style={{ ...styles.chartBox, padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-            <div style={{ background: '#94a3b8', padding: '12px', textAlign: 'center' }}>
+            <div style={{ background: 'var(--text-light)', padding: '12px', textAlign: 'center' }}>
               <h3 style={{ margin: 0, color: 'white', fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase' }}>Distribución por Tipo de Reunión</h3>
             </div>
             <div style={{ padding: '20px', height: '350px', display: 'flex', flexDirection: 'column' }}>
@@ -246,15 +246,15 @@ export default function DashboardReuniones() {
           </div>
 
           <div style={{ ...styles.chartBox, padding: 0, overflow: 'hidden' }}>
-            <div style={{ background: '#94a3b8', padding: '10px', textAlign: 'center' }}>
+            <div style={{ background: 'var(--text-light)', padding: '10px', textAlign: 'center' }}>
               <h3 style={{ margin: 0, color: 'white', fontSize: '16px', fontWeight: 'bold' }}>Distribución por Tipo de Reunión</h3>
             </div>
             <div style={{ padding: '20px', height: '350px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--bg-muted)" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#475569', fontWeight: 'bold'}} width={100} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: 'var(--text-muted)', fontWeight: 'bold'}} width={100} />
                   <Tooltip cursor={{fill: '#f8fafc'}} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={25}>
                     {barData.map((entry, index) => (
@@ -299,7 +299,7 @@ export default function DashboardReuniones() {
                       </td>
                       <td style={styles.tdCell}>
                         <div style={{ fontWeight: 'bold', color: '#334155' }}>{r.tipo_reu}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{r.motivo_reu}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.motivo_reu}</div>
                       </td>
                       <td style={styles.tdCell}>
                         {adjuntos.length > 0 ? (
@@ -310,13 +310,13 @@ export default function DashboardReuniones() {
                                 href={`http://localhost:8080/uploads/${file}`} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                style={{ fontSize: '10px', color: '#3b82f6', textDecoration: 'none' }}
+                                style={{ fontSize: '10px', color: 'var(--secondary-color)', textDecoration: 'none' }}
                               >
                                 📄 {file.split('-').slice(2).join('-') || file}
                               </a>
                             ))}
                           </div>
-                        ) : <span style={{ fontSize: '10px', color: '#cbd5e1' }}>-</span>}
+                        ) : <span style={{ fontSize: '10px', color: 'var(--border-input)' }}>-</span>}
                       </td>
                       <td style={styles.tdCell}>
                         <div style={{ fontSize: '11px' }}>{r.enviado_a}</div>
@@ -329,7 +329,7 @@ export default function DashboardReuniones() {
                             {r.estado_envio?.toUpperCase()}
                           </span>
                           {r.estado_envio === 'enviado' && r.created_at && (
-                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-light)' }}>
                               {new Date(r.created_at).toLocaleString('es-CL', { 
                                 day: '2-digit', month: '2-digit', year: 'numeric', 
                                 hour: '2-digit', minute: '2-digit' 
@@ -349,7 +349,7 @@ export default function DashboardReuniones() {
                               {r.encuesta_estado_envio?.toUpperCase()}
                             </span>
                             {r.encuesta_estado_envio === 'enviado' && r.encuesta_programada_para && (
-                              <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                              <span style={{ fontSize: '10px', color: 'var(--text-light)' }}>
                                 {new Date(r.encuesta_programada_para).toLocaleString('es-CL', { 
                                   day: '2-digit', month: '2-digit', year: 'numeric', 
                                   hour: '2-digit', minute: '2-digit' 
@@ -357,7 +357,7 @@ export default function DashboardReuniones() {
                               </span>
                             )}
                           </div>
-                        ) : <span style={{ fontSize: '10px', color: '#cbd5e1' }}>-</span>}
+                        ) : <span style={{ fontSize: '10px', color: 'var(--border-input)' }}>-</span>}
                       </td>
                     </tr>
                   );

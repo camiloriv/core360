@@ -10,6 +10,11 @@ services:
       - DB_NAME=core360
     depends_on:
       - db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
   frontend:
     build: ./frontend
@@ -19,6 +24,11 @@ services:
       - VITE_API_URL=http://localhost:8080
     depends_on:
       - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 1024M
 
   db:
     image: mysql:8.0
@@ -30,6 +40,11 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
 
 volumes:
   db_data:

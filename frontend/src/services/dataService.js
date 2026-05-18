@@ -14,6 +14,12 @@ export const getJefaturas = async () => {
   return res.data;
 };
 
+// Empresas
+export const getEmpresas = async () => {
+  const res = await axios.get(`${API}/empresas`);
+  return res.data;
+};
+
 // Empresas por ejecutiva
 export const getEmpresasByEjecutiva = async (id) => {
   const res = await axios.get(`${API}/empresas/${id}`);

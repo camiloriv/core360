@@ -40,7 +40,7 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
         display: "block", 
         fontSize: "11px", 
         fontWeight: "bold", 
-        color: "#64748b", 
+        color: "var(--text-muted)", 
         textTransform: "uppercase",
         marginBottom: "6px"
       }}>
@@ -69,7 +69,7 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
             fontSize: "13px",
             color: "#334155",
             outline: "none",
-            background: "#fff",
+            background: "var(--bg-container)",
             transition: "border-color 0.2s",
             cursor: "pointer"
           }}
@@ -105,7 +105,7 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
           boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
         }}>
           {filteredOptions.length === 0 ? (
-            <li style={{ padding: "10px", color: "#94a3b8", fontSize: "13px", textAlign: 'center' }}>
+            <li style={{ padding: "10px", color: "var(--text-light)", fontSize: "13px", textAlign: 'center' }}>
                 Sin resultados
             </li>
           ) : (
@@ -117,9 +117,9 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
                   padding: "10px 12px",
                   cursor: "pointer",
                   fontSize: "13px",
-                  color: opt === value ? "#1e40af" : "#334155",
+                  color: opt === value ? "var(--primary-color)" : "#334155",
                   fontWeight: opt === value ? "bold" : "normal",
-                  background: opt === value ? "#eff6ff" : "transparent",
+                  background: opt === value ? "var(--bg-muted)" : "transparent",
                   borderRadius: "6px",
                   marginBottom: "2px",
                   transition: "all 0.1s"

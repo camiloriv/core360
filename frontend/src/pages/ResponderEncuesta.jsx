@@ -108,7 +108,7 @@ function ResponderEncuesta() {
   if (loading) {
     return (
       <div className="container public-container" style={{ padding: "100px", textAlign: "center" }}>
-        <p style={{ color: "#64748b", fontWeight: "bold" }}>Cargando encuesta...</p>
+        <p style={{ color: "var(--text-muted)", fontWeight: "bold" }}>Cargando encuesta...</p>
       </div>
     );
   }
@@ -117,8 +117,8 @@ function ResponderEncuesta() {
     return (
       <div className="container public-container" style={{ textAlign: "center", padding: "100px 20px" }}>
         <div style={{ fontSize: "60px", marginBottom: "20px" }}>⚠️</div>
-        <h2 style={{ color: "#64748b" }}>Encuesta no disponible</h2>
-        <p style={{ color: "#94a3b8" }}>Este enlace ha sido desactivado o ya no es válido.</p>
+        <h2 style={{ color: "var(--text-muted)" }}>Encuesta no disponible</h2>
+        <p style={{ color: "var(--text-light)" }}>Este enlace ha sido desactivado o ya no es válido.</p>
       </div>
     );
   }
@@ -127,15 +127,15 @@ function ResponderEncuesta() {
     return (
       <div className="encuesta-page">
         <header className="agoras-header" style={{ justifyContent: 'flex-end' }}>
-          <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e3a8a', textAlign: 'right', textTransform: 'uppercase' }}>
+          <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary-color)', textAlign: 'right', textTransform: 'uppercase' }}>
             {encuesta.empresa}
           </div>
         </header>
 
         <div className="container public-container" style={{ textAlign: "center", padding: "100px 20px" }}>
           <div style={{ fontSize: "60px", marginBottom: "20px" }}>✅</div>
-          <h2 style={{ color: "#1e3a8a", marginBottom: "10px" }}>¡Gracias por tu participación!</h2>
-          <p style={{ color: "#64748b", fontSize: "16px" }}>
+          <h2 style={{ color: "var(--primary-color)", marginBottom: "10px" }}>¡Gracias por tu participación!</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "16px" }}>
             Tus respuestas han sido procesadas correctamente. Valoramos mucho tu opinión.
           </p>
         </div>
@@ -151,23 +151,23 @@ function ResponderEncuesta() {
   return (
     <div className="encuesta-page">
       <header className="agoras-header" style={{ justifyContent: 'flex-end' }}>
-        <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e3a8a', textAlign: 'right', textTransform: 'uppercase' }}>
+        <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary-color)', textAlign: 'right', textTransform: 'uppercase' }}>
           {encuesta.empresa}
         </div>
       </header>
 
       <div className="container public-container">
-        <div className="title" style={{ fontSize: '24px', color: '#1e3a8a', marginBottom: '10px' }}>{encuesta.template}</div>
+        <div className="title" style={{ fontSize: '24px', color: 'var(--primary-color)', marginBottom: '10px' }}>{encuesta.template}</div>
 
-        <div className="subtitle" style={{ color: '#64748b', fontWeight: '600', marginBottom: '15px' }}>
+        <div className="subtitle" style={{ color: 'var(--text-muted)', fontWeight: '600', marginBottom: '15px' }}>
           PREGUNTA {index + 1} DE {total}
         </div>
 
         {/* 🔹 PROGRESS BAR */}
-        <div className="progress-bar" style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '40px' }}>
+        <div className="progress-bar" style={{ height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden', marginBottom: '40px' }}>
           <div
             className="progress-fill"
-            style={{ width: `${progreso}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s ease' }}
+            style={{ width: `${progreso}%`, height: '100%', background: 'var(--secondary-color)', transition: 'width 0.3s ease' }}
           />
         </div>
 
@@ -176,7 +176,7 @@ function ResponderEncuesta() {
           <p style={{ fontSize: '18px', color: '#334155', fontWeight: '600', lineHeight: '1.5', marginBottom: '30px' }}>
             {pregunta.texto}
             {pregunta.requerida === 1 && (
-              <span style={{ color: "#ef4444", marginLeft: '5px' }}>*</span>
+              <span style={{ color: "var(--danger-color)", marginLeft: '5px' }}>*</span>
             )}
           </p>
 
@@ -197,7 +197,7 @@ function ResponderEncuesta() {
               {pregunta.opciones?.map((opt) => {
                 const isSelected = respuestas[pregunta.id] === opt;
                 return (
-                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#eff6ff' : '#fff', borderColor: isSelected ? '#3b82f6' : '#e2e8f0' }}>
+                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--bg-muted)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--secondary-color)' : 'var(--border-color)' }}>
                     <input
                       type="radio"
                       name={pregunta.id}
@@ -206,7 +206,7 @@ function ResponderEncuesta() {
                       onChange={(e) => handleChange(pregunta.id, e.target.value)}
                       style={{ display: 'none' }}
                     />
-                    <span style={{ fontWeight: isSelected ? '700' : '500', color: isSelected ? '#1e40af' : '#475569' }}>{opt}</span>
+                    <span style={{ fontWeight: isSelected ? '700' : '500', color: isSelected ? 'var(--primary-color)' : 'var(--text-muted)' }}>{opt}</span>
                   </label>
                 );
               })}
@@ -220,7 +220,7 @@ function ResponderEncuesta() {
                 const currentValues = respuestas[pregunta.id] || [];
                 const isSelected = currentValues.includes(opt);
                 return (
-                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#f0fdf4' : '#fff', borderColor: isSelected ? '#22c55e' : '#e2e8f0' }}>
+                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#f0fdf4' : 'var(--bg-container)', borderColor: isSelected ? '#22c55e' : 'var(--border-color)' }}>
                     <input
                       type="checkbox"
                       value={opt}
@@ -233,7 +233,7 @@ function ResponderEncuesta() {
                       }}
                       style={{ display: 'none' }}
                     />
-                    <span style={{ fontWeight: isSelected ? '700' : '500', color: isSelected ? '#166534' : '#475569' }}>{opt}</span>
+                    <span style={{ fontWeight: isSelected ? '700' : '500', color: isSelected ? '#166534' : 'var(--text-muted)' }}>{opt}</span>
                   </label>
                 );
               })}
@@ -250,7 +250,7 @@ function ResponderEncuesta() {
                 ).map((n) => {
                   const isSelected = respuestas[pregunta.id] === n;
                   return (
-                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#3b82f6' : '#fff', borderColor: isSelected ? '#2563eb' : '#e2e8f0', color: isSelected ? '#fff' : '#475569', fontWeight: 'bold' }}>
+                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--secondary-color)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--primary-hover)' : 'var(--border-color)', color: isSelected ? 'var(--bg-container)' : 'var(--text-muted)', fontWeight: 'bold' }}>
                       <input
                         type="radio"
                         name={pregunta.id}
@@ -264,7 +264,7 @@ function ResponderEncuesta() {
                   );
                 })}
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "15px", fontSize: "12px", color: "#64748b", fontWeight: "700", padding: "0 5px", textTransform: "uppercase" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "15px", fontSize: "12px", color: "var(--text-muted)", fontWeight: "700", padding: "0 5px", textTransform: "uppercase" }}>
                 <span>Nada probable</span>
                 <span>Muy probable</span>
               </div>
@@ -278,7 +278,7 @@ function ResponderEncuesta() {
             <button 
               className="btn-secondary" 
               onClick={handlePrev} 
-              style={{ padding: '12px 25px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 'bold', cursor: 'pointer' }}
+              style={{ padding: '12px 25px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: 'var(--bg-container)', color: 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer' }}
             >
               ← Anterior
             </button>
@@ -288,14 +288,14 @@ function ResponderEncuesta() {
             <button 
                 onClick={handleSubmit} 
                 disabled={enviando}
-                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}
+                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: 'var(--success-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}
             >
               {enviando ? "Enviando..." : "Finalizar y Enviar"}
             </button>
           ) : (
             <button 
                 onClick={handleNext}
-                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: 'var(--secondary-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
             >
               Siguiente →
             </button>

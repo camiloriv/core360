@@ -153,7 +153,7 @@ const MenuBar = ({ editor }) => {
 
   const labelStyle = {
     fontSize: '10px',
-    color: '#94a3b8',
+    color: 'var(--text-light)',
     marginTop: 'auto',
     fontWeight: 'bold',
     textTransform: 'uppercase'
@@ -165,7 +165,7 @@ const MenuBar = ({ editor }) => {
     border: '1px solid #e2e8f0',
     borderRadius: '4px',
     background: 'white',
-    color: '#1e293b',
+    color: 'var(--text-main)',
     outline: 'none',
     cursor: 'pointer'
   };
@@ -214,8 +214,8 @@ const MenuBar = ({ editor }) => {
     }
   };
 
-  const standardTextColors = ['#000000', '#475569', '#1e40af', '#b91c1c', '#15803d', '#7c3aed'];
-  const standardCellColors = ['#ffffff', '#f1f5f9', '#e2e8f0', '#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2'];
+  const standardTextColors = ['#000000', 'var(--text-muted)', 'var(--primary-color)', '#b91c1c', '#15803d', '#7c3aed'];
+  const standardCellColors = ['var(--bg-container)', 'var(--bg-muted)', 'var(--border-color)', '#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2'];
 
   return (
     <div className="editor-menubar" style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '8px 4px', borderTopLeftRadius: '12px', borderTopRightRadius: '12px', flexWrap: 'wrap', gap: '4px' }}>
@@ -288,7 +288,7 @@ const MenuBar = ({ editor }) => {
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }} className={editor.isActive('italic') ? 'is-active' : ''}><ItalicIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }} className={editor.isActive('underline') ? 'is-active' : ''}><UnderlineIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} className={editor.isActive('strike') ? 'is-active' : ''}><StrikeIcon size={16} /></button>
-          <div style={{ width: '1px', height: '20px', background: '#e2e8f0', margin: '0 4px' }}></div>
+          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }}></div>
           <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }} title="Color de Texto">
             {standardTextColors.map(color => (
               <div key={color} className="color-dot" style={{ background: color }} onClick={() => editor.chain().focus().setColor(color).run()} />
@@ -321,14 +321,14 @@ const MenuBar = ({ editor }) => {
           className={showTableMenu ? 'is-active' : ''}
           style={{ width: 'auto', padding: '0 10px', background: showTableMenu ? '#dbeafe' : 'transparent', fontWeight: 'bold' }}
         >
-          <TableIcon size={18} style={{ marginRight: '6px' }} color={showTableMenu ? '#2563eb' : '#475569'} />
+          <TableIcon size={18} style={{ marginRight: '6px' }} color={showTableMenu ? 'var(--primary-hover)' : 'var(--text-muted)'} />
           TABLA
         </button>
         <span style={labelStyle}>Opciones</span>
       </div>
 
       {showTableMenu && (
-        <div style={{ ...groupStyle, borderRight: 'none', background: '#f1f5f9', borderRadius: '8px', flexDirection: 'row', gap: '15px', padding: '8px' }}>
+        <div style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', gap: '15px', padding: '8px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <button
               onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
@@ -336,13 +336,13 @@ const MenuBar = ({ editor }) => {
             >+ INSERTAR</button>
             <span style={{ fontSize: '9px', color: '#666' }}>Nueva</span>
           </div>
-          <div style={{ width: '1px', height: '30px', background: '#cbd5e1' }}></div>
+          <div style={{ width: '1px', height: '30px', background: 'var(--border-input)' }}></div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
               <div style={{ display: 'flex', gap: '2px', background: 'white', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().addColumnAfter().run(); }} title="Agregar Columna"><Columns size={14} color="#059669" /></button>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().addRowAfter().run(); }} title="Agregar Fila"><Rows size={14} color="#059669" /></button>
-                <div style={{ width: '1px', background: '#e2e8f0', margin: '0 2px' }}></div>
+                <div style={{ width: '1px', background: 'var(--border-color)', margin: '0 2px' }}></div>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().mergeCells().run(); }} title="Combinar"><CaseUpper size={14} /></button>
               </div>
               <div style={{ display: 'flex', gap: '2px', background: 'white', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
@@ -351,12 +351,12 @@ const MenuBar = ({ editor }) => {
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().setCellAttribute('verticalAlign', 'bottom').run(); }}><ChevronDown size={14} /></button>
               </div>
               <div style={{ position: 'relative' }}>
-                <button onClick={(e) => { e.preventDefault(); setShowDeleteOptions(!showDeleteOptions); }} style={{ color: showDeleteOptions ? '#ef4444' : '#64748b' }}><Trash2 size={16} /></button>
+                <button onClick={(e) => { e.preventDefault(); setShowDeleteOptions(!showDeleteOptions); }} style={{ color: showDeleteOptions ? 'var(--danger-color)' : 'var(--text-muted)' }}><Trash2 size={16} /></button>
                 {showDeleteOptions && (
                   <div style={{ position: 'absolute', top: '100%', right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', zIndex: 100, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '120px' }}>
                     <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteRow().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Fila</button>
                     <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteColumn().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Columna</button>
-                    <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setShowDeleteOptions(false); }} style={{ ...dropdownBtnStyle, background: '#ef4444', color: 'white' }}>BORRAR TABLA</button>
+                    <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setShowDeleteOptions(false); }} style={{ ...dropdownBtnStyle, background: 'var(--danger-color)', color: 'white' }}>BORRAR TABLA</button>
                   </div>
                 )}
               </div>
@@ -535,16 +535,16 @@ function MinutaEditor({ form, setForm }) {
         }
       `}} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <label style={{ fontWeight: 'bold', color: '#1e293b' }}>Editor de Minuta (Avanzado)</label>
+        <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Editor de Minuta (Avanzado)</label>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={handlePreview} style={btnStyle('#f1f5f9', '#475569')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
+          <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
           <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>Borrador Completo</button>
           <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>+ Inducción Franquicia</button>
           <button onClick={(e) => insertTemplate(e, templateAgoras)} style={btnStyle('#dcfce7', '#166534')}>+ Inducción Ágoras</button>
         </div>
       </div>
       <div className="tiptap-editor-container" style={{
-        background: '#f1f5f9',
+        background: 'var(--bg-muted)',
         borderRadius: '12px',
         border: '1px solid #e2e8f0',
         display: 'flex',
@@ -593,10 +593,10 @@ function MinutaEditor({ form, setForm }) {
             style={{ background: 'white', width: '100%', maxWidth: '900px', maxHeight: '90vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'default' }}
           >
             <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>Vista Previa del Correo</h3>
-              <button onClick={() => setShowPreviewModal(false)} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar Vista</button>
+              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-main)' }}>Vista Previa del Correo</h3>
+              <button onClick={() => setShowPreviewModal(false)} style={{ background: 'var(--danger-color)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar Vista</button>
             </div>
-            <div style={{ padding: '32px', overflowY: 'auto', background: '#f1f5f9', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ padding: '32px', overflowY: 'auto', background: 'var(--bg-muted)', display: 'flex', justifyContent: 'center' }}>
               <div style={{ width: '100%', maxWidth: '800px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', borderRadius: '4px' }} dangerouslySetInnerHTML={{ __html: getPreviewHTML() }} />
             </div>
           </div>

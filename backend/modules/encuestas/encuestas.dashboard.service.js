@@ -19,7 +19,7 @@ const obtenerTodasLasRespuestas = async () => {
     FROM encuestas e
     JOIN encuesta_templates t ON e.template_id = t.id
     LEFT JOIN empresas emp ON e.empresa_id = emp.id
-    LEFT JOIN ejecutivas ej ON e.ejecutiva_id = ej.id
+    LEFT JOIN usuarios ej ON e.ejecutiva_id = ej.id
     ORDER BY e.fecha_creacion DESC
   `;
   const [result] = await db.query(sql);
@@ -56,7 +56,7 @@ const obtenerRankingEjecutivas = async () => {
     FROM encuesta_respuestas r
     JOIN encuestas e ON r.encuesta_id = e.id
     LEFT JOIN empresas emp ON e.empresa_id = emp.id
-    LEFT JOIN jefaturas j ON emp.jefatura_id = j.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
     WHERE r.valor_numerico IS NOT NULL
     GROUP BY j.id, j.nombre
     ORDER BY promedio DESC

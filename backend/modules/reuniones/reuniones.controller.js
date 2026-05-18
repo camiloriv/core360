@@ -10,9 +10,9 @@ exports.listarReuniones = async (req, res) => {
             emp.nombre AS empresa_nombre,
             j.nombre AS jefatura_nombre
         FROM reuniones r
-        JOIN ejecutivas e ON r.ejecutiva_id = e.id
+        JOIN usuarios e ON r.ejecutiva_id = e.id
         JOIN empresas emp ON r.empresa_id = emp.id
-        LEFT JOIN jefaturas j ON e.jefatura_id = j.id
+        LEFT JOIN usuarios j ON e.jefatura_id = j.id
         ORDER BY r.fecha_reu DESC, r.hora DESC
     `;
 
@@ -42,7 +42,7 @@ exports.obtenerStats = async (req, res) => {
         const [porEjecutiva] = await db.query(`
             SELECT e.nombre as name, COUNT(*) as value 
             FROM reuniones r
-            JOIN ejecutivas e ON r.ejecutiva_id = e.id
+            JOIN usuarios e ON r.ejecutiva_id = e.id
             GROUP BY e.id, e.nombre
             ORDER BY value DESC
         `);
@@ -171,8 +171,8 @@ exports.crearReunion = async (req, res) => {
                 j.correo AS jefatura_correo
             FROM reuniones r
             JOIN empresas emp ON r.empresa_id = emp.id
-            JOIN ejecutivas e ON r.ejecutiva_id = e.id
-            LEFT JOIN jefaturas j ON e.jefatura_id = j.id
+            JOIN usuarios e ON r.ejecutiva_id = e.id
+            LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE r.id_reunion = ?
         `;
 

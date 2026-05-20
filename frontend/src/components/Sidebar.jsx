@@ -87,11 +87,11 @@ const Sidebar = () => {
   ];
 
   if (user.permisos !== 'admin') {
-    menuItems = menuItems.filter(item => item.path !== '/gestion-usuarios');
+    menuItems = menuItems.filter(item => !['/gestion-usuarios', '/gestion-ejecutivas'].includes(item.path));
   }
 
   if (user.permisos !== 'jefatura' && user.permisos !== 'admin') {
-    menuItems = menuItems.filter(item => !['/editor-encuestas', '/gestion-ejecutivas'].includes(item.path));
+    menuItems = menuItems.filter(item => item.path !== '/editor-encuestas');
   }
 
   useEffect(() => {

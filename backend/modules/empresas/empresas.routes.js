@@ -7,5 +7,6 @@ router.get("/", controller.listarEmpresas);
 router.get("/:id_ejecutiva", controller.obtenerEmpresasPorEjecutiva);
 router.get("/jefatura/:id_jefatura", controller.obtenerEmpresasPorJefatura);
 router.put("/:id", controller.actualizarEmpresa);
+router.patch("/:id/estado", controller.actualizarEstadoEmpresa);
 
 module.exports = router;

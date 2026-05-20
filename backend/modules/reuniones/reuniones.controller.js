@@ -10,9 +10,9 @@ exports.listarReuniones = async (req, res) => {
             emp.nombre AS empresa_nombre,
             j.nombre AS jefatura_nombre
         FROM reuniones r
-        JOIN usuarios e ON r.ejecutiva_id = e.id
-        JOIN empresas emp ON r.empresa_id = emp.id
-        LEFT JOIN usuarios j ON e.jefatura_id = j.id
+        LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
+        LEFT JOIN empresas emp ON r.empresa_id = emp.id
+        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
         ORDER BY r.fecha_reu DESC, r.hora DESC
     `;
 
@@ -145,8 +145,8 @@ exports.crearReunion = async (req, res) => {
                 tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
                 motivo_reu, minuta, form_f, empresa_id, programado_para,
                 estado_envio, archivos_nombres, programar_encuesta,
-                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -156,7 +156,8 @@ exports.crearReunion = async (req, res) => {
             'enviado', archivosNombres, isSurveyProgrammed ? 1 : 0,
             isSurveyProgrammed ? encuesta_tipo : null,
             isSurveyProgrammed ? encuesta_programada_para : null,
-            isSurveyProgrammed ? 'pendiente' : 'enviado'
+            isSurveyProgrammed ? 'pendiente' : 'enviado',
+            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0
         ];
 
         await db.query(sql, values);

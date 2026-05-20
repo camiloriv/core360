@@ -7,6 +7,7 @@ import {
 import styles from "../styles/DashboardStyles";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import KpiCard from "../components/dashboard/KpiCard";
+import { exportToExcel } from "../utils/exportExcel";
 
 const TYPE_COLORS = {
   'Inducción': 'var(--secondary-color)', // Azul
@@ -105,6 +106,24 @@ export default function DashboardReuniones() {
       date,
       ...counts
     }));
+
+  const handleExport = () => {
+    const dataToExport = filteredReuniones.map(r => ({
+      ID: r.id_reunion,
+      Fecha: new Date(r.fecha_reu),
+      Hora: r.hora,
+      Tipo: r.tipo_reu,
+      Motivo: r.motivo_reu,
+      Empresa: r.empresa_nombre,
+      Ejecutiva: r.ejecutiva_nombre,
+      Jefatura: r.jefatura_nombre,
+      Lugar: r.lugar,
+      Participantes: r.participantes,
+      Destinatario: r.enviado_a,
+      Estado: r.estado_envio
+    }));
+    exportToExcel(dataToExport, `Reuniones_Core360_${new Date().toISOString().split('T')[0]}`);
+  };
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Cargando dashboard profesional...</div>;
 
@@ -269,8 +288,16 @@ export default function DashboardReuniones() {
 
         {/* --- HISTORIAL (TABLA AL FINAL) --- */}
         <div style={styles.tableCard}>
-          <div style={styles.tableHeader}>
+          <div style={{ ...styles.tableHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ ...styles.sectionTitle, marginBottom: 0 }}>Historial de Reuniones / Minutas</h3>
+            <button 
+              onClick={handleExport}
+              style={{ padding: '8px 16px', background: '#dcfce7', color: '#166534', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}
+              onMouseEnter={(e) => e.target.style.background = '#bbf7d0'}
+              onMouseLeave={(e) => e.target.style.background = '#dcfce7'}
+            >
+              📊 Exportar a Excel
+            </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={styles.table}>

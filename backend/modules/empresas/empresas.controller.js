@@ -54,3 +54,33 @@ exports.actualizarEmpresa = async (req, res) => {
     res.status(500).json({ error: "Error en la BD" });
   }
 };
+
+exports.actualizarEstadoEmpresa = async (req, res) => {
+  const { id } = req.params;
+  const { estado_seguimiento } = req.body;
+  try {
+    let query = "UPDATE empresas SET estado_seguimiento = ? WHERE id = ?";
+    let params = [estado_seguimiento, id];
+
+    if (estado_seguimiento === 'solicitada') {
+      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = NOW(), fecha_concretada = NULL WHERE id = ?";
+      params = [estado_seguimiento, id];
+    } else if (estado_seguimiento === 'concretada') {
+      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = COALESCE(fecha_solicitada, NOW()), fecha_concretada = NOW() WHERE id = ?";
+      params = [estado_seguimiento, id];
+    } else if (estado_seguimiento === 'pendiente') {
+      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = NULL, fecha_concretada = NULL WHERE id = ?";
+      params = [estado_seguimiento, id];
+    }
+
+    await db.query(query, params);
+    const [[updatedEmp]] = await db.query("SELECT fecha_solicitada, fecha_concretada FROM empresas WHERE id = ?", [id]);
+    res.json({ 
+      msg: "Estado actualizado", 
+      fecha_solicitada: updatedEmp ? updatedEmp.fecha_solicitada : null, 
+      fecha_concretada: updatedEmp ? updatedEmp.fecha_concretada : null 
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};

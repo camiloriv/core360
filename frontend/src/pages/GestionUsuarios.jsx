@@ -150,34 +150,49 @@ const GestionUsuarios = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ background: 'var(--bg-muted)', borderBottom: '2px solid var(--border-color)' }}>
             <tr>
-              <th style={styles.th}>Nombre</th>
-              <th style={styles.th}>Correo</th>
-              <th style={styles.th}>Permisos</th>
-              <th style={styles.th}>Cargo</th>
-              <th style={styles.th}>Jefatura Asignada</th>
-              <th style={styles.th}>Acciones</th>
+              <th style={{ ...styles.th, fontSize: '12px', textTransform: 'uppercase' }}>Nombre / Correo</th>
+              <th style={{ ...styles.th, fontSize: '12px', textTransform: 'uppercase' }}>Permisos</th>
+              <th style={{ ...styles.th, fontSize: '12px', textTransform: 'uppercase' }}>Cargo</th>
+              <th style={{ ...styles.th, fontSize: '12px', textTransform: 'uppercase' }}>Jefatura Asignada</th>
+              <th style={{ ...styles.th, fontSize: '12px', textTransform: 'uppercase' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {usuarios.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <td style={styles.td}>{u.nombre}</td>
-                <td style={styles.td}>{u.correo}</td>
-                <td style={styles.td}>
+              <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ ...styles.td, padding: '10px 15px' }}>
+                  <div style={{ fontWeight: 'bold', color: '#334155', fontSize: '13px' }}>{u.nombre}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{u.correo}</div>
+                </td>
+                <td style={{ ...styles.td, padding: '10px 15px' }}>
                   <span style={{
-                    padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
-                    background: u.permisos === 'admin' ? '#fef08a' : u.permisos === 'jefatura' ? '#bfdbfe' : 'var(--bg-muted)',
-                    color: u.permisos === 'admin' ? '#854d0e' : u.permisos === 'jefatura' ? 'var(--primary-color)' : 'var(--text-muted)'
+                    padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', display: 'inline-block',
+                    background: u.permisos === 'admin' ? '#fef9c3' : u.permisos === 'jefatura' ? '#e0f2fe' : '#f1f5f9',
+                    color: u.permisos === 'admin' ? '#854d0e' : u.permisos === 'jefatura' ? '#0369a1' : 'var(--text-muted)'
                   }}>
                     {u.permisos.toUpperCase()}
                   </span>
                 </td>
-                <td style={styles.td}>{u.cargos || '-'}</td>
-                <td style={styles.td}>{u.jefatura_nombre || '-'}</td>
-                <td style={styles.td}>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => handleEdit(u)} style={styles.btnIcon} title="Editar">✏️</button>
-                    <button onClick={() => handleDelete(u.id)} style={{ ...styles.btnIcon, color: 'var(--danger-color)' }} title="Eliminar">🗑️</button>
+                <td style={{ ...styles.td, padding: '10px 15px', fontSize: '12px', color: 'var(--text-muted)' }}>{u.cargos || '-'}</td>
+                <td style={{ ...styles.td, padding: '10px 15px', fontSize: '12px', color: '#0369a1', fontWeight: u.jefatura_nombre ? 'bold' : 'normal' }}>{u.jefatura_nombre || '-'}</td>
+                <td style={{ ...styles.td, padding: '10px 15px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={() => handleEdit(u)} 
+                      style={{ padding: '6px 15px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: '#dbeafe', color: 'var(--primary-color)', transition: 'background 0.2s' }}
+                      onMouseEnter={(e) => e.target.style.background = '#bfdbfe'}
+                      onMouseLeave={(e) => e.target.style.background = '#dbeafe'}
+                    >
+                      ✏️ Editar
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(u.id)} 
+                      style={{ padding: '6px 15px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: '#fee2e2', color: '#991b1b', transition: 'background 0.2s' }}
+                      onMouseEnter={(e) => e.target.style.background = '#fecaca'}
+                      onMouseLeave={(e) => e.target.style.background = '#fee2e2'}
+                    >
+                      🚫 Eliminar
+                    </button>
                   </div>
                 </td>
               </tr>

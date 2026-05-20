@@ -156,6 +156,12 @@ function ReunionesForm({ onSuccess }) {
                   <span style={{ fontSize: '12px', color: 'var(--info-color)', fontWeight: 'bold' }}>FECHA Y HORA DE ENVÍO:</span>
                   <input type="datetime-local" value={form.encuesta_programada_para} onChange={(e) => setField("encuesta_programada_para", e.target.value)} style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)' }} />
                 </div>
+                <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.encuesta_relacionada} onChange={(e) => setField("encuesta_relacionada", e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--info-color)' }} />
+                    <span style={{ fontSize: '13px', color: 'var(--text-color)' }}>Encuesta relacionada con esta minuta/reunión</span>
+                  </label>
+                </div>
               </div>
             )}
           </div>

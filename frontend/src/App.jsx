@@ -58,7 +58,9 @@ function App() {
                     
                     {/* Solo Jefatura puede ver esto, o admins */}
                     <Route path="/editor-encuestas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin']}><EditorEncuestas /></ProtectedRoute>} />
-                    <Route path="/gestion-ejecutivas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin']}><GestionEjecutivas /></ProtectedRoute>} />
+                    
+                    {/* Solo Administradores */}
+                    <Route path="/gestion-ejecutivas" element={<ProtectedRoute allowedRoles={['admin']}><GestionEjecutivas /></ProtectedRoute>} />
                     <Route path="/seguimiento-empresas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin', 'ejecutiva']}><SeguimientoEmpresas /></ProtectedRoute>} />
                     
                     {/* Solo Administradores */}

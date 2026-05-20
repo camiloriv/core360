@@ -18,7 +18,8 @@ const initialState = {
   archivos: [],
   programar_encuesta: false,
   encuesta_tipo: "",
-  encuesta_programada_para: ""
+  encuesta_programada_para: "",
+  encuesta_relacionada: false
 };
 
 export default function useReunionesForm() {

@@ -10,6 +10,7 @@ import {
 import styles from "../styles/DashboardStyles";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import KpiCard from "../components/dashboard/KpiCard";
+import { exportToExcel } from "../utils/exportExcel";
 
 // =============================================================================
 // 🏗️ SUBCOMPONENTES (Modularización)
@@ -291,6 +292,22 @@ export default function DashboardEncuestas() {
     });
   };
 
+  const handleExport = () => {
+    const dataToExport = filteredTableData.map(r => ({
+      ID_Encuesta: r.id,
+      ID_Reunion: r.reunion_id || 'S/I',
+      Tipo_Encuesta: r.titulo,
+      Empresa: r.empresa,
+      Ejecutiva: r.ejecutiva,
+      Jefatura: r.jefatura,
+      Estado: r.activo === 0 ? 'Inactiva' : (r.estado === 'completada' ? 'Completada' : 'Pendiente'),
+      Enviado_a: r.enviado_a,
+      Fecha_Envio: new Date(r.fecha_creacion),
+      Fecha_Respuesta: r.fecha_respuesta ? new Date(r.fecha_respuesta) : null
+    }));
+    exportToExcel(dataToExport, `Encuestas_Core360_${new Date().toISOString().split('T')[0]}`);
+  };
+
   return (
     <div className="encuesta-page">
       <div className="container">
@@ -353,8 +370,16 @@ export default function DashboardEncuestas() {
             </div>
 
             <div style={styles.tableCard}>
-              <div style={styles.tableHeader}>
+              <div style={{ ...styles.tableHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--text-main)', textTransform: 'uppercase' }}>Detalle de Respuestas con Preguntas Reales</h3>
+                <button 
+                  onClick={handleExport}
+                  style={{ padding: '8px 16px', background: '#dcfce7', color: '#166534', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}
+                  onMouseEnter={(e) => e.target.style.background = '#bbf7d0'}
+                  onMouseLeave={(e) => e.target.style.background = '#dcfce7'}
+                >
+                  📊 Exportar a Excel
+                </button>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={styles.table}>

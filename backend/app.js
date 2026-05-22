@@ -41,6 +41,7 @@ const encuestasRoutes = require("./modules/encuestas/encuestas.routes");
 const jefaturasRoutes = require("./modules/jefaturas/jefaturas.routes");
 const authRoutes = require("./modules/auth/auth.routes");
 const usuariosRoutes = require("./modules/usuarios/usuarios.routes");
+const zonasRoutes = require("./modules/zonas/zonas.routes");
 
 app.use("/reuniones", reunionesRoutes);
 app.use("/ejecutivas", ejecutivasRoutes);
@@ -49,6 +50,7 @@ app.use("/encuestas", encuestasRoutes);
 app.use("/jefaturas", jefaturasRoutes);
 app.use("/auth", authRoutes);
 app.use("/usuarios", usuariosRoutes);
+app.use("/zonas", zonasRoutes);
 
 // 🔹 Test de Salud
 app.get("/health", (req, res) => {

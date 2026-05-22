@@ -2,7 +2,18 @@ const db = require("../../database/connection");
 
 exports.obtenerJefaturas = async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM usuarios WHERE permisos = 'jefatura' ORDER BY nombre ASC");
+    const { gerencia_id, jefatura_id } = req.query;
+    let query = "SELECT * FROM usuarios WHERE permisos = 'jefatura'";
+    const params = [];
+    if (gerencia_id) {
+      query += " AND id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(gerencia_id);
+    } else if (jefatura_id) {
+      query += " AND id = ?";
+      params.push(jefatura_id);
+    }
+    query += " ORDER BY nombre ASC";
+    const [rows] = await db.query(query, params);
     res.json(rows);
   } catch (err) {
     console.error(err);

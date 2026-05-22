@@ -14,10 +14,11 @@ import ResponderEncuesta from "./pages/ResponderEncuesta";
 import DashboardReuniones from "./pages/DashboardReuniones";
 import DashboardEncuestas from "./pages/DashboardEncuestas";
 import EditorEncuestas from "./pages/EditorEncuestas";
-import GestionEjecutivas from "./pages/GestionEjecutivas";
+import GestionEmpresas from "./pages/GestionEmpresas";
 import SeguimientoEmpresas from "./pages/SeguimientoEmpresas";
 import GestionUsuarios from "./pages/GestionUsuarios";
 import Sidebar from "./components/Sidebar";
+import { useInactivityLogout } from "./hooks/useInactivityLogout";
 
 // ProtectedRoute component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -28,10 +29,39 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.permisos)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/registrar-reunion" replace />;
   }
 
   return children;
+};
+
+// MainLayout wrapper to handle inactivity logout hook
+const MainLayout = () => {
+  useInactivityLogout();
+  return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar />
+      <div style={{ flex: 1, marginLeft: '100px', minHeight: '100vh', background: 'var(--bg-body)' }}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/registrar-reunion" replace />} />
+          <Route path="/registrar-reunion" element={<Home />} />
+          <Route path="/crear-encuesta" element={<CrearEncuesta />} />
+          <Route path="/dashboard-reuniones" element={<DashboardReuniones />} />
+          <Route path="/dashboard-encuestas" element={<DashboardEncuestas />} />
+          
+          {/* Jefatura y Ejecutiva tienen los mismos permisos */}
+          <Route path="/editor-encuestas" element={<ProtectedRoute allowedRoles={['jefatura', 'ejecutiva', 'admin']}><EditorEncuestas /></ProtectedRoute>} />
+          
+          {/* Solo Administradores */}
+          <Route path="/gestion-empresas" element={<ProtectedRoute allowedRoles={['admin']}><GestionEmpresas /></ProtectedRoute>} />
+          <Route path="/seguimiento-empresas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin', 'ejecutiva', 'gerencia', 'gerencia_general']}><SeguimientoEmpresas /></ProtectedRoute>} />
+          
+          {/* Solo Administradores */}
+          <Route path="/gestion-usuarios" element={<ProtectedRoute allowedRoles={['admin']}><GestionUsuarios /></ProtectedRoute>} />
+        </Routes>
+      </div>
+    </div>
+  );
 };
 
 function App() {
@@ -47,27 +77,7 @@ function App() {
           path="*" 
           element={
             <ProtectedRoute>
-              <div style={{ display: 'flex' }}>
-                <Sidebar />
-                <div style={{ flex: 1, marginLeft: '100px', minHeight: '100vh', background: 'var(--bg-body)' }}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/crear-encuesta" element={<CrearEncuesta />} />
-                    <Route path="/dashboard-reuniones" element={<DashboardReuniones />} />
-                    <Route path="/dashboard-encuestas" element={<DashboardEncuestas />} />
-                    
-                    {/* Solo Jefatura puede ver esto, o admins */}
-                    <Route path="/editor-encuestas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin']}><EditorEncuestas /></ProtectedRoute>} />
-                    
-                    {/* Solo Administradores */}
-                    <Route path="/gestion-ejecutivas" element={<ProtectedRoute allowedRoles={['admin']}><GestionEjecutivas /></ProtectedRoute>} />
-                    <Route path="/seguimiento-empresas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin', 'ejecutiva']}><SeguimientoEmpresas /></ProtectedRoute>} />
-                    
-                    {/* Solo Administradores */}
-                    <Route path="/gestion-usuarios" element={<ProtectedRoute allowedRoles={['admin']}><GestionUsuarios /></ProtectedRoute>} />
-                  </Routes>
-                </div>
-              </div>
+              <MainLayout />
             </ProtectedRoute>
           } 
         />

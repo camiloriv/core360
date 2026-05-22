@@ -1,31 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import "../styles/agoras-theme.css";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const GestionUsuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [jefaturas, setJefaturas] = useState([]);
+  const [gerencias, setGerencias] = useState([]);
+  const [zonas, setZonas] = useState([]);
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [form, setForm] = useState({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '' });
+  const [form, setForm] = useState({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '' });
   const [isEditing, setIsEditing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchUsuarios = async () => {
+  const fetchData = async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/usuarios`);
-      setUsuarios(data);
-      setJefaturas(data.filter(u => u.permisos === 'jefatura' || u.permisos === 'admin'));
+      const [resUsr, resZonas] = await Promise.all([
+        axios.get(`${API_URL}/usuarios`),
+        axios.get(`${API_URL}/zonas`)
+      ]);
+      setUsuarios(resUsr.data);
+      setJefaturas(resUsr.data.filter(u => u.permisos === 'jefatura' || u.permisos === 'admin'));
+      setGerencias(resUsr.data.filter(u => u.permisos === 'gerencia' || u.permisos === 'admin'));
+      setZonas(resZonas.data);
     } catch (err) {
       console.error(err);
-      setError('Error al cargar usuarios');
+      setError('Error al cargar datos');
     }
   };
 
   useEffect(() => {
-    fetchUsuarios();
+    fetchData();
   }, []);
 
   const handleChange = (e) => {
@@ -41,10 +49,10 @@ const GestionUsuarios = () => {
       } else {
         await axios.post(`${API_URL}/usuarios`, form);
       }
-      setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '' });
+      setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '' });
       setIsEditing(false);
       setIsModalOpen(false);
-      fetchUsuarios();
+      fetchData();
     } catch (err) {
       console.error(err);
       setError('Error al guardar el usuario');
@@ -52,6 +60,10 @@ const GestionUsuarios = () => {
   };
 
   const handleEdit = (u) => {
+    const selectedGerencias = u.gerencia_ids 
+      ? u.gerencia_ids.split(',').map(id => Number(id)) 
+      : (u.gerencia_id ? [Number(u.gerencia_id)] : []);
+
     setForm({
       id: u.id,
       nombre: u.nombre || '',
@@ -59,7 +71,10 @@ const GestionUsuarios = () => {
       contrasena: u.contrasena || '',
       permisos: u.permisos || 'ejecutiva',
       cargos: u.cargos || '',
-      jefatura_id: u.jefatura_id || ''
+      jefatura_id: u.jefatura_id || '',
+      gerencia_id: u.gerencia_id || '',
+      gerencia_ids: selectedGerencias,
+      zona_id: u.zona_id || ''
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -69,7 +84,7 @@ const GestionUsuarios = () => {
     if (!window.confirm('¿Seguro que deseas eliminar este usuario?')) return;
     try {
       await axios.delete(`${API_URL}/usuarios/${id}`);
-      fetchUsuarios();
+      fetchData();
     } catch (err) {
       console.error(err);
       setError('Error al eliminar');
@@ -77,14 +92,14 @@ const GestionUsuarios = () => {
   };
 
   const handleCancel = () => {
-    setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '' });
+    setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '' });
     setIsEditing(false);
     setIsModalOpen(false);
     setError('');
   };
 
   const handleNewUser = () => {
-    setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '' });
+    setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '' });
     setIsEditing(false);
     setError('');
     setIsModalOpen(true);
@@ -114,7 +129,38 @@ const GestionUsuarios = () => {
     return gradients[index % gradients.length];
   };
 
-  // Sort: 1. Admin, 2. Jefatura, 3. Ejecutiva. Alphabetical within each role.
+  // Sort: Jerárquico (Gerencia -> Jefatura -> Ejecutiva)
+  const getSortKey = (u) => {
+    if (u.permisos === 'admin') return `1_admin_${u.nombre}`;
+    
+    if (u.permisos === 'gerencia') return `2_gerencia_${u.nombre}`;
+    
+    if (u.permisos === 'jefatura') {
+      const gId = u.gerencia_ids ? u.gerencia_ids.split(',')[0] : u.gerencia_id;
+      const gerencia = usuarios.find(x => x.id === Number(gId));
+      const gerenciaKey = gerencia ? `2_gerencia_${gerencia.nombre}` : `2_gerencia_ZZZ_SinGerencia`;
+      return `${gerenciaKey}_3_jefatura_${u.nombre}`;
+    }
+    
+    if (u.permisos === 'ejecutiva') {
+      const jefatura = usuarios.find(x => x.id === u.jefatura_id);
+      let gerenciaKey = `2_gerencia_ZZZ_SinGerencia`;
+      let jefaturaName = `ZZZ_SinJefatura`;
+      
+      if (jefatura) {
+        jefaturaName = jefatura.nombre;
+        const gId = jefatura.gerencia_ids ? jefatura.gerencia_ids.split(',')[0] : jefatura.gerencia_id;
+        const gerencia = usuarios.find(x => x.id === Number(gId));
+        if (gerencia) {
+          gerenciaKey = `2_gerencia_${gerencia.nombre}`;
+        }
+      }
+      return `${gerenciaKey}_3_jefatura_${jefaturaName}_4_ejecutiva_${u.nombre}`;
+    }
+    
+    return `5_otros_${u.nombre}`;
+  };
+
   const usuariosFiltradosYOrdenados = usuarios
     .filter(u => {
       const term = filtroBusqueda.toLowerCase();
@@ -126,38 +172,47 @@ const GestionUsuarios = () => {
       );
     })
     .sort((a, b) => {
-      const prioridad = { admin: 1, jefatura: 2, ejecutiva: 3 };
-      const prioA = prioridad[a.permisos] || 3;
-      const prioB = prioridad[b.permisos] || 3;
-
-      if (prioA !== prioB) {
-        return prioA - prioB;
-      }
-      return a.nombre.localeCompare(b.nombre);
+      const keyA = getSortKey(a);
+      const keyB = getSortKey(b);
+      return keyA.localeCompare(keyB);
     });
 
   return (
-    <div style={{ padding: '30px', maxWidth: '1100px', margin: '0 auto', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
-      {/* Style injection to cleanly suppress default browser focus outline and shadow for our search field */}
-      <style>{`
-        .no-focus-outline:focus {
-          outline: none !important;
-          border: none !important;
-          border-color: transparent !important;
-          box-shadow: none !important;
-        }
-      `}</style>
-
-      {/* Header Container */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '15px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h2 style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--text-main)', margin: 0 }}>Gestión de Usuarios</h2>
-          <span style={styles.countBadge}>{usuarios.length} usuarios</span>
-        </div>
-        <button onClick={handleNewUser} style={styles.buttonPrimary}>
-          <span style={{ marginRight: '6px' }}>+</span> Nuevo Usuario
-        </button>
-      </div>
+    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh' }}>
+      <div className="container">
+        {/* Style injection to cleanly suppress default browser focus outline and shadow for our search field */}
+        <style>{`
+          .no-focus-outline:focus {
+            outline: none !important;
+            border: none !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+          }
+        `}</style>
+        
+        {/* Header Container */}
+        <header className="page-header">
+          <div className="page-title-area" style={{ marginBottom: "30px" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <h1 
+                className="page-title"
+                style={{
+                  borderBottom: "2px solid var(--secondary-color)",
+                  paddingBottom: "8px",
+                  display: "inline-block",
+                  marginBottom: "0",
+                }}
+              >
+                Gestión de Usuarios
+              </h1>
+              <span style={{ ...styles.countBadge, margin: 0 }}>{usuarios.length} usuarios</span>
+            </div>
+            <p className="page-subtitle">ADMINISTRACIÓN DE COLABORADORES, ASIGNACIÓN DE ROLES, JEFATURAS Y ZONAS</p>
+          </div>
+          <button onClick={handleNewUser} className="btn-header-primary">
+            <span style={{ marginRight: '6px' }}>+</span> Nuevo Usuario
+          </button>
+        </header>
 
       {/* Modern Filter / Search Section */}
       <div style={styles.filterSection}>
@@ -209,9 +264,17 @@ const GestionUsuarios = () => {
                   name="contrasena" 
                   value={form.contrasena} 
                   onChange={handleChange} 
-                  style={styles.input} 
+                  style={{
+                    ...styles.input,
+                    backgroundColor: isEditing ? '#f8fafc' : 'white',
+                    cursor: isEditing ? 'not-allowed' : 'text',
+                    color: isEditing ? '#64748b' : '#334155',
+                    borderColor: isEditing ? '#e2e8f0' : '#cbd5e1'
+                  }} 
                   required={!isEditing} 
-                  placeholder={isEditing ? 'Dejar en blanco para conservar' : 'Contraseña de ingreso'} 
+                  readOnly={isEditing}
+                  title={isEditing ? "La contraseña no se puede modificar desde aquí por seguridad" : ""}
+                  placeholder="Contraseña de ingreso" 
                 />
               </div>
               <div>
@@ -219,6 +282,7 @@ const GestionUsuarios = () => {
                 <select name="permisos" value={form.permisos} onChange={handleChange} style={styles.input} required>
                   <option value="ejecutiva">Ejecutiva</option>
                   <option value="jefatura">Jefatura</option>
+                  <option value="gerencia">Gerencia</option>
                   <option value="admin">Administrador</option>
                 </select>
               </div>
@@ -228,7 +292,7 @@ const GestionUsuarios = () => {
               </div>
               {form.permisos === 'ejecutiva' && (
                 <div>
-                  <label style={styles.label}>Jefatura asignada</label>
+                  <label style={styles.label}>Jefatura asignada (Hereda Zona)</label>
                   <select name="jefatura_id" value={form.jefatura_id} onChange={handleChange} style={styles.input}>
                     <option value="">Ninguna</option>
                     {jefaturas.map(j => (
@@ -237,8 +301,81 @@ const GestionUsuarios = () => {
                   </select>
                 </div>
               )}
+              {form.permisos === 'jefatura' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={styles.label}>Gerencias a cargo (Reporta a múltiples)</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '10px' }}>
+                    {gerencias.map(g => {
+                      const isSelected = form.gerencia_ids && form.gerencia_ids.includes(g.id);
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => {
+                            const currentIds = form.gerencia_ids || [];
+                            const newIds = isSelected
+                              ? currentIds.filter(id => id !== g.id)
+                              : [...currentIds, g.id];
+                            setForm({ ...form, gerencia_ids: newIds });
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '8px 14px',
+                            borderRadius: '100px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            border: '1px solid',
+                            transition: 'all 0.2s ease',
+                            backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
+                            color: isSelected ? '#1d4ed8' : '#64748b',
+                            borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
+                            boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                          }}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span>{g.nombre}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {form.permisos === 'jefatura' && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={styles.label}>Zona Asignada</label>
+                  <select name="zona_id" value={form.zona_id} onChange={handleChange} style={{ ...styles.input, maxWidth: '280px' }}>
+                    <option value="">Ninguna</option>
+                    {zonas.map(z => (
+                      <option key={z.id} value={z.id}>{z.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                {isEditing && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                        handleDelete(form.id);
+                        setIsModalOpen(false);
+                    }} 
+                    style={{...styles.buttonSecondary, color: 'var(--danger-color)', border: '1px solid #fecaca', background: '#fef2f2', marginRight: 'auto'}}
+                  >
+                    🚫 Eliminar
+                  </button>
+                )}
                 <button type="button" onClick={handleCancel} style={styles.buttonSecondary}>Cancelar</button>
                 <button type="submit" style={styles.buttonPrimary}>{isEditing ? 'Actualizar' : 'Guardar'}</button>
               </div>
@@ -259,16 +396,20 @@ const GestionUsuarios = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={styles.theadRow}>
-                <th style={{ ...styles.th, width: '35%' }}>Nombre / Correo</th>
-                <th style={{ ...styles.th, width: '15%' }}>Permisos</th>
-                <th style={{ ...styles.th, width: '20%' }}>Cargo</th>
-                <th style={{ ...styles.th, width: '15%' }}>Jefatura Asignada</th>
-                <th style={{ ...styles.th, width: '15%', textAlign: 'center' }}>Acciones</th>
+                <th style={{ ...styles.th, width: '25%' }}>Nombre</th>
+                <th style={{ ...styles.th, width: '20%' }}>Permisos</th>
+                <th style={{ ...styles.th, width: '30%' }}>Cargo / Zona</th>
+                <th style={{ ...styles.th, width: '25%' }}>Reporta A</th>
               </tr>
             </thead>
             <tbody>
               {usuariosFiltradosYOrdenados.map((u, idx) => (
-                <tr key={u.id} style={{ ...styles.tbodyRow, background: idx % 2 === 0 ? 'transparent' : '#f8fafc' }}>
+                <tr 
+                  key={u.id} 
+                  style={{ ...styles.tbodyRow, background: idx % 2 === 0 ? 'transparent' : '#f8fafc', cursor: 'pointer' }}
+                  onClick={() => handleEdit(u)}
+                  title="Haz clic para editar"
+                >
                   {/* Name & Avatar Column */}
                   <td style={styles.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -278,7 +419,6 @@ const GestionUsuarios = () => {
                       </div>
                       <div>
                         <div style={{ fontWeight: 'bold', color: '#1e293b', fontSize: '14px' }}>{u.nombre}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{u.correo}</div>
                       </div>
                     </div>
                   </td>
@@ -293,38 +433,28 @@ const GestionUsuarios = () => {
                       {u.permisos.toUpperCase()}
                     </span>
                   </td>
-                  {/* Cargo Column */}
+                  {/* Cargo / Zona Column */}
                   <td style={{ ...styles.td, fontSize: '13px', color: '#475569' }}>
-                    {u.cargos || <span style={{ color: '#cbd5e1' }}>—</span>}
+                    <div style={{ fontWeight: '600', color: '#334155' }}>
+                      {u.cargos || <span style={{ color: '#cbd5e1', fontWeight: '400' }}>Sin cargo</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      📍 {u.zona_nombre || <span style={{ color: '#cbd5e1' }}>—</span>}
+                    </div>
                   </td>
-                  {/* Assigned Jefatura Column */}
-                  <td style={styles.td}>
+                  {/* Assigned Superior Column */}
+                  <td style={{...styles.td, whiteSpace: 'nowrap'}}>
                     {u.jefatura_nombre ? (
-                      <span style={styles.jefaturaLink}>
-                        👤 {u.jefatura_nombre}
+                      <span style={{...styles.jefaturaLink, whiteSpace: 'nowrap'}}>
+                        👤 Jef: {u.jefatura_nombre}
+                      </span>
+                    ) : u.gerencia_nombre ? (
+                      <span style={{...styles.jefaturaLink, background: '#fef3c7', color: '#b45309', whiteSpace: 'nowrap'}}>
+                        👔 Ger: {u.gerencia_nombre}
                       </span>
                     ) : (
                       <span style={{ color: '#cbd5e1', fontSize: '13px' }}>—</span>
                     )}
-                  </td>
-                  {/* Actions Column */}
-                  <td style={{ ...styles.td, padding: '10px' }}>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                      <button 
-                        onClick={() => handleEdit(u)} 
-                        style={styles.actionBtnEdit}
-                        title="Editar usuario"
-                      >
-                        ✏️ Editar
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(u.id)} 
-                        style={styles.actionBtnDelete}
-                        title="Eliminar usuario"
-                      >
-                        🚫 Eliminar
-                      </button>
-                    </div>
                   </td>
                 </tr>
               ))}
@@ -333,6 +463,7 @@ const GestionUsuarios = () => {
         )}
       </div>
     </div>
+  </div>
   );
 };
 
@@ -358,7 +489,7 @@ const styles = {
     width: '100%',
     maxWidth: '450px',
     background: 'white',
-    borderRadius: '10px',
+    borderRadius: 'var(--radius-btn)',
     border: '1px solid #e2e8f0',
     padding: '0 12px',
     boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
@@ -396,7 +527,7 @@ const styles = {
   input: { 
     width: '100%', 
     padding: '10px 12px', 
-    borderRadius: '8px', 
+    borderRadius: 'var(--radius-btn)', 
     border: '1px solid #cbd5e1', 
     fontSize: '14px', 
     boxSizing: 'border-box',
@@ -404,21 +535,21 @@ const styles = {
     outline: 'none',
     transition: 'border-color 0.2s',
     '&:focus': {
-      borderColor: 'var(--primary-color)'
+      borderColor: 'var(--secondary-color)'
     }
   },
   buttonPrimary: { 
     padding: '10px 22px', 
-    background: '#2563eb', 
+    background: 'var(--secondary-color)', 
     color: 'white', 
     border: 'none', 
-    borderRadius: '8px', 
+    borderRadius: 'var(--radius-btn)', 
     cursor: 'pointer', 
     fontWeight: 'bold',
     fontSize: '14px',
     display: 'flex',
     alignItems: 'center',
-    boxShadow: '0 2px 4px rgba(37,99,235,0.2)',
+    boxShadow: 'var(--shadow-sm)',
     transition: 'background 0.2s'
   },
   buttonSecondary: { 
@@ -426,7 +557,7 @@ const styles = {
     background: '#f1f5f9', 
     color: '#475569', 
     border: 'none', 
-    borderRadius: '8px', 
+    borderRadius: 'var(--radius-btn)', 
     cursor: 'pointer', 
     fontWeight: 'bold',
     fontSize: '14px',
@@ -434,7 +565,7 @@ const styles = {
   },
   tableWrapper: { 
     background: 'white', 
-    borderRadius: '12px', 
+    borderRadius: 'var(--radius-card)', 
     boxShadow: '0 4px 18px rgba(0,0,0,0.03)', 
     border: '1px solid #f1f5f9',
     overflow: 'hidden' 
@@ -477,7 +608,7 @@ const styles = {
   },
   roleBadge: {
     padding: '4px 10px', 
-    borderRadius: '6px', 
+    borderRadius: 'var(--radius-btn)', 
     fontSize: '11px', 
     fontWeight: '700', 
     display: 'inline-block',
@@ -489,17 +620,17 @@ const styles = {
     fontWeight: '600',
     background: '#e0f2fe',
     padding: '4px 8px',
-    borderRadius: '6px'
+    borderRadius: 'var(--radius-btn)'
   },
   actionBtnEdit: {
     padding: '6px 14px', 
-    borderRadius: '8px', 
+    borderRadius: 'var(--radius-btn)', 
     fontSize: '12px', 
     fontWeight: 'bold', 
     border: 'none', 
     cursor: 'pointer', 
     background: '#eff6ff', 
-    color: '#2563eb', 
+    color: 'var(--secondary-color)', 
     transition: 'all 0.2s ease',
     '&:hover': {
       background: '#dbeafe'
@@ -507,13 +638,13 @@ const styles = {
   },
   actionBtnDelete: {
     padding: '6px 14px', 
-    borderRadius: '8px', 
+    borderRadius: 'var(--radius-btn)', 
     fontSize: '12px', 
     fontWeight: 'bold', 
     border: 'none', 
     cursor: 'pointer', 
     background: '#fef2f2', 
-    color: '#dc2626', 
+    color: 'var(--danger-color)', 
     transition: 'all 0.2s ease',
     '&:hover': {
       background: '#fee2e2'
@@ -545,7 +676,7 @@ const styles = {
   modalContent: {
     background: 'white',
     padding: '24px 28px',
-    borderRadius: '16px',
+    borderRadius: 'var(--radius-card)',
     width: '100%',
     maxWidth: '650px',
     boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',

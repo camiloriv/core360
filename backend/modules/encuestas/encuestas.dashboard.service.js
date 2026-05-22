@@ -29,7 +29,26 @@ const obtenerTodasLasRespuestas = async () => {
 /**
  * Obtiene promedios por dimensión (Ideal para Radar Chart)
  */
-const obtenerPromediosPorDimension = async () => {
+const obtenerPromediosPorDimension = async (usuario_id, rol) => {
+  let joinClause = `
+    JOIN encuestas e ON r.encuesta_id = e.id
+    LEFT JOIN empresas emp ON e.empresa_id = emp.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+  `;
+  let whereClause = "WHERE r.valor_numerico IS NOT NULL";
+  let params = [];
+
+  if (rol === 'ejecutiva') {
+      whereClause += " AND e.ejecutiva_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'jefatura') {
+      whereClause += " AND emp.jefatura_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'gerencia') {
+      whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(usuario_id);
+  }
+
   const sql = `
     SELECT 
       d.nombre as dimension,
@@ -37,17 +56,32 @@ const obtenerPromediosPorDimension = async () => {
     FROM encuesta_respuestas r
     JOIN encuesta_catalogo_preguntas q ON r.pregunta_id = q.id
     JOIN encuesta_dimensiones d ON q.dimension_id = d.id
-    WHERE r.valor_numerico IS NOT NULL
+    ${joinClause}
+    ${whereClause}
     GROUP BY d.id, d.nombre
   `;
-  const [result] = await db.query(sql);
+  const [result] = await db.query(sql, params);
   return result;
 };
 
 /**
  * Obtiene promedios por jefatura (Ranking)
  */
-const obtenerRankingEjecutivas = async () => {
+const obtenerRankingEjecutivas = async (usuario_id, rol) => {
+  let whereClause = "WHERE r.valor_numerico IS NOT NULL";
+  let params = [];
+
+  if (rol === 'ejecutiva') {
+      whereClause += " AND e.ejecutiva_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'jefatura') {
+      whereClause += " AND emp.jefatura_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'gerencia') {
+      whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(usuario_id);
+  }
+
   const sql = `
     SELECT 
       j.nombre as jefatura,
@@ -57,18 +91,37 @@ const obtenerRankingEjecutivas = async () => {
     JOIN encuestas e ON r.encuesta_id = e.id
     LEFT JOIN empresas emp ON e.empresa_id = emp.id
     LEFT JOIN usuarios j ON emp.jefatura_id = j.id
-    WHERE r.valor_numerico IS NOT NULL
+    ${whereClause}
     GROUP BY j.id, j.nombre
     ORDER BY promedio DESC
   `;
-  const [result] = await db.query(sql);
+  const [result] = await db.query(sql, params);
   return result;
 };
 
 /**
  * Obtiene el detalle de todas las respuestas (Pregunta + Respuesta)
  */
-const obtenerDetalleRespuestas = async () => {
+const obtenerDetalleRespuestas = async (usuario_id, rol) => {
+  let joinClause = `
+    JOIN encuestas e ON r.encuesta_id = e.id
+    LEFT JOIN empresas emp ON e.empresa_id = emp.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+  `;
+  let whereClause = "WHERE 1=1";
+  let params = [];
+
+  if (rol === 'ejecutiva') {
+      whereClause += " AND e.ejecutiva_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'jefatura') {
+      whereClause += " AND emp.jefatura_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'gerencia') {
+      whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(usuario_id);
+  }
+
   const sql = `
     SELECT 
       r.encuesta_id,
@@ -77,8 +130,10 @@ const obtenerDetalleRespuestas = async () => {
       r.valor_numerico
     FROM encuesta_respuestas r
     JOIN encuesta_catalogo_preguntas q ON r.pregunta_id = q.id
+    ${joinClause}
+    ${whereClause}
   `;
-  const [result] = await db.query(sql);
+  const [result] = await db.query(sql, params);
   return result;
 };
 

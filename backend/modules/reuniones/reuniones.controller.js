@@ -3,6 +3,22 @@ const { enviarCorreo } = require("../../services/email/email.service");
 
 // 🔹 LISTAR REUNIONES
 exports.listarReuniones = async (req, res) => {
+    const { usuario_id, rol } = req.query;
+
+    let whereClause = "WHERE 1=1";
+    let params = [];
+
+    if (rol === 'ejecutiva') {
+        whereClause += " AND r.ejecutiva_id = ?";
+        params.push(usuario_id);
+    } else if (rol === 'jefatura') {
+        whereClause += " AND emp.jefatura_id = ?";
+        params.push(usuario_id);
+    } else if (rol === 'gerencia') {
+        whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+        params.push(usuario_id);
+    }
+
     const sql = `
         SELECT 
             r.*, 
@@ -13,11 +29,12 @@ exports.listarReuniones = async (req, res) => {
         LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
         LEFT JOIN empresas emp ON r.empresa_id = emp.id
         LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+        ${whereClause}
         ORDER BY r.fecha_reu DESC, r.hora DESC
     `;
 
     try {
-        const [result] = await db.query(sql);
+        const [result] = await db.query(sql, params);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
@@ -27,47 +44,74 @@ exports.listarReuniones = async (req, res) => {
 
 // 🔹 ESTADÍSTICAS PARA DASHBOARD
 exports.obtenerStats = async (req, res) => {
+    const { usuario_id, rol } = req.query;
+
+    let joinClause = `
+        LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
+        LEFT JOIN empresas emp ON r.empresa_id = emp.id
+        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    `;
+    let whereClause = "WHERE 1=1";
+    let params = [];
+
+    if (rol === 'ejecutiva') {
+        whereClause += " AND r.ejecutiva_id = ?";
+        params.push(usuario_id);
+    } else if (rol === 'jefatura') {
+        whereClause += " AND emp.jefatura_id = ?";
+        params.push(usuario_id);
+    } else if (rol === 'gerencia') {
+        whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+        params.push(usuario_id);
+    }
+
     try {
         const stats = {};
 
         // 1. Conteo por tipo
         const [porTipo] = await db.query(`
-            SELECT tipo_reu as name, COUNT(*) as value 
-            FROM reuniones 
-            GROUP BY tipo_reu
-        `);
+            SELECT r.tipo_reu as name, COUNT(*) as value 
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause}
+            GROUP BY r.tipo_reu
+        `, params);
         stats.porTipo = porTipo;
 
         // 2. Conteo por ejecutiva
         const [porEjecutiva] = await db.query(`
             SELECT e.nombre as name, COUNT(*) as value 
             FROM reuniones r
-            JOIN usuarios e ON r.ejecutiva_id = e.id
+            ${joinClause}
+            ${whereClause}
             GROUP BY e.id, e.nombre
             ORDER BY value DESC
-        `);
+        `, params);
         stats.porEjecutiva = porEjecutiva;
 
         // 3. Resumen general
         const [resumen] = await db.query(`
             SELECT 
                 COUNT(*) as total,
-                COUNT(CASE WHEN YEAR(created_at) = YEAR(CURDATE()) THEN 1 END) as este_ano,
-                COUNT(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) THEN 1 END) as este_mes
-            FROM reuniones
-        `);
+                COUNT(CASE WHEN YEAR(r.created_at) = YEAR(CURDATE()) THEN 1 END) as este_ano,
+                COUNT(CASE WHEN MONTH(r.created_at) = MONTH(CURDATE()) AND YEAR(r.created_at) = YEAR(CURDATE()) THEN 1 END) as este_mes
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause}
+        `, params);
         stats.resumen = resumen[0];
 
         // 4. Últimos 6 meses (Tendencia)
         const [tendencia] = await db.query(`
             SELECT 
-                DATE_FORMAT(created_at, '%Y-%m') as mes,
+                DATE_FORMAT(r.created_at, '%Y-%m') as mes,
                 COUNT(*) as total
-            FROM reuniones
-            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause} AND r.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
             GROUP BY mes
             ORDER BY mes ASC
-        `);
+        `, params);
         stats.tendencia = tendencia;
 
         res.json(stats);

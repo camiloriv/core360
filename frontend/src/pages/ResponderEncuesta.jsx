@@ -187,7 +187,7 @@ function ResponderEncuesta() {
               placeholder="Escribe tu comentario aquí..."
               value={respuestas[pregunta.id] || ""}
               onChange={(e) => handleChange(pregunta.id, e.target.value)}
-              style={{ width: '100%', minHeight: '120px', padding: '15px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px' }}
+              style={{ width: '100%', minHeight: '120px', padding: '15px', borderRadius: 'var(--radius-btn)', border: '1.5px solid #e2e8f0', fontSize: '14px' }}
             />
           )}
 
@@ -197,7 +197,7 @@ function ResponderEncuesta() {
               {pregunta.opciones?.map((opt) => {
                 const isSelected = respuestas[pregunta.id] === opt;
                 return (
-                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--bg-muted)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--secondary-color)' : 'var(--border-color)' }}>
+                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-btn)', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--bg-muted)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--secondary-color)' : 'var(--border-color)' }}>
                     <input
                       type="radio"
                       name={pregunta.id}
@@ -220,7 +220,7 @@ function ResponderEncuesta() {
                 const currentValues = respuestas[pregunta.id] || [];
                 const isSelected = currentValues.includes(opt);
                 return (
-                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#f0fdf4' : 'var(--bg-container)', borderColor: isSelected ? '#22c55e' : 'var(--border-color)' }}>
+                  <label key={opt} className={`radio-option ${isSelected ? 'selected' : ''}`} style={{ padding: '15px', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-btn)', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? '#f0fdf4' : 'var(--bg-container)', borderColor: isSelected ? '#22c55e' : 'var(--border-color)' }}>
                     <input
                       type="checkbox"
                       value={opt}
@@ -250,7 +250,7 @@ function ResponderEncuesta() {
                 ).map((n) => {
                   const isSelected = respuestas[pregunta.id] === n;
                   return (
-                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--secondary-color)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--primary-hover)' : 'var(--border-color)', color: isSelected ? 'var(--bg-container)' : 'var(--text-muted)', fontWeight: 'bold' }}>
+                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-btn)', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--secondary-color)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--primary-hover)' : 'var(--border-color)', color: isSelected ? 'var(--bg-container)' : 'var(--text-muted)', fontWeight: 'bold' }}>
                       <input
                         type="radio"
                         name={pregunta.id}
@@ -278,7 +278,7 @@ function ResponderEncuesta() {
             <button 
               className="btn-secondary" 
               onClick={handlePrev} 
-              style={{ padding: '12px 25px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: 'var(--bg-container)', color: 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer' }}
+              style={{ padding: '12px 25px', borderRadius: 'var(--radius-btn)', border: '1.5px solid #e2e8f0', background: 'var(--bg-container)', color: 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer' }}
             >
               ← Anterior
             </button>
@@ -288,14 +288,14 @@ function ResponderEncuesta() {
             <button 
                 onClick={handleSubmit} 
                 disabled={enviando}
-                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: 'var(--success-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}
+                style={{ padding: '12px 40px', borderRadius: 'var(--radius-btn)', border: 'none', background: 'var(--success-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)' }}
             >
               {enviando ? "Enviando..." : "Finalizar y Enviar"}
             </button>
           ) : (
             <button 
                 onClick={handleNext}
-                style={{ padding: '12px 40px', borderRadius: '8px', border: 'none', background: 'var(--secondary-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                style={{ padding: '12px 40px', borderRadius: 'var(--radius-btn)', border: 'none', background: 'var(--secondary-color)', color: 'var(--bg-container)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
             >
               Siguiente →
             </button>

@@ -2,9 +2,10 @@ const db = require("../../database/connection");
 
 // --- GESTIÓN DE TEMPLATES ---
 const listarTemplates = async () => {
-    const [rows] = await db.query("SELECT * FROM encuesta_templates ORDER BY id DESC");
+    const [rows] = await db.query("SELECT * FROM encuesta_templates WHERE activo != 2 ORDER BY id DESC");
     return rows;
 };
+
 
 const crearTemplate = async (nombre) => {
     const [result] = await db.query("INSERT INTO encuesta_templates (nombre, activo) VALUES (?, 1)", [nombre]);
@@ -112,6 +113,10 @@ const guardarPregunta = async (data) => {
         `, [dimension_id, subdimension || null, texto, tipo, escala || 5, es_nps || 0, JSON.stringify(opciones_json || []), pregunta_id]);
     }
 
+    if (!template_id) {
+        return { id: finalPreguntaId };
+    }
+
     // 2. LÓGICA DE ASIGNACIÓN (TEMPLATE-PREGUNTA)
     // Asegurar que existe el vínculo (para nuevos) o actualizar orden/requerida
     await db.query(`
@@ -129,6 +134,14 @@ const eliminarPregunta = async (template_id, pregunta_id) => {
     await db.query("DELETE FROM encuesta_template_preguntas WHERE template_id = ? AND pregunta_id = ?", [template_id, pregunta_id]);
 };
 
+const eliminarPreguntaCatalogo = async (preguntaId) => {
+    // Primero eliminamos los vínculos en templates
+    await db.query("DELETE FROM encuesta_template_preguntas WHERE pregunta_id = ?", [preguntaId]);
+    // Luego de la biblioteca maestro, en lugar de eliminar físicamente, marcamos como eliminado (activo = 2)
+    await db.query("UPDATE encuesta_catalogo_preguntas SET activo = 2 WHERE id = ?", [preguntaId]);
+    return { success: true };
+};
+
 const vincularPreguntaATemplate = async (template_id, pregunta_id) => {
     // Buscar el último orden para ponerla al final
     const [[lastOrder]] = await db.query("SELECT MAX(orden) as max_o FROM encuesta_template_preguntas WHERE template_id = ?", [template_id]);
@@ -143,6 +156,16 @@ const vincularPreguntaATemplate = async (template_id, pregunta_id) => {
     return { success: true };
 };
 
+const eliminarTemplate = async (id) => {
+    await db.query("UPDATE encuesta_templates SET activo = 2 WHERE id = ?", [id]);
+    return { success: true };
+};
+
+const eliminarDimension = async (id) => {
+    await db.query("DELETE FROM encuesta_dimensiones WHERE id = ?", [id]);
+    return { success: true };
+};
+
 module.exports = {
     listarTemplates,
     crearTemplate,
@@ -152,5 +175,9 @@ module.exports = {
     listarPreguntasPorTemplate,
     guardarPregunta,
     eliminarPregunta,
-    vincularPreguntaATemplate
+    eliminarPreguntaCatalogo,
+    vincularPreguntaATemplate,
+    eliminarTemplate,
+    eliminarDimension
 };
+

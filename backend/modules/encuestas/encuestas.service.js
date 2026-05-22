@@ -198,7 +198,21 @@ const guardarRespuesta = async ({ encuesta_id, respuestas_json }) => {
   }
 };
 
-const obtenerTodasLasRespuestas = async () => {
+const obtenerTodasLasRespuestas = async (usuario_id, rol) => {
+  let whereClause = "WHERE 1=1";
+  let params = [];
+
+  if (rol === 'ejecutiva') {
+      whereClause += " AND e.ejecutiva_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'jefatura') {
+      whereClause += " AND emp.jefatura_id = ?";
+      params.push(usuario_id);
+  } else if (rol === 'gerencia') {
+      whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(usuario_id);
+  }
+
   const sql = `
     SELECT 
       e.id,
@@ -218,9 +232,10 @@ const obtenerTodasLasRespuestas = async () => {
     LEFT JOIN empresas emp ON e.empresa_id = emp.id
     LEFT JOIN usuarios ej ON e.ejecutiva_id = ej.id
     LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    ${whereClause}
     ORDER BY e.fecha_creacion DESC
   `;
-  const [result] = await db.query(sql);
+  const [result] = await db.query(sql, params);
   return result;
 };
 
@@ -245,6 +260,7 @@ const obtenerCatalogoPreguntas = async () => {
     SELECT q.id, q.texto, q.tipo, d.nombre as dimension 
     FROM encuesta_catalogo_preguntas q 
     LEFT JOIN encuesta_dimensiones d ON q.dimension_id = d.id
+    WHERE COALESCE(q.activo, 1) != 2
   `;
   const [result] = await db.query(sql);
   return result;

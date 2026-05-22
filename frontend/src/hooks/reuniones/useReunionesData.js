@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { getDestinatarios } from "../../services/reunionesService";
 import { obtenerTemplates } from "../../services/encuestaService";
-import { getEmpresas, getEmpresasByJefatura, getEmpresasByEjecutiva } from "../../services/dataService";
+import { getEmpresas, getEmpresasByJefatura, getEjecutivas } from "../../services/dataService";
 
 export default function useReunionesData(user, empresa_id) {
   const [empresas, setEmpresas] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [destinatarios, setDestinatarios] = useState([]);
+  const [ejecutivas, setEjecutivas] = useState([]);
 
   useEffect(() => {
     obtenerTemplates().then(setTemplates);
@@ -20,6 +21,7 @@ export default function useReunionesData(user, empresa_id) {
 
     if (user.permisos === "admin") {
       getEmpresas().then(setEmpresas);
+      getEjecutivas().then(setEjecutivas);
     } else if (user.permisos === "jefatura") {
       getEmpresasByJefatura(user.id).then(setEmpresas);
     } else if (user.jefatura_id) {
@@ -40,7 +42,7 @@ export default function useReunionesData(user, empresa_id) {
     empresas,
     setEmpresas,
     templates,
-    destinatarios
+    destinatarios,
+    ejecutivas
   };
 }
-

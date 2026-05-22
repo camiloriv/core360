@@ -94,137 +94,147 @@ function CrearEncuesta() {
   };
 
   return (
-    <div className="container">
-      <div style={{ marginBottom: "25px" }}>
-        <div className="title">Crear Encuesta</div>
-        <div className="subtitle">
-          Selecciona la empresa y el tipo de encuesta
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        {/* 🔹 EMPRESA (Buscador Inteligente) */}
-        <SelectEmpresa
-          value={form.empresa_id}
-          empresas={empresas}
-          onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}
-        />
-
-        {/* 🔹 ID REUNION */}
-        <div className="field">
-          <label>ID REUNIÓN (OPCIONAL)</label>
-          <input 
-            type="number" 
-            placeholder="Ej: 1024"
-            value={form.reunion_id}
-            onChange={(e) => setForm({ ...form, reunion_id: e.target.value })}
-            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-input)' }}
-          />
-        </div>
-
-        {/* 🔹 TIPO ENCUESTA */}
-        <div className="field">
-          <label>TIPO DE ENCUESTA</label>
-          <select
-            value={form.tipo_encuesta}
-            onChange={(e) =>
-              setForm({ ...form, tipo_encuesta: e.target.value })
-            }
+    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh', overflow: 'hidden' }}>
+      <div className="container">
+        <div style={{ marginBottom: "30px" }}>
+          <h1
+            className="page-title"
+            style={{
+              borderBottom: "2px solid var(--secondary-color)",
+              paddingBottom: "8px",
+              display: "inline-block",
+              marginBottom: "8px",
+            }}
           >
-            <option value="">Seleccionar tipo</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.nombre}>{t.nombre.charAt(0).toUpperCase() + t.nombre.slice(1)}</option>
-            ))}
-          </select>
+            Crear Encuesta
+          </h1>
+          <p className="page-subtitle">SELECCIONA LA EMPRESA Y EL TIPO DE ENCUESTA</p>
         </div>
 
-        <button type="submit" className="btn">
-          Generar encuesta
-        </button>
-      </form>
+        <form onSubmit={handleSubmit}>
+          {/* 🔹 EMPRESA (Buscador Inteligente) */}
+          <SelectEmpresa
+            value={form.empresa_id}
+            empresas={empresas}
+            onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}
+          />
 
-      {/* 🔹 URL GENERADA Y ENVÍO POR CORREO */}
-      {url && (
-        <div className="link-box" style={{ marginTop: '20px', padding: '15px', background: 'var(--bg-body)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)' }}>Link generado:</strong>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <a 
-              href={url} 
-              target="_blank" 
-              rel="noreferrer"
-              style={{ flex: 1, wordBreak: 'break-all', color: 'var(--primary-hover)', textDecoration: 'none' }}
-            >
-              {url}
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(url);
-                Swal.fire({
-                  toast: true,
-                  position: 'top-end',
-                  icon: 'success',
-                  title: '¡Link copiado al portapapeles!',
-                  showConfirmButton: false,
-                  timer: 2000,
-                  timerProgressBar: true
-                });
-              }}
-              style={{
-                background: 'var(--secondary-color)',
-                color: 'white',
-                border: 'none',
-                padding: '8px 14px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-                transition: 'background 0.2s'
-              }}
-              onMouseOver={(e) => e.target.style.background = 'var(--primary-hover)'}
-              onMouseOut={(e) => e.target.style.background = 'var(--secondary-color)'}
-            >
-              Copiar
-            </button>
+          {/* 🔹 ID REUNION */}
+          <div className="field">
+            <label>ID REUNIÓN (OPCIONAL)</label>
+            <input 
+              type="number" 
+              placeholder="Ej: 1024"
+              value={form.reunion_id}
+              onChange={(e) => setForm({ ...form, reunion_id: e.target.value })}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-input)' }}
+            />
           </div>
 
-          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-input)', paddingTop: '15px' }}>
-            <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)' }}>Enviar a:</strong>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input 
-                type="email" 
-                placeholder="correo@empresa.com" 
-                value={emailDestino}
-                onChange={(e) => setEmailDestino(e.target.value)}
-                style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-input)', fontSize: '13px' }}
-              />
-              <button 
-                type="button" 
-                onClick={handleEnviarCorreo}
-                disabled={enviandoCorreo}
+          {/* 🔹 TIPO ENCUESTA */}
+          <div className="field">
+            <label>TIPO DE ENCUESTA</label>
+            <select
+              value={form.tipo_encuesta}
+              onChange={(e) =>
+                setForm({ ...form, tipo_encuesta: e.target.value })
+              }
+            >
+              <option value="">Seleccionar tipo</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.nombre}>{t.nombre.charAt(0).toUpperCase() + t.nombre.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+
+          <button type="submit" className="btn">
+            Generar encuesta
+          </button>
+        </form>
+
+        {/* 🔹 URL GENERADA Y ENVÍO POR CORREO */}
+        {url && (
+          <div className="link-box" style={{ marginTop: '20px', padding: '15px', background: 'var(--bg-body)', borderRadius: 'var(--radius-card)', border: '1px solid var(--border-color)' }}>
+            <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)' }}>Link generado:</strong>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noreferrer"
+                style={{ flex: 1, wordBreak: 'break-all', color: 'var(--primary-hover)', textDecoration: 'none' }}
+              >
+                {url}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(url);
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: '¡Link copiado al portapapeles!',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true
+                  });
+                }}
                 style={{
-                  background: 'var(--success-color)',
+                  background: 'var(--secondary-color)',
                   color: 'white',
                   border: 'none',
                   padding: '8px 14px',
-                  borderRadius: '6px',
-                  cursor: enviandoCorreo ? 'not-allowed' : 'pointer',
+                  borderRadius: 'var(--radius-btn)',
+                  cursor: 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
                   whiteSpace: 'nowrap',
-                  opacity: enviandoCorreo ? 0.7 : 1,
                   transition: 'background 0.2s'
                 }}
-                onMouseOver={(e) => { if(!enviandoCorreo) e.target.style.background = '#059669' }}
-                onMouseOut={(e) => { if(!enviandoCorreo) e.target.style.background = 'var(--success-color)' }}
+                onMouseOver={(e) => e.target.style.background = 'var(--primary-hover)'}
+                onMouseOut={(e) => e.target.style.background = 'var(--secondary-color)'}
               >
-                {enviandoCorreo ? "Enviando..." : "Enviar"}
+                Copiar
               </button>
             </div>
+
+            <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-input)', paddingTop: '15px' }}>
+              <strong style={{ display: 'block', marginBottom: '8px', color: 'var(--text-main)' }}>Enviar a:</strong>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="email" 
+                  placeholder="correo@empresa.com" 
+                  value={emailDestino}
+                  onChange={(e) => setEmailDestino(e.target.value)}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius-btn)', border: '1px solid var(--border-input)', fontSize: '13px' }}
+                />
+                <button 
+                  type="button" 
+                  onClick={handleEnviarCorreo}
+                  disabled={enviandoCorreo}
+                  style={{
+                    background: 'var(--success-color)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-btn)',
+                    cursor: enviandoCorreo ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    opacity: enviandoCorreo ? 0.7 : 1,
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => { if(!enviandoCorreo) e.target.style.background = '#059669' }}
+                  onMouseOut={(e) => { if(!enviandoCorreo) e.target.style.background = 'var(--success-color)' }}
+                >
+                  {enviandoCorreo ? "Enviando..." : "Enviar"}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

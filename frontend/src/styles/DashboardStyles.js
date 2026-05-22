@@ -68,10 +68,10 @@ const styles = {
   ejecutivaName: { fontSize: '11px', color: '#64748b' },
   actionsCol: { display: 'flex', flexDirection: 'column', gap: '10px' },
   pendingActions: { display: 'flex', gap: '5px' },
-  btnAction: { flex: 1, padding: '6px 8px', borderRadius: '6px', border: 'none', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' },
+  btnAction: { flex: 1, padding: '6px 8px', borderRadius: '8px', border: 'none', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' },
   btnSecondary: { 
     padding: '6px 12px', 
-    borderRadius: '6px', 
+    borderRadius: '8px', 
     border: '1px solid #d1d5db', 
     background: '#fff', 
     color: '#374151', 

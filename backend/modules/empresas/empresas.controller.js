@@ -2,12 +2,24 @@ const db = require("../../database/connection");
 
 exports.listarEmpresas = async (req, res) => {
   try {
+    const { gerencia_id, jefatura_id } = req.query;
+    let whereClause = "";
+    const params = [];
+    if (gerencia_id) {
+      whereClause = " WHERE j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
+      params.push(gerencia_id);
+    } else if (jefatura_id) {
+      whereClause = " WHERE e.jefatura_id = ?";
+      params.push(jefatura_id);
+    }
     const [rows] = await db.query(`
-      SELECT e.*, j.nombre as jefatura_nombre 
+      SELECT e.*, j.nombre as jefatura_nombre, z.nombre as zona_nombre
       FROM empresas e 
       LEFT JOIN usuarios j ON e.jefatura_id = j.id
+      LEFT JOIN zonas z ON e.zona_id = z.id
+      ${whereClause}
       ORDER BY e.nombre ASC
-    `);
+    `, params);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Error en la BD" });
@@ -46,9 +58,10 @@ exports.obtenerEmpresasPorJefatura = async (req, res) => {
 
 exports.actualizarEmpresa = async (req, res) => {
   const { id } = req.params;
-  const { jefatura_id } = req.body;
+  const { nombre, jefatura_id, zona_id } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
-    await db.query("UPDATE empresas SET jefatura_id = ? WHERE id = ?", [jefatura_id || null, id]);
+    await db.query("UPDATE empresas SET nombre = ?, jefatura_id = ?, zona_id = ? WHERE id = ?", [nombre, jefatura_id || null, zona_id || null, id]);
     res.json({ msg: "Actualizada" });
   } catch (err) {
     res.status(500).json({ error: "Error en la BD" });
@@ -84,3 +97,85 @@ exports.actualizarEstadoEmpresa = async (req, res) => {
     res.status(500).json({ error: "Error en la BD" });
   }
 };
+
+exports.crearEmpresa = async (req, res) => {
+  const { nombre, jefatura_id, zona_id } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
+  try {
+    const [result] = await db.query(
+      "INSERT INTO empresas (nombre, jefatura_id, zona_id, estado_seguimiento) VALUES (?, ?, ?, 'pendiente')",
+      [nombre, jefatura_id || null, zona_id || null]
+    );
+    res.json({ id: result.insertId, msg: "Empresa creada exitosamente" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+exports.eliminarEmpresa = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query("DELETE FROM empresas WHERE id = ?", [id]);
+    res.json({ msg: "Empresa eliminada exitosamente" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+exports.traspasoMasivo = async (req, res) => {
+  const { source_jefatura_id, target_jefatura_id, empresa_ids } = req.body;
+  if (!target_jefatura_id) {
+    return res.status(400).json({ error: "Jefatura de destino requerida" });
+  }
+  try {
+    if (empresa_ids && empresa_ids.length > 0) {
+      // Traspaso de empresas seleccionadas
+      await db.query(
+        "UPDATE empresas SET jefatura_id = ? WHERE id IN (?)",
+        [target_jefatura_id, empresa_ids]
+      );
+    } else if (source_jefatura_id) {
+      // Traspaso de TODAS las empresas de una jefatura a otra
+      await db.query(
+        "UPDATE empresas SET jefatura_id = ? WHERE jefatura_id = ?",
+        [target_jefatura_id, source_jefatura_id]
+      );
+    } else {
+      return res.status(400).json({ error: "Debe especificar empresa_ids o source_jefatura_id" });
+    }
+    res.json({ msg: "Traspaso masivo realizado con éxito" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+exports.traspasoExcel = async (req, res) => {
+  const { traspasos } = req.body;
+  if (!traspasos || !Array.isArray(traspasos)) {
+    return res.status(400).json({ error: "Datos de traspaso inválidos" });
+  }
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    for (const t of traspasos) {
+      const { empresa_id, target_jefatura_id } = t;
+      await connection.query(
+        "UPDATE empresas SET jefatura_id = ? WHERE id = ?",
+        [target_jefatura_id || null, empresa_id]
+      );
+    }
+    await connection.commit();
+    res.json({ msg: "Traspaso por Excel completado con éxito" });
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ error: "Error en la BD al procesar el Excel" });
+  } finally {
+    connection.release();
+  }
+};
+
+

@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const Login = () => {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -40,14 +41,24 @@ const Login = () => {
           </div>
           <div style={styles.inputGroup}>
             <label style={styles.label}>Contraseña</label>
-            <input 
-              type="password" 
-              value={contrasena} 
-              onChange={(e) => setContrasena(e.target.value)} 
-              style={styles.input}
-              required 
-              autoComplete="new-password"
-            />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={contrasena} 
+                onChange={(e) => setContrasena(e.target.value)} 
+                style={{ ...styles.input, width: '100%', paddingRight: '45px', boxSizing: 'border-box' }}
+                required 
+                autoComplete="new-password"
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                style={styles.toggleButton}
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
           {error && <p style={styles.error}>{error}</p>}
           <button type="submit" style={styles.button}>Ingresar</button>
@@ -67,7 +78,21 @@ const styles = {
   label: { fontSize: '14px', fontWeight: '600', color: 'var(--text-muted)' },
   input: { padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px', outline: 'none' },
   button: { background: 'var(--secondary-color)', color: 'white', padding: '14px', borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' },
-  error: { color: 'var(--danger-color)', fontSize: '14px', textAlign: 'center' }
+  error: { color: 'var(--danger-color)', fontSize: '14px', textAlign: 'center' },
+  toggleButton: {
+    position: 'absolute',
+    right: '12px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '4px',
+    color: '#64748b',
+    userSelect: 'none'
+  }
 };
 
 export default Login;

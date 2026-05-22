@@ -92,7 +92,8 @@ const enviarCorreo = async (req, res) => {
 
 const obtenerRespuestas = async (req, res) => {
   try {
-    const respuestas = await service.obtenerTodasLasRespuestas();
+    const { usuario_id, rol } = req.query;
+    const respuestas = await service.obtenerTodasLasRespuestas(usuario_id, rol);
     res.json(respuestas);
   } catch (error) {
     console.error(error);
@@ -122,10 +123,11 @@ const obtenerPreguntas = async (req, res) => {
 
 const obtenerKpis = async (req, res) => {
   try {
+    const { usuario_id, rol } = req.query;
     const [promedios, ranking, detalles, dimensiones] = await Promise.all([
-      dashboardService.obtenerPromediosPorDimension(),
-      dashboardService.obtenerRankingEjecutivas(),
-      dashboardService.obtenerDetalleRespuestas(),
+      dashboardService.obtenerPromediosPorDimension(usuario_id, rol),
+      dashboardService.obtenerRankingEjecutivas(usuario_id, rol),
+      dashboardService.obtenerDetalleRespuestas(usuario_id, rol),
       editorService.listarDimensiones()
     ]);
     res.json({ promedios, ranking, detalles, dimensiones });
@@ -193,10 +195,31 @@ const eliminarPregunta = async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
+const eliminarPreguntaCatalogo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        res.json(await editorService.eliminarPreguntaCatalogo(id));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
 const vincularPregunta = async (req, res) => {
     try {
         const { templateId, preguntaId } = req.body;
         res.json(await editorService.vincularPreguntaATemplate(templateId, preguntaId));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+const eliminarTemplate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        res.json(await editorService.eliminarTemplate(id));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+const eliminarDimension = async (req, res) => {
+    try {
+        const { id } = req.params;
+        res.json(await editorService.eliminarDimension(id));
     } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
@@ -219,5 +242,8 @@ module.exports = {
   listarPreguntasTemplate,
   guardarPregunta,
   eliminarPregunta,
-  vincularPregunta
+  eliminarPreguntaCatalogo,
+  vincularPregunta,
+  eliminarTemplate,
+  eliminarDimension
 };

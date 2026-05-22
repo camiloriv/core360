@@ -58,7 +58,7 @@
   background: var(--bg-container);
   padding: 40px;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
@@ -120,7 +120,7 @@ select,
 textarea {
   width: 100%;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-btn);
   border: 1px solid var(--border-input);
   font-size: 13px;
   color: #334155;
@@ -249,7 +249,7 @@ button {
   color: white;
   border: none;
   padding: 8px 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-btn);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -428,3 +428,193 @@ button:disabled {
   text-align: center !important;
   background-color: var(--bg-container);
 }
+
+/* ======================================================
+   🔹 SWEETALERT2 MODERNIZATION & OVERFLOW FIXES
+   ====================================================== */
+.swal2-popup {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid #f1f5f9 !important;
+}
+
+.swal2-title {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  margin-bottom: 12px !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.swal2-html-container {
+  font-size: 14px !important;
+  color: #475569 !important;
+  margin: 10px 0 !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.swal2-input,
+.swal2-textarea,
+.swal2-select {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 10px 0 !important;
+  padding: 10px 14px !important;
+  border-radius: 8px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  font-size: 14px !important;
+  color: #1e293b !important;
+  background-color: #ffffff !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  height: 42px !important;
+}
+
+.swal2-textarea {
+  height: 90px !important;
+}
+
+.swal2-input:focus,
+.swal2-textarea:focus,
+.swal2-select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+  outline: none !important;
+}
+
+.swal2-input-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-top: 10px !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: left !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.swal2-actions {
+  margin-top: 24px !important;
+  gap: 12px !important;
+}
+
+.swal2-styled {
+  padding: 10px 24px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+
+.swal2-confirm {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.swal2-confirm:hover {
+  background-color: #2563eb !important;
+}
+
+.swal2-cancel {
+  background-color: #64748b !important;
+  color: white !important;
+}
+
+.swal2-cancel:hover {
+  background-color: #475569 !important;
+}
+
+/* Fix library modal conflict */
+.swal-lib-container .swal-lib-search-input {
+  margin: 0 !important;
+  height: 38px !important;
+}
+
+/* Premium uniform header buttons */
+.btn-editor-header {
+  background: white !important;
+  color: var(--text-muted, #64748b) !important;
+  border: 1.5px solid #e2e8f0 !important;
+  padding: 10px 20px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+  height: 42px !important;
+  box-sizing: border-box !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.btn-editor-header:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: var(--text-main, #334155) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+.btn-editor-header:active {
+  transform: translateY(0) !important;
+}
+
+/* Premium modal options buttons inside SweetAlert2 */
+.swal-option-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.swal-option-btn.primary {
+  background-color: var(--secondary-color, #3b82f6) !important;
+  color: white !important;
+}
+
+.swal-option-btn.primary:hover {
+  background-color: #2563eb !important;
+  transform: translateY(-1px) !important;
+}
+
+.swal-option-btn.outline {
+  background-color: white !important;
+  border: 1.5px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.swal-option-btn.outline:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+  transform: translateY(-1px) !important;
+}
+
+.swal-option-btn.danger {
+  background-color: #fee2e2 !important;
+  border: 1px solid #fecaca !important;
+  color: #dc2626 !important;
+}
+
+.swal-option-btn.danger:hover {
+  background-color: #fca5a5 !important;
+  color: #b91c1c !important;
+  transform: translateY(-1px) !important;
+}

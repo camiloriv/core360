@@ -13,11 +13,14 @@ router.get("/stats/kpis", controller.obtenerKpis);
 router.get("/editor/templates", controller.listarTemplatesFull);
 router.post("/editor/templates", controller.crearTemplateBase);
 router.patch("/editor/templates", controller.actualizarTemplateBase);
+router.delete("/editor/templates/:id", controller.eliminarTemplate);
 router.get("/editor/dimensiones", controller.listarDimensiones);
 router.post("/editor/dimensiones", controller.crearDimension);
+router.delete("/editor/dimensiones/:id", controller.eliminarDimension);
 router.get("/editor/preguntas/:id", controller.listarPreguntasTemplate);
 router.post("/editor/preguntas", controller.guardarPregunta);
 router.delete("/editor/preguntas/:templateId/:preguntaId", controller.eliminarPregunta);
+router.delete("/editor/catalogo-preguntas/:id", controller.eliminarPreguntaCatalogo);
 router.post("/editor/preguntas/vincular", controller.vincularPregunta);
 
 // 3. RUTAS DE ACCIÓN

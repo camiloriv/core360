@@ -2,28 +2,80 @@ import React, { useState, useEffect } from "react";
 import api from "../services/api";
 import styles from "../styles/DashboardStyles";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
-
 import Swal from "sweetalert2";
+import "../styles/agoras-theme.css";
 
 export default function SeguimientoEmpresas() {
+  const user = JSON.parse(localStorage.getItem("usuario") || "null");
+  const userRol = user?.permisos;
+
   const [jefaturas, setJefaturas] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [reuniones, setReuniones] = useState([]);
   const [filtroJefatura, setFiltroJefatura] = useState("");
   const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
+  const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
   const [viewMode, setViewMode] = useState("grid");
   const [loading, setLoading] = useState(true);
+
+  // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
+  const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
+  // Solo admin, gerencia_general y gerencia pueden ver y cambiar el filtro de Jefatura
+  const mostrarFiltroJefatura = userRol === 'admin' || userRol === 'gerencia_general' || userRol === 'gerencia';
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const rol = userRol;
+        const id = user?.id;
+        const jefaturaId = user?.jefatura_id;
+
+        // Parámetros según rol
+        let jefaturasUrl = "/jefaturas";
+        let empresasUrl = "/empresas";
+        let reunionesUrl = "/reuniones";
+
+        if (rol === "gerencia" && id) {
+          // Gerencia regional/matriz: solo ve sus datos
+          jefaturasUrl = `/jefaturas?gerencia_id=${id}`;
+          empresasUrl = `/empresas?gerencia_id=${id}`;
+          reunionesUrl = `/reuniones?usuario_id=${id}&rol=gerencia`;
+        } else if (rol === "gerencia_general" && id) {
+          // Gerencia general: ve todo (sin filtro por gerencia)
+          reunionesUrl = `/reuniones`;
+        } else if (rol === "jefatura" && id) {
+          jefaturasUrl = `/jefaturas?jefatura_id=${id}`;
+          empresasUrl = `/empresas?jefatura_id=${id}`;
+          reunionesUrl = `/reuniones?usuario_id=${id}&rol=jefatura`;
+        } else if (rol === "ejecutiva" && id) {
+          const targetJefId = jefaturaId || id;
+          jefaturasUrl = `/jefaturas?jefatura_id=${targetJefId}`;
+          empresasUrl = `/empresas?jefatura_id=${targetJefId}`;
+          reunionesUrl = `/reuniones?usuario_id=${id}&rol=ejecutiva`;
+        }
+
         const [resJ, resE, resR] = await Promise.all([
-          api.get("/jefaturas"),
-          api.get("/empresas"),
-          api.get("/reuniones")
+          api.get(jefaturasUrl),
+          api.get(empresasUrl),
+          api.get(reunionesUrl)
         ]);
-        setJefaturas(resJ.data || []);
-        setEmpresas(resE.data || []);
+
+        let filteredJefaturas = resJ.data || [];
+        let filteredEmpresas = resE.data || [];
+
+        if (rol === "jefatura" && id) {
+          filteredJefaturas = filteredJefaturas.filter(j => j.id === id);
+          filteredEmpresas = filteredEmpresas.filter(e => e.jefatura_id === id);
+          setFiltroJefatura(id.toString());
+        } else if (rol === "ejecutiva" && (jefaturaId || id)) {
+          const targetJefId = jefaturaId || id;
+          filteredJefaturas = filteredJefaturas.filter(j => j.id === targetJefId);
+          filteredEmpresas = filteredEmpresas.filter(e => e.jefatura_id === targetJefId);
+          setFiltroJefatura(targetJefId.toString());
+        }
+
+        setJefaturas(filteredJefaturas);
+        setEmpresas(filteredEmpresas);
         setReuniones(resR.data || []);
       } catch (err) {
         console.error("Error cargando datos:", err);
@@ -38,12 +90,24 @@ export default function SeguimientoEmpresas() {
     setFiltroEmpresa("Todas");
   }, [filtroJefatura]);
 
+  useEffect(() => {
+    setFiltroJefatura("");
+    setFiltroEmpresa("Todas");
+  }, [filtroMacroZona]);
+
   const tieneReunion = (empresaId) => {
     return reuniones.some(r => r.empresa_id === empresaId && r.estado_envio !== 'pendiente');
   };
 
   const getReunionInfo = (empresaId) => {
-    return reuniones.find(r => r.empresa_id === empresaId && r.estado_envio !== 'pendiente');
+    const reunionesEmpresa = reuniones
+      .filter(r => r.empresa_id === empresaId && r.estado_envio !== 'pendiente')
+      .sort((a, b) => {
+        const fechaA = a.fecha_reu ? new Date(a.fecha_reu) : new Date(0);
+        const fechaB = b.fecha_reu ? new Date(b.fecha_reu) : new Date(0);
+        return fechaB - fechaA; // más reciente primero
+      });
+    return reunionesEmpresa[0] || null;
   };
 
   const formatearFecha = (fechaStr) => {
@@ -67,9 +131,18 @@ export default function SeguimientoEmpresas() {
     }
   };
 
-  const empresasPorJefatura = empresas.filter(emp => 
-    filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura)
-  );
+  const empresasPorJefatura = empresas.filter(emp => {
+    const pasaJefatura = filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
+    
+    let pasaMacroZona = true;
+    if (filtroMacroZona === "Matriz") {
+      pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
+    } else if (filtroMacroZona === "Regiones") {
+      pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
+    }
+
+    return pasaJefatura && pasaMacroZona;
+  });
 
   const empresasFiltradas = empresasPorJefatura.filter(emp =>
     filtroEmpresa === "Todas" || emp.nombre === filtroEmpresa
@@ -148,127 +221,239 @@ export default function SeguimientoEmpresas() {
   const totalGestionadas = empresasPorJefatura.filter(emp => tieneReunion(emp.id)).length;
   const porcentajeAvance = totalEmpresas > 0 ? Math.round((totalGestionadas / totalEmpresas) * 100) : 0;
 
+  // Jefaturas que tienen al menos una empresa en la macro-zona seleccionada
+  const jefaturasFiltradas = jefaturas.filter(j =>
+    empresas.some(e => {
+      if (e.jefatura_id !== j.id) return false;
+      if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
+      if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
+      return true;
+    })
+  );
+
   if (loading) return <div style={{ padding: 40 }}>Cargando seguimiento...</div>;
 
   return (
-    <div className="container">
-      <div style={{ marginBottom: "30px", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: "2rem", color: "var(--text-main)", fontWeight: "bold" }}>Seguimiento de Cobertura</h1>
-          <p style={{ color: "var(--text-muted)", margin: 0 }}>Estado de reuniones por empresa y jefatura</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', background: 'white', padding: '5px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexWrap: 'wrap' }}>
-          <button 
-            onClick={() => setViewMode('grid')}
-            style={{ padding: '8px 15px', borderRadius: '6px', border: 'none', background: viewMode === 'grid' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s' }}
-          >
-            🔲 Vista Cuadrícula
-          </button>
-          <button 
-            onClick={() => setViewMode('split')}
-            style={{ padding: '8px 15px', borderRadius: '6px', border: 'none', background: viewMode === 'split' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'split' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s' }}
-          >
-            📋 Vista Dividida
-          </button>
-          <button 
-            onClick={() => setViewMode('detail')}
-            style={{ padding: '8px 15px', borderRadius: '6px', border: 'none', background: viewMode === 'detail' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'detail' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s' }}
-          >
-            📊 Detalle
-          </button>
-        </div>
-      </div>
-
-      {/* FILTRO JEFATURA Y CONTADOR ALINEADOS */}
+    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh' }}>
+      <div className="container">
+        
+        {/* Unified Page Header */}
+        <header className="page-header">
+          <div className="page-title-area" style={{ marginBottom: "30px" }}>
+            <h1 
+              className="page-title"
+              style={{
+                borderBottom: "2px solid var(--secondary-color)",
+                paddingBottom: "8px",
+                display: "inline-block",
+                marginBottom: "8px",
+              }}
+            >
+              Seguimiento de Cobertura
+            </h1>
+            <p className="page-subtitle">ESTADO DE REUNIONES POR EMPRESA Y JEFATURA</p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', background: 'white', padding: '5px', borderRadius: 'var(--radius-btn)', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexWrap: 'wrap', height: '42px', alignItems: 'center', boxSizing: 'border-box' }}>
+            <button 
+              onClick={() => setViewMode('grid')}
+              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'grid' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
+            >
+              🔲 Vista Cuadrícula
+            </button>
+            <button 
+              onClick={() => setViewMode('split')}
+              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'split' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'split' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
+            >
+              📋 Vista Dividida
+            </button>
+            <button 
+              onClick={() => setViewMode('detail')}
+              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'detail' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'detail' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
+            >
+              📊 Detalle
+            </button>
+          </div>
+        </header>
+             {/* CONTENEDOR DE FILTROS REESTRUCTURADO */}
       <div style={{ 
         display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "flex-end", 
+        flexDirection: "column",
         background: "white", 
         padding: "25px", 
-        borderRadius: "15px", 
+        borderRadius: "var(--radius-card)", 
         boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", 
         marginBottom: "30px",
-        gap: "40px",
-        flexWrap: "wrap"
+        gap: "25px"
       }}>
-        <div style={{ display: "flex", gap: "30px", flex: 1, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flexShrink: 0 }}>
+        {/* ROW 1: Macro-Zona, Buscar Empresa, Avance */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "20px" }}>
+          
+          <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", alignItems: "flex-end" }}>
+            {/* Filtro Macro-Zona: solo visible para gerencia_general y admin */}
+            {mostrarFiltroMacroZona && (
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "1px" }}>
+                  Macro-Zona
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {['Todas', 'Matriz', 'Regiones'].map(mz => {
+                    const isSelected = filtroMacroZona === mz;
+                    return (
+                      <button
+                        key={mz}
+                        onClick={() => setFiltroMacroZona(mz)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 14px',
+                          borderRadius: '100px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          border: '1px solid',
+                          transition: 'all 0.2s ease',
+                          backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
+                          color: isSelected ? '#1d4ed8' : '#64748b',
+                          borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
+                          boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                        }}
+                      >
+                        <span>{isSelected ? '✓' : '+'}</span>
+                        <span>{mz.toUpperCase()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Buscar Empresa */}
+            <div style={{ minWidth: "250px", maxWidth: "300px" }}>
+              <SearchableFilter 
+                label="Buscar Empresa"
+                value={filtroEmpresa}
+                options={optionsEmpresas}
+                onChange={(val) => setFiltroEmpresa(val)}
+                placeholder="Escribe para buscar..."
+              />
+            </div>
+          </div>
+
+          {/* Avance */}
+          <div style={{ flex: "1 1 300px", textAlign: "right" }}>
+            <div style={{ fontSize: "11px", fontWeight: "bold", color: "var(--text-light)", textTransform: "uppercase", marginBottom: "8px" }}>
+              Avance de Cobertura
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "15px", justifyContent: "flex-end" }}>
+              <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--secondary-color)" }}>
+                {porcentajeAvance}%
+              </div>
+              <div style={{ flex: 1, maxWidth: "400px", height: "10px", background: "var(--bg-muted)", borderRadius: "10px", overflow: "hidden" }}>
+                <div style={{ 
+                  width: `${porcentajeAvance}%`, 
+                  height: "100%", 
+                  background: "var(--secondary-color)", 
+                  transition: "width 0.5s ease" 
+                }}></div>
+              </div>
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--border-input)", marginTop: "5px" }}>
+              {totalGestionadas} de {totalEmpresas} empresas listas
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 2: Jefaturas */}
+        {mostrarFiltroJefatura && (
+          <div>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>
               Seleccionar Jefatura
             </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-              <button
-                onClick={() => setFiltroJefatura("")}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                  fontSize: "13px",
-                  transition: "all 0.2s",
-                  background: filtroJefatura === "" ? "var(--secondary-color)" : "var(--bg-muted)",
-                  color: filtroJefatura === "" ? "white" : "var(--text-muted)"
-                }}
-              >
-                TODAS
-              </button>
-              {jefaturas.map(j => (
-                <button
-                  key={j.id}
-                  onClick={() => setFiltroJefatura(j.id.toString())}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    fontSize: "13px",
-                    transition: "all 0.2s",
-                    background: filtroJefatura === j.id.toString() ? "var(--secondary-color)" : "var(--bg-muted)",
-                    color: filtroJefatura === j.id.toString() ? "white" : "var(--text-muted)"
-                  }}
-                >
-                  {j.nombre.toUpperCase()}
-                </button>
-              ))}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {(() => {
+                const isAllSelected = filtroJefatura === "";
+                return (
+                  <button
+                    onClick={() => setFiltroJefatura("")}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '100px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      transition: 'all 0.2s ease',
+                      backgroundColor: isAllSelected ? '#eff6ff' : '#f8fafc',
+                      color: isAllSelected ? '#1d4ed8' : '#64748b',
+                      borderColor: isAllSelected ? '#3b82f6' : '#cbd5e1',
+                      boxShadow: isAllSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      if (!isAllSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      if (!isAllSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                    }}
+                  >
+                    <span>{isAllSelected ? '✓' : '+'}</span>
+                    <span>TODAS</span>
+                  </button>
+                );
+              })()}
+              
+              {jefaturasFiltradas.map(j => {
+                const isSelected = filtroJefatura === j.id.toString();
+                return (
+                  <button
+                    key={j.id}
+                    onClick={() => setFiltroJefatura(j.id.toString())}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '100px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      border: '1px solid',
+                      transition: 'all 0.2s ease',
+                      backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
+                      color: isSelected ? '#1d4ed8' : '#64748b',
+                      borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
+                      boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                    }}
+                  >
+                    <span>{isSelected ? '✓' : '+'}</span>
+                    <span>{j.nombre.toUpperCase()}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          <div style={{ minWidth: "220px", maxWidth: "300px", flex: 1 }}>
-            <SearchableFilter 
-              label="Buscar Empresa"
-              value={filtroEmpresa}
-              options={optionsEmpresas}
-              onChange={(val) => setFiltroEmpresa(val)}
-              placeholder="Escribe para buscar..."
-            />
-          </div>
-        </div>
-
-        {/* CONTADOR DE AVANCE ABARCANDO EL ESPACIO RESTANTE */}
-        <div style={{ flex: 1, textAlign: "right" }}>
-          <div style={{ fontSize: "11px", fontWeight: "bold", color: "var(--text-light)", textTransform: "uppercase", marginBottom: "8px" }}>
-            Avance de Cobertura
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "15px", justifyContent: "flex-end" }}>
-            <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--secondary-color)" }}>
-              {porcentajeAvance}%
-            </div>
-            <div style={{ flex: 1, maxWidth: "400px", height: "10px", background: "var(--bg-muted)", borderRadius: "10px", overflow: "hidden" }}>
-              <div style={{ 
-                width: `${porcentajeAvance}%`, 
-                height: "100%", 
-                background: "var(--secondary-color)", 
-                transition: "width 0.5s ease" 
-              }}></div>
-            </div>
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--border-input)", marginTop: "5px" }}>
-            {totalGestionadas} de {totalEmpresas} empresas listas
-          </div>
-        </div>
+        )}
       </div>
 
       {/* GRID DE EMPRESAS (CUADRÍCULA) */}
@@ -442,7 +627,7 @@ export default function SeguimientoEmpresas() {
 
       {/* VISTA DETALLE (TABLA) */}
       {viewMode === 'detail' && (
-        <div style={{ background: 'white', padding: '25px', borderRadius: '15px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginBottom: '30px' }}>
+        <div style={{ background: 'white', padding: '25px', borderRadius: 'var(--radius-card)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginBottom: '30px' }}>
           <h3 style={{ marginTop: 0, color: 'var(--text-main)', borderBottom: '1px solid #f1f5f9', paddingBottom: '15px', fontSize: '16px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Resumen de Cobertura por Jefatura
           </h3>
@@ -526,5 +711,6 @@ export default function SeguimientoEmpresas() {
         </div>
       )}
     </div>
+  </div>
   );
 }

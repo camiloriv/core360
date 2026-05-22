@@ -2,13 +2,14 @@
   margin-top: 25px;
   width: 100%;
   padding: 12px;
-  background: var(--primary-hover);
+  background: var(--secondary-color);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-btn);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease-in-out;
 }
 
 .btn:hover {
@@ -56,7 +57,7 @@
 /* FILE UPLOAD STYLES */
 .file-upload-zone {
   border: 2px dashed var(--border-input);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   padding: 25px;
   text-align: center;
   background-color: var(--bg-muted);
@@ -150,3 +151,89 @@
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Standard Page Header Styles */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 35px;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+}
+
+.page-title-area {
+  flex: 1;
+  min-width: 280px;
+}
+
+.page-title {
+  margin: 0 !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  color: var(--text-main) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.2 !important;
+}
+
+.page-subtitle {
+  margin: 6px 0 0 0 !important;
+  color: var(--text-muted) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.btn-header-primary {
+  background: var(--secondary-color) !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: var(--radius-btn) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+  box-shadow: var(--shadow-sm) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 42px !important;
+  box-sizing: border-box !important;
+}
+
+.btn-header-primary:hover {
+  background: var(--primary-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-header-primary:active {
+  transform: translateY(0) !important;
+}
+
+.btn-header-outline {
+  background: transparent !important;
+  color: var(--secondary-color) !important;
+  border: 1.5px solid var(--secondary-color) !important;
+  padding: 10px 20px !important;
+  border-radius: var(--radius-btn) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 42px !important;
+  box-sizing: border-box !important;
+}
+
+.btn-header-outline:hover {
+  background: rgba(59, 130, 246, 0.05) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-header-outline:active {
+  transform: translateY(0) !important;
+}
+

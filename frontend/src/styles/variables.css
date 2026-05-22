@@ -10,7 +10,7 @@
   --info-color: #0ea5e9;
   
   /* Neutral Colors */
-  --bg-body: #f4f6f9;
+  --bg-body: #f8fafc;
   --bg-container: #ffffff;
   --bg-muted: #f1f5f9;
   --bg-hover: #e2e8f0;
@@ -28,6 +28,8 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 24px;
+  --radius-btn: 8px;
+  --radius-card: 12px;
   
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);

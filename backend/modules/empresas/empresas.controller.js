@@ -6,8 +6,16 @@ exports.listarEmpresas = async (req, res) => {
     let whereClause = "";
     const params = [];
     if (gerencia_id) {
-      whereClause = " WHERE j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
-      params.push(gerencia_id);
+      whereClause = ` WHERE j.id IN (
+        SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
+        UNION
+        SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+          SELECT ug.usuario_id FROM usuario_gerencias ug 
+          JOIN usuarios u ON ug.usuario_id = u.id 
+          WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
+        )
+      )`;
+      params.push(gerencia_id, gerencia_id);
     } else if (jefatura_id) {
       whereClause = " WHERE e.jefatura_id = ?";
       params.push(jefatura_id);

@@ -301,53 +301,65 @@ const GestionUsuarios = () => {
                   </select>
                 </div>
               )}
-              {form.permisos === 'jefatura' && (
+              {(form.permisos === 'jefatura' || form.permisos === 'gerencia') && (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={styles.label}>Gerencias a cargo (Reporta a múltiples)</label>
+                  <label style={styles.label}>
+                    {form.permisos === 'gerencia' 
+                      ? 'Gerencias a cargo (Hereda sus jefaturas y empresas)' 
+                      : 'Gerencias a cargo (Reporta a múltiples)'}
+                  </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', marginBottom: '10px' }}>
-                    {gerencias.map(g => {
-                      const isSelected = form.gerencia_ids && form.gerencia_ids.includes(g.id);
-                      return (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => {
-                            const currentIds = form.gerencia_ids || [];
-                            const newIds = isSelected
-                              ? currentIds.filter(id => id !== g.id)
-                              : [...currentIds, g.id];
-                            setForm({ ...form, gerencia_ids: newIds });
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 14px',
-                            borderRadius: '100px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            border: '1px solid',
-                            transition: 'all 0.2s ease',
-                            backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
-                            color: isSelected ? '#1d4ed8' : '#64748b',
-                            borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
-                            boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                            if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
-                          }}
-                        >
-                          <span>{isSelected ? '✓' : '+'}</span>
-                          <span>{g.nombre}</span>
-                        </button>
-                      );
-                    })}
+                    {gerencias.filter(g => g.id !== form.id).length === 0 ? (
+                      <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        No hay otras gerencias disponibles.
+                      </span>
+                    ) : (
+                      gerencias
+                        .filter(g => g.id !== form.id)
+                        .map(g => {
+                          const isSelected = form.gerencia_ids && form.gerencia_ids.includes(g.id);
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                const currentIds = form.gerencia_ids || [];
+                                const newIds = isSelected
+                                  ? currentIds.filter(id => id !== g.id)
+                                  : [...currentIds, g.id];
+                                setForm({ ...form, gerencia_ids: newIds });
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '100px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                border: '1px solid',
+                                transition: 'all 0.2s ease',
+                                backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
+                                color: isSelected ? '#1d4ed8' : '#64748b',
+                                borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
+                                boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                              }}
+                            >
+                              <span>{isSelected ? '✓' : '+'}</span>
+                              <span>{g.nombre}</span>
+                            </button>
+                          );
+                        })
+                    )}
                   </div>
                 </div>
               )}

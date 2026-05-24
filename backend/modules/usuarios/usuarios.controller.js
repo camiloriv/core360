@@ -17,13 +17,21 @@ exports.obtenerUsuarios = async (req, res) => {
                FROM usuario_gerencias ug
                WHERE ug.usuario_id = u.id
              ) as gerencia_ids,
-             CASE
-               WHEN u.permisos = 'gerencia' THEN (
-                 SELECT GROUP_CONCAT(DISTINCT z2.nombre SEPARATOR ', ')
-                 FROM usuarios j2
-                 JOIN zonas z2 ON j2.zona_id = z2.id
-                 WHERE j2.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = u.id)
-               )
+              CASE
+                WHEN u.permisos = 'gerencia' THEN (
+                  SELECT GROUP_CONCAT(DISTINCT z2.nombre SEPARATOR ', ')
+                  FROM usuarios j2
+                  JOIN zonas z2 ON j2.zona_id = z2.id
+                  WHERE j2.id IN (
+                    SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = u.id
+                    UNION
+                    SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+                      SELECT ug.usuario_id FROM usuario_gerencias ug 
+                      JOIN usuarios usr ON ug.usuario_id = usr.id 
+                      WHERE ug.gerencia_id = u.id AND usr.permisos = 'gerencia'
+                    )
+                  )
+                )
                WHEN u.permisos = 'ejecutiva' THEN zj.nombre
                ELSE z.nombre
              END as zona_nombre
@@ -53,9 +61,11 @@ exports.crearUsuario = async (req, res) => {
       return res.status(400).json({ error: "Ya existe un usuario con este correo o nombre" });
     }
 
-    const fallbackGerenciaId = (Array.isArray(gerencia_ids) && gerencia_ids.length > 0) 
-      ? gerencia_ids[0] 
-      : (gerencia_id || null);
+    const fallbackGerenciaId = (permisos === 'jefatura' || permisos === 'gerencia')
+      ? (Array.isArray(gerencia_ids)
+          ? (gerencia_ids.length > 0 ? gerencia_ids[0] : null)
+          : (gerencia_id || null))
+      : null;
 
     const [result] = await db.query(
       "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -64,7 +74,7 @@ exports.crearUsuario = async (req, res) => {
 
     const newUserId = result.insertId;
 
-    if (permisos === 'jefatura' && Array.isArray(gerencia_ids)) {
+    if ((permisos === 'jefatura' || permisos === 'gerencia') && Array.isArray(gerencia_ids)) {
       for (const gid of gerencia_ids) {
         if (gid) {
           await db.query("INSERT IGNORE INTO usuario_gerencias (usuario_id, gerencia_id) VALUES (?, ?)", [newUserId, gid]);
@@ -89,9 +99,11 @@ exports.actualizarUsuario = async (req, res) => {
       return res.status(400).json({ error: "Ya existe otro usuario con este correo o nombre" });
     }
 
-    const fallbackGerenciaId = (Array.isArray(gerencia_ids) && gerencia_ids.length > 0) 
-      ? gerencia_ids[0] 
-      : (gerencia_id || null);
+    const fallbackGerenciaId = (permisos === 'jefatura' || permisos === 'gerencia')
+      ? (Array.isArray(gerencia_ids)
+          ? (gerencia_ids.length > 0 ? gerencia_ids[0] : null)
+          : (gerencia_id || null))
+      : null;
 
     if (contrasena) {
       await db.query(
@@ -105,7 +117,7 @@ exports.actualizarUsuario = async (req, res) => {
       );
     }
 
-    if (permisos === 'jefatura') {
+    if (permisos === 'jefatura' || permisos === 'gerencia') {
       await db.query("DELETE FROM usuario_gerencias WHERE usuario_id = ?", [id]);
       if (Array.isArray(gerencia_ids)) {
         for (const gid of gerencia_ids) {
@@ -114,6 +126,8 @@ exports.actualizarUsuario = async (req, res) => {
           }
         }
       }
+    } else {
+      await db.query("DELETE FROM usuario_gerencias WHERE usuario_id = ?", [id]);
     }
 
     res.json({ msg: "Usuario actualizado" });

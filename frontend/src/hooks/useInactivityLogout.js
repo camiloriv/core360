@@ -17,16 +17,10 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
     // Si estamos en la página de login, tampoco lo necesitamos
     if (location.pathname === '/login') return;
 
-    const resetTimer = () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      timerRef.current = setTimeout(handleLogout, timeoutMs);
-    };
-
     const handleLogout = () => {
-      // Remover usuario de la sesión
+      // Remover usuario de la sesión y del timestamp
       localStorage.removeItem('usuario');
+      localStorage.removeItem('ultimoAcceso');
       
       // Mostrar alerta al usuario
       Swal.fire({
@@ -41,6 +35,32 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
         // Redirigir al login
         navigate('/login');
       });
+    };
+
+    // Verificar en el montaje si ya excedió el tiempo límite mientras el navegador estuvo cerrado
+    const ultimoAcceso = localStorage.getItem('ultimoAcceso');
+    if (ultimoAcceso) {
+      const diff = Date.now() - parseInt(ultimoAcceso, 10);
+      if (diff > timeoutMs) {
+        handleLogout();
+        return;
+      }
+    } else {
+      localStorage.setItem('ultimoAcceso', Date.now().toString());
+    }
+
+    const resetTimer = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      timerRef.current = setTimeout(handleLogout, timeoutMs);
+
+      // Throttling: solo escribir en localStorage si han pasado más de 5 segundos desde la última actualización
+      const now = Date.now();
+      const lastWrite = parseInt(localStorage.getItem('ultimoAcceso') || '0', 10);
+      if (now - lastWrite > 5000) {
+        localStorage.setItem('ultimoAcceso', now.toString());
+      }
     };
 
     // Eventos a monitorear para reiniciar el timer de inactividad

@@ -87,3 +87,109 @@ Corregimos de manera definitiva una inconsistencia visual crítica relacionada c
    - Seleccione una jefatura diferente en **Destino**.
    - Marque algunas empresas (o presione "Seleccionar Todas") y haga clic en **Ejecutar Traspaso en Lote**.
    - Confirme el traspaso. Al finalizar, la lista se actualizará automáticamente y las empresas seleccionadas ahora se reflejarán bajo la Jefatura receptora en la tabla de empresas.
+
+---
+
+## 📈 Compactación de la Tabla de Cobertura (Detalle)
+
+Hemos refinado el diseño de la tabla **"Resumen de Cobertura por Jefatura"** dentro de la pestaña de **Detalle** en la vista de **Seguimiento de Cobertura** (`SeguimientoEmpresas.jsx`). 
+
+### Cambios Visuales y de Proporciones:
+- **Reducción de Padding**: Ajustamos el espaciado interno de las celdas de cabecera (`th`) y de datos (`td`) de un holgado `12px 15px`/`15px` a un sumamente esbelto y profesional `8px 12px`.
+- **Ancho Fijo Acotado para Cifras**: Se asignaron anchos fijos de control a todas las columnas numéricas (`width: '95px'` para Pendientes, Solicitadas, Concretadas y Gestionadas, y `width: '80px'` para la columna Total). Esto evita que los números y cabeceras queden excesivamente dispersos en pantallas panorámicas.
+- **Alineación Centrada Elegante**: Se centró todo el contenido numérico y sus respectivas etiquetas para mantener una perfecta simetría y legibilidad.
+- **Badges Estilizados y Uniformes**: Rediseñamos los contenedores de las cifras estadísticas (`padding: '3px 8px'`) y les fijamos un ancho mínimo (`minWidth: '24px'`), garantizando que tanto los números de un dígito como los de dos dígitos se muestren de forma idéntica, compacta y estética.
+
+Esto erradica los espacios vacíos redundantes, logrando una presentación de datos corporativa sumamente limpia, premium y balanceada.
+
+---
+
+## 🔒 Control de Expiración de Sesión Persistente (Inactividad de 30 minutos)
+
+Implementamos un sistema de control de expiración robusto e infalible, de modo que la inactividad de **30 minutos** se valide tanto si el navegador se mantiene abierto como si el usuario lo cierra, apaga su terminal o desconecta su computadora.
+
+### Detalles de la Implementación:
+1. **Timestamp Persistente (`ultimoAcceso`)**: 
+   - Al iniciar sesión con éxito en [Login.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/Login.jsx), se inicializa una clave `ultimoAcceso` en `localStorage` con la marca de tiempo exacta (`Date.now()`).
+2. **Validación en Carga Primaria (Montaje)**:
+   - Al montar el hook de seguridad [useInactivityLogout.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/useInactivityLogout.js), comparamos inmediatamente el timestamp guardado contra el tiempo actual. 
+   - Si la diferencia excede los 30 minutos (el tiempo de timeout configurado), la sesión es destruida en el acto, limpiando todas las claves de `localStorage` y forzando la redirección al Login. Esto previene que un usuario regrese al sistema horas después tras cerrar el navegador y acceda sin credenciales.
+3. **Monitoreo de Actividad Optimizado (`Throttling`)**:
+   - En lugar de reescribir en el disco en cada mínimo movimiento del mouse (lo cual genera sobrecarga innecesaria de CPU), implementamos un estrangulador (`throttle`).
+   - El timestamp `ultimoAcceso` en `localStorage` únicamente se actualiza si han transcurrido **más de 5 segundos** desde la última escritura, cuidando al máximo la fluidez y el rendimiento de la aplicación React.
+4. **Cierre de Sesión Manual Limpio**:
+   - Al cerrar sesión voluntariamente en la barra lateral ([Sidebar.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/Sidebar.jsx)), se limpian de forma segura tanto la clave de `usuario` como la de `ultimoAcceso`.
+
+Esto brinda un balance ideal entre persistencia cómoda y seguridad informática estricta en el ecosistema CORE 360.
+
+---
+
+## 🔒 Rediseño de Vista de Login Premium (CORE 360)
+
+Hemos rediseñado por completo la vista de inicio de sesión (`Login.jsx`) para que coincida de forma milimétrica con la imagen de referencia y las especificaciones solicitadas, creando una interfaz oscura, sofisticada y de excelente usabilidad.
+
+### Cambios Clave Realizados:
+- **Estructura Oscura Minimalista**: Eliminamos las tarjetas flotantes tradicionales y los blobs de color claro, logrando una estética ultra-limpia basada en un degradado lineal oscuro (`#2b2b2b` a `#1e1e1e`) y centrado absoluto.
+- **Fondo de Red Tecnológica**: Añadimos un fondo de líneas de red y nodos circulares SVG asimétricos renderizados de forma dinámica a partir de porcentajes exactos de pantalla. Esto imita fielmente el patrón visual "tech" de la referencia sin sobrecargar la CPU.
+- **Branding CORE 360**: Implementamos el logotipo "CORE 360" en mayúsculas utilizando tipografía geométrica blanca con espaciado de letras expandido (`letterSpacing: "8px"`), otorgando un aspecto sumamente moderno e institucional.
+- **Campos en Formato Píldora Centrada**: Rediseñamos los campos de entrada como píldoras suaves y redondeadas (`borderRadius: "100px"`) con fondo azul-grisáceo muy claro (`#eff4fc`). El texto escrito y los placeholders están perfectamente al centro (`textAlign: "center"`).
+- **Botón de Ingreso Azul Acero**: Diseñamos el botón píldora "INGRESAR" en el tono exacto de azul acero (`#426ca5`) con transiciones suaves en eventos de hover y active.
+- **Sección de Ayuda Dinámica**: Añadimos el enlace "Ayuda | contactar al administrador" y el botón azul `Ver >`, configurado para disparar un cuadro modal informativo de SweetAlert2 con la información de soporte técnico (correo, teléfono y horarios).
+- **Pie de Página CORE 360 | 2026**: Añadimos el divisor horizontal y el pie de página actualizado.
+- **Compilación Exitosa**: Todo el bundle de producción compila de forma limpia en solo 3.38 segundos.
+
+---
+
+## ⚙️ Simplificación del Modal de Control de Templates
+
+Hemos rediseñado y simplificado por completo el modal **"Panel de Control de Template"** en el panel de administración de encuestas (`EditorEncuestas.jsx`), eliminando la sobrecarga visual de contenedores y centralizando las acciones del administrador.
+
+### Cambios Clave Realizados:
+- **Encabezado Integrado**: Eliminamos la tarjeta gris intermedia (`#f8fafc`) que consumía espacio redundante. El nombre del template (ej. `📋 template_prueba`) ahora se sitúa directamente como el título principal en la parte superior del modal SweetAlert2, junto a un badge de visibilidad estilizado (`ACTIVO` en verde, `INACTIVO` en rojo) para una rápida confirmación de estado.
+- **Barra de Herramientas Unificada**: Consolidamos todos los controles del template y de vinculación de preguntas en una única fila horizontal compacta y balanceada. El panel ahora muestra el contador de `"Preguntas Vinculadas (N)"` a la izquierda y agrupa las acciones a la derecha en botones píldora uniformes de `32px` de alto:
+  - `✏️ Renombrar / Estado`
+  - `🔍 Vincular`
+  - `➕ Nueva Pregunta`
+  - `🗑️ Eliminar`
+- **Mayor Densidad Visual**: La tabla de preguntas vinculadas se monta directamente debajo de la barra unificada, reduciendo el espacio vertical desperdiciado y brindando una visualización inmediata del contenido del template con un scroll mínimo.
+- **Validación**: Todas las funciones internas (vinculación, edición, eliminación de preguntas y reordenamiento ascendente/descendente) siguen operando de manera perfecta, y el bundle de producción compila de manera impecable en Vite en solo 2.14 segundos.
+
+---
+
+## 🎨 Ajustes Estéticos: Ocultación de Estados y Centrado de Títulos
+
+Ajustamos la visualización en el gestor de encuestas (`EditorEncuestas.jsx`) para simplificar aún más el diseño del panel, ocultando los indicadores de estado y centrando las cabeceras de los cuadros de diálogo principales:
+
+### Cambios Realizados:
+- **Ocultación de Estado en Modales**: Removimos el badge dinámico `ACTIVO` / `INACTIVO` del título en el modal principal del Panel de Control de Template.
+- **Ocultación de Estado en Barra Lateral**: Eliminamos por completo la visualización de los estados bajo los nombres de los templates dentro del listado de "Templates Activos" en el panel lateral, logrando una lista de navegación mucho más limpia y despejada.
+- **Centrado de Título en Modales de Edición**: 
+  - Centramos el título del modal del **Panel de Control de Template** (`📋 [Nombre]`).
+  - Centramos el título del modal **"Editar Template"** (`title: "Editar Template"`).
+  - Centramos el título de los modales de **"Nueva Pregunta"** y **"Editar Pregunta"** para lograr una armonía geométrica de los diálogos SweetAlert2.
+- **Empaquetado Limpio**: El bundle de producción de Vite volvió a compilarse con total éxito en 2.68 segundos.
+
+---
+
+## ✏️ Edición de Título Inline y Botón "Cambiar Estado" Unificado
+
+Refinamos significativamente la experiencia del administrador de encuestas (`EditorEncuestas.jsx`), permitiendo la edición instantánea del nombre del template directamente en la cabecera del modal y unificando los controles en un selector de estados interactivo:
+
+### Cambios Clave Realizados:
+- **Título Editable Directamente en Modal**: Transformamos la etiqueta estática del título del template en un campo de entrada de texto (`<input>`) perfectamente centrado y estilizado. 
+  - Cuenta con transiciones suaves en hover y focus.
+  - Al hacer clic, se abre para edición. Al presionar **Enter** o hacer clic fuera del campo (**Blur**), el sistema realiza un guardado automático e instantáneo vía API, actualizando de forma reactiva la barra lateral y los estados locales de React sin requerir recargas de página o cierres del modal.
+  - **Corrección de Renderizado de HTML**: Migramos todo este contenedor del encabezado editable al inicio del parámetro `html` de `Swal.fire` (en lugar del parámetro `title`). Esto soluciona de forma definitiva el error de parseo donde SweetAlert2 volcaba los atributos como texto plano (`placeholder="..." class="..." style="..."`) dentro de la etiqueta `<h2>` nativa de la ventana emergente.
+  - **Limpieza de Etiquetas y Escala**: Eliminamos la etiqueta informativa secundaria `Nombre del Template (Haz clic para editar)` para lograr un aspecto minimalista, agrandamos el tamaño de la tipografía del input a unos imponentes `26px` en negrita, y ajustamos el relleno del contenedor principal (`padding-top: 12px`). Esto corrige de forma impecable las proporciones del modal, haciendo que la **X** del botón de cerrar se ubique perfectamente alineada y en equilibrio con la cabecera.
+  - **Persistencia Abierta del Modal y Feedback Visual**: Reemplazamos la notificación `Toast.fire` de SweetAlert2 (que causaba que el modal principal se cerrara debido a la limitación de SweetAlert2 de un solo modal activo) por un **sistema de feedback visual directo en el DOM**. Al guardar con éxito, el input parpadea con un borde verde esmeralda brillante (`#10b981`) y un texto de confirmación elegante (`✓ Guardado con éxito`) aparece suavemente por debajo con una transición de opacidad durante 1.8 segundos, manteniendo el modal principal **completamente abierto y operativo** en todo momento.
+- **Botón Unificado "Cambiar Estado"**: Fusionamos los botones `"Renombrar"` y `"Eliminar"` del menú de herramientas en un único control `"⚙️ Cambiar Estado"`. Al accionarlo, se despliega una tarjeta de selección SweetAlert2 compacta con tres opciones explícitas y coloreadas según su criticidad:
+  - `🟢 ACTIVO` (Visible para envíos)
+  - `🟡 INACTIVO` (Archivado / Oculto)
+  - `🔴 ELIMINAR TEMPLATE` (Borrado lógico con control de confirmaciones)
+- **Visual Loop Optimizada**: Al cancelar o culminar una acción en el selector de estados, el sistema retorna con suavidad al modal principal del template, garantizando un flujo interactivo ininterrumpido.
+- **Compilación Flawless**: La compilación final empaquetó el bundle del cliente en Vite en solo 1.77 segundos.
+
+
+
+
+

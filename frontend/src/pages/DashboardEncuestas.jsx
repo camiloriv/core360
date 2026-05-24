@@ -111,7 +111,7 @@ const SurveyRow = ({ r, onToggleStatus, onResend, onShowDetail }) => (
       <div style={styles.actionsCol}>
         {r.detalles?.length > 0 ? (
           <button onClick={() => onShowDetail(r)} style={styles.btnSecondary}>
-            👁️ Ver Respuestas ({r.detalles.length})
+            Ver Respuestas ({r.detalles.length})
           </button>
         ) : (
           <div style={styles.respuestasBox}>

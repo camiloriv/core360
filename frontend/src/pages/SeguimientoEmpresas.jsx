@@ -231,6 +231,67 @@ export default function SeguimientoEmpresas() {
     })
   );
 
+  // Clasificador de Jefatura Matriz o Región
+  const esJefaturaMatriz = (jefId) => {
+    return empresas.some(e => e.jefatura_id === jefId && e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz"));
+  };
+
+  // Ordenar jefaturas filtradas: primero Matriz, luego Regiones. Dentro de cada grupo, alfabéticamente.
+  const jefaturasFiltradasOrdenadas = [...jefaturasFiltradas].sort((a, b) => {
+    const aEsMatriz = esJefaturaMatriz(a.id);
+    const bEsMatriz = esJefaturaMatriz(b.id);
+    
+    if (aEsMatriz && !bEsMatriz) return -1;
+    if (!aEsMatriz && bEsMatriz) return 1;
+    
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  // Ordenar lista general de jefaturas: primero Matriz, luego Regiones. Dentro de cada grupo, alfabéticamente.
+  const jefaturasGeneralOrdenadas = [...jefaturas].sort((a, b) => {
+    const aEsMatriz = esJefaturaMatriz(a.id);
+    const bEsMatriz = esJefaturaMatriz(b.id);
+    
+    if (aEsMatriz && !bEsMatriz) return -1;
+    if (!aEsMatriz && bEsMatriz) return 1;
+    
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  const optionsMacroZona = ["TODAS", "MATRIZ", "REGIONES"];
+  const selectedMacroValue = (filtroMacroZona || "Todas").toUpperCase();
+  const handleMacroZonaChange = (val) => {
+    if (val === "TODAS" || !val) {
+      setFiltroMacroZona("Todas");
+    } else if (val === "MATRIZ") {
+      setFiltroMacroZona("Matriz");
+    } else if (val === "REGIONES") {
+      setFiltroMacroZona("Regiones");
+    }
+  };
+
+  const optionsJefaturas = [
+    "TODAS",
+    ...jefaturasFiltradasOrdenadas.map(j => j.nombre.toUpperCase())
+  ];
+
+  const selectedJefValue = filtroJefatura
+    ? (jefaturas.find(j => j.id.toString() === filtroJefatura)?.nombre?.toUpperCase() || "TODAS")
+    : "TODAS";
+
+  const handleJefaturaChange = (val) => {
+    if (val === "TODAS" || !val) {
+      setFiltroJefatura("");
+    } else {
+      const found = jefaturas.find(j => j.nombre.toUpperCase() === val.toUpperCase());
+      if (found) {
+        setFiltroJefatura(found.id.toString());
+      } else {
+        setFiltroJefatura("");
+      }
+    }
+  };
+
   if (loading) return <div style={{ padding: 40 }}>Cargando seguimiento...</div>;
 
   return (
@@ -253,91 +314,79 @@ export default function SeguimientoEmpresas() {
             </h1>
             <p className="page-subtitle">ESTADO DE REUNIONES POR EMPRESA Y JEFATURA</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px', background: 'white', padding: '5px', borderRadius: 'var(--radius-btn)', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', flexWrap: 'wrap', height: '42px', alignItems: 'center', boxSizing: 'border-box' }}>
-            <button 
-              onClick={() => setViewMode('grid')}
-              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'grid' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'grid' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
-            >
-              🔲 Vista Cuadrícula
-            </button>
-            <button 
-              onClick={() => setViewMode('split')}
-              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'split' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'split' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
-            >
-              📋 Vista Dividida
-            </button>
-            <button 
-              onClick={() => setViewMode('detail')}
-              style={{ padding: '6px 12px', borderRadius: 'var(--radius-btn)', border: 'none', background: viewMode === 'detail' ? 'var(--secondary-color)' : 'transparent', color: viewMode === 'detail' ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', transition: 'all 0.2s', height: '32px' }}
-            >
-              📊 Detalle
-            </button>
+          
+          {/* Avance de Cobertura en la Cabecera */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", minWidth: "260px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "bold", color: "var(--text-light)", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "1px" }}>
+              Avance de Cobertura
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", justifyContent: "flex-end" }}>
+              <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--secondary-color)", lineHeight: 1 }}>
+                {porcentajeAvance}%
+              </div>
+              <div style={{ width: "150px", height: "8px", background: "var(--bg-muted)", borderRadius: "10px", overflow: "hidden" }}>
+                <div style={{ 
+                  width: `${porcentajeAvance}%`, 
+                  height: "100%", 
+                  background: "var(--secondary-color)", 
+                  transition: "width 0.5s ease" 
+                }}></div>
+              </div>
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", fontWeight: "500" }}>
+              {totalGestionadas} de {totalEmpresas} empresas listas
+            </div>
           </div>
         </header>
-             {/* CONTENEDOR DE FILTROS REESTRUCTURADO */}
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "column",
-        background: "white", 
-        padding: "25px", 
-        borderRadius: "var(--radius-card)", 
-        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", 
-        marginBottom: "30px",
-        gap: "25px"
-      }}>
-        {/* ROW 1: Macro-Zona, Buscar Empresa, Avance */}
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: "20px" }}>
+
+        {/* CONTENEDOR DE FILTROS REESTRUCTURADO */}
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "column",
+          background: "white", 
+          padding: "25px", 
+          borderRadius: "var(--radius-card)", 
+          boxShadow: "0 4px 18px rgba(0, 0, 0, 0.03)", 
+          marginBottom: "30px",
+          gap: "20px"
+        }}>
           
-          <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", alignItems: "flex-end" }}>
-            {/* Filtro Macro-Zona: solo visible para gerencia_general y admin */}
+          {/* FILTROS UNIFICADOS EN UNA SOLA LÍNEA HORIZONTAL */}
+          <div style={{ 
+            display: "flex", 
+            flexWrap: "wrap", 
+            alignItems: "flex-end", 
+            gap: "25px",
+            width: "100%"
+          }}>
+            {/* Filtro Macro-Zona */}
             {mostrarFiltroMacroZona && (
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "1px" }}>
-                  Macro-Zona
-                </label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  {['Todas', 'Matriz', 'Regiones'].map(mz => {
-                    const isSelected = filtroMacroZona === mz;
-                    return (
-                      <button
-                        key={mz}
-                        onClick={() => setFiltroMacroZona(mz)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '8px 14px',
-                          borderRadius: '100px',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          border: '1px solid',
-                          transition: 'all 0.2s ease',
-                          backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
-                          color: isSelected ? '#1d4ed8' : '#64748b',
-                          borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
-                          boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                          if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
-                        }}
-                      >
-                        <span>{isSelected ? '✓' : '+'}</span>
-                        <span>{mz.toUpperCase()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div style={{ minWidth: "260px", maxWidth: "320px", flex: "1 1 300px" }}>
+                <SearchableFilter 
+                  label="Macro-Zona"
+                  value={selectedMacroValue}
+                  options={optionsMacroZona}
+                  onChange={handleMacroZonaChange}
+                  placeholder="Escribe para buscar..."
+                />
+              </div>
+            )}
+
+            {/* Seleccionar Jefatura */}
+            {mostrarFiltroJefatura && (
+              <div style={{ minWidth: "260px", maxWidth: "320px", flex: "1 1 300px" }}>
+                <SearchableFilter 
+                  label="Seleccionar Jefatura / Ejecutiva"
+                  value={selectedJefValue}
+                  options={optionsJefaturas}
+                  onChange={handleJefaturaChange}
+                  placeholder="Escribe para buscar..."
+                />
               </div>
             )}
 
             {/* Buscar Empresa */}
-            <div style={{ minWidth: "250px", maxWidth: "300px" }}>
+            <div style={{ minWidth: "260px", maxWidth: "320px", flex: "1 1 300px" }}>
               <SearchableFilter 
                 label="Buscar Empresa"
                 value={filtroEmpresa}
@@ -348,113 +397,77 @@ export default function SeguimientoEmpresas() {
             </div>
           </div>
 
-          {/* Avance */}
-          <div style={{ flex: "1 1 300px", textAlign: "right" }}>
-            <div style={{ fontSize: "11px", fontWeight: "bold", color: "var(--text-light)", textTransform: "uppercase", marginBottom: "8px" }}>
-              Avance de Cobertura
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "15px", justifyContent: "flex-end" }}>
-              <div style={{ fontSize: "28px", fontWeight: "bold", color: "var(--secondary-color)" }}>
-                {porcentajeAvance}%
-              </div>
-              <div style={{ flex: 1, maxWidth: "400px", height: "10px", background: "var(--bg-muted)", borderRadius: "10px", overflow: "hidden" }}>
-                <div style={{ 
-                  width: `${porcentajeAvance}%`, 
-                  height: "100%", 
-                  background: "var(--secondary-color)", 
-                  transition: "width 0.5s ease" 
-                }}></div>
-              </div>
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--border-input)", marginTop: "5px" }}>
-              {totalGestionadas} de {totalEmpresas} empresas listas
+          {/* DIVISOR SUTIL */}
+          <div style={{ height: "1px", background: "#f1f5f9", margin: "5px 0" }}></div>
+
+          {/* SELECTOR DE VISTAS AL PIE DEL CONTENEDOR */}
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '8px', 
+              background: '#f8fafc', 
+              padding: '5px', 
+              borderRadius: 'var(--radius-btn)', 
+              border: '1px solid #e2e8f0',
+              flexWrap: 'wrap', 
+              height: '42px', 
+              alignItems: 'center', 
+              boxSizing: 'border-box' 
+            }}>
+              <button 
+                onClick={() => setViewMode('grid')}
+                style={{ 
+                  padding: '6px 12px', 
+                  borderRadius: 'var(--radius-btn)', 
+                  border: 'none', 
+                  background: viewMode === 'grid' ? 'var(--secondary-color)' : 'transparent', 
+                  color: viewMode === 'grid' ? 'white' : 'var(--text-muted)', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  fontSize: '12px', 
+                  transition: 'all 0.2s', 
+                  height: '32px' 
+                }}
+              >
+                🔲 Vista Cuadrícula
+              </button>
+              <button 
+                onClick={() => setViewMode('split')}
+                style={{ 
+                  padding: '6px 12px', 
+                  borderRadius: 'var(--radius-btn)', 
+                  border: 'none', 
+                  background: viewMode === 'split' ? 'var(--secondary-color)' : 'transparent', 
+                  color: viewMode === 'split' ? 'white' : 'var(--text-muted)', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  fontSize: '12px', 
+                  transition: 'all 0.2s', 
+                  height: '32px' 
+                }}
+              >
+                📋 Vista Dividida
+              </button>
+              <button 
+                onClick={() => setViewMode('detail')}
+                style={{ 
+                  padding: '6px 12px', 
+                  borderRadius: 'var(--radius-btn)', 
+                  border: 'none', 
+                  background: viewMode === 'detail' ? 'var(--secondary-color)' : 'transparent', 
+                  color: viewMode === 'detail' ? 'white' : 'var(--text-muted)', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  fontSize: '12px', 
+                  transition: 'all 0.2s', 
+                  height: '32px' 
+                }}
+              >
+                📊 Detalle
+              </button>
             </div>
           </div>
         </div>
-
-        {/* ROW 2: Jefaturas */}
-        {mostrarFiltroJefatura && (
-          <div>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>
-              Seleccionar Jefatura
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {(() => {
-                const isAllSelected = filtroJefatura === "";
-                return (
-                  <button
-                    onClick={() => setFiltroJefatura("")}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 14px',
-                      borderRadius: '100px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      border: '1px solid',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: isAllSelected ? '#eff6ff' : '#f8fafc',
-                      color: isAllSelected ? '#1d4ed8' : '#64748b',
-                      borderColor: isAllSelected ? '#3b82f6' : '#cbd5e1',
-                      boxShadow: isAllSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      if (!isAllSelected) e.currentTarget.style.borderColor = '#94a3b8';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      if (!isAllSelected) e.currentTarget.style.borderColor = '#cbd5e1';
-                    }}
-                  >
-                    <span>{isAllSelected ? '✓' : '+'}</span>
-                    <span>TODAS</span>
-                  </button>
-                );
-              })()}
-              
-              {jefaturasFiltradas.map(j => {
-                const isSelected = filtroJefatura === j.id.toString();
-                return (
-                  <button
-                    key={j.id}
-                    onClick={() => setFiltroJefatura(j.id.toString())}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 14px',
-                      borderRadius: '100px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      border: '1px solid',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: isSelected ? '#eff6ff' : '#f8fafc',
-                      color: isSelected ? '#1d4ed8' : '#64748b',
-                      borderColor: isSelected ? '#3b82f6' : '#cbd5e1',
-                      boxShadow: isSelected ? '0 2px 4px rgba(59,130,246,0.1)' : 'none',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      if (!isSelected) e.currentTarget.style.borderColor = '#94a3b8';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
-                    }}
-                  >
-                    <span>{isSelected ? '✓' : '+'}</span>
-                    <span>{j.nombre.toUpperCase()}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* GRID DE EMPRESAS (CUADRÍCULA) */}
       {viewMode === 'grid' && (
@@ -627,7 +640,7 @@ export default function SeguimientoEmpresas() {
 
       {/* VISTA DETALLE (TABLA) */}
       {viewMode === 'detail' && (
-        <div style={{ background: 'white', padding: '25px', borderRadius: 'var(--radius-card)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginBottom: '30px' }}>
+        <div style={{ background: 'white', padding: '25px', borderRadius: 'var(--radius-card)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginBottom: '30px', maxWidth: '850px', margin: '0 auto 30px auto' }}>
           <h3 style={{ marginTop: 0, color: 'var(--text-main)', borderBottom: '1px solid #f1f5f9', paddingBottom: '15px', fontSize: '16px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Resumen de Cobertura por Jefatura
           </h3>
@@ -635,16 +648,16 @@ export default function SeguimientoEmpresas() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 15px', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Jefatura</th>
-                  <th style={{ padding: '12px 15px', color: '#dc2626', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center' }}>Pendientes</th>
-                  <th style={{ padding: '12px 15px', color: '#f97316', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center' }}>Solicitadas</th>
-                  <th style={{ padding: '12px 15px', color: '#ca8a04', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center' }}>Concretadas</th>
-                  <th style={{ padding: '12px 15px', color: '#10b981', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center' }}>Gestionadas</th>
-                  <th style={{ padding: '12px 15px', color: 'var(--text-main)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center' }}>Total</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Jefatura</th>
+                  <th style={{ padding: '8px 12px', color: '#dc2626', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center', width: '95px' }}>Pendientes</th>
+                  <th style={{ padding: '8px 12px', color: '#f97316', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center', width: '95px' }}>Solicitadas</th>
+                  <th style={{ padding: '8px 12px', color: '#ca8a04', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center', width: '95px' }}>Concretadas</th>
+                  <th style={{ padding: '8px 12px', color: '#10b981', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center', width: '95px' }}>Gestionadas</th>
+                  <th style={{ padding: '8px 12px', color: 'var(--text-main)', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px', textAlign: 'center', width: '80px' }}>Total</th>
                 </tr>
               </thead>
               <tbody>
-                {(filtroJefatura === "" ? jefaturas : jefaturas.filter(j => j.id === Number(filtroJefatura))).map(jef => {
+                {(filtroJefatura === "" ? jefaturasGeneralOrdenadas : jefaturasGeneralOrdenadas.filter(j => j.id === Number(filtroJefatura))).map(jef => {
                   const empsJef = empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa));
                   const pendientes = empsJef.filter(e => !tieneReunion(e.id) && (e.estado_seguimiento || 'pendiente') === 'pendiente').length;
                   const solicitadas = empsJef.filter(e => !tieneReunion(e.id) && e.estado_seguimiento === 'solicitada').length;
@@ -654,47 +667,47 @@ export default function SeguimientoEmpresas() {
 
                   return (
                     <tr key={jef.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '15px', fontWeight: 'bold', color: 'var(--text-main)' }}>{jef.nombre.toUpperCase()}</td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{pendientes}</span>
+                      <td style={{ padding: '8px 12px', fontWeight: 'bold', color: 'var(--text-main)' }}>{jef.nombre.toUpperCase()}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{ background: '#fee2e2', color: '#991b1b', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>{pendientes}</span>
                       </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        <span style={{ background: '#ffedd5', color: '#c2410c', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{solicitadas}</span>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{ background: '#ffedd5', color: '#c2410c', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>{solicitadas}</span>
                       </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        <span style={{ background: '#fef08a', color: '#854d0e', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{concretadas}</span>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{ background: '#fef08a', color: '#854d0e', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>{concretadas}</span>
                       </td>
-                      <td style={{ padding: '15px', textAlign: 'center' }}>
-                        <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{gestionadas}</span>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{ background: '#d1fae5', color: '#065f46', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>{gestionadas}</span>
                       </td>
-                      <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{total}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{total}</td>
                     </tr>
                   );
                 })}
                 {(filtroJefatura === "" ? jefaturas : jefaturas.filter(j => j.id === Number(filtroJefatura))).length > 1 && (
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0', fontWeight: 'bold' }}>
-                    <td style={{ padding: '15px', color: 'var(--text-main)' }}>TOTAL GENERAL</td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <span style={{ background: '#dc2626', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--text-main)' }}>TOTAL GENERAL</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <span style={{ background: '#dc2626', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
                         {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && (e.estado_seguimiento || 'pendiente') === 'pendiente').length, 0)}
                       </span>
                     </td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <span style={{ background: '#f97316', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <span style={{ background: '#f97316', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
                         {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && e.estado_seguimiento === 'solicitada').length, 0)}
                       </span>
                     </td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <span style={{ background: '#ca8a04', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <span style={{ background: '#ca8a04', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
                         {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && e.estado_seguimiento === 'concretada').length, 0)}
                       </span>
                     </td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <span style={{ background: '#10b981', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
                         {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && tieneReunion(e.id)).length, 0)}
                       </span>
                     </td>
-                    <td style={{ padding: '15px', textAlign: 'center', fontSize: '14px', color: 'var(--text-main)' }}>
+                    <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '14px', color: 'var(--text-main)' }}>
                       {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa)).length, 0)}
                     </td>
                   </tr>

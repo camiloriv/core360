@@ -209,8 +209,16 @@ const obtenerTodasLasRespuestas = async (usuario_id, rol) => {
       whereClause += " AND emp.jefatura_id = ?";
       params.push(usuario_id);
   } else if (rol === 'gerencia') {
-      whereClause += " AND j.id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)";
-      params.push(usuario_id);
+      whereClause += ` AND j.id IN (
+          SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
+          UNION
+          SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+              SELECT ug.usuario_id FROM usuario_gerencias ug 
+              JOIN usuarios u ON ug.usuario_id = u.id 
+              WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
+          )
+      )`;
+      params.push(usuario_id, usuario_id);
   }
 
   const sql = `

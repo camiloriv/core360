@@ -51,7 +51,7 @@ export default function EditorEncuestas() {
 
   const handleEditTemplate = async (template) => {
     const { value: formValues } = await Swal.fire({
-      title: "Editar Template",
+      title: '<div style="text-align: center; font-size: 22px; font-weight: 800; color: #0f172a;">Editar Template</div>',
       html: `
                 <div style="text-align: left; padding: 10px;">
                     <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Nombre del Template</label>
@@ -339,8 +339,8 @@ export default function EditorEncuestas() {
         );
         const catalogo = res.data;
 
-        const templateHeader = selectedTemplate
-          ? `<p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Vincula preguntas a <b>${selectedTemplate.nombre}</b> o gestiona la biblioteca global.</p>`
+        const templateHeader = strictReturn && selectedTemplate
+          ? `<p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Busca y selecciona preguntas de la Biblioteca Maestro para vincular a <b>${selectedTemplate.nombre}</b>.</p>`
           : `<p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Gestión de preguntas globales en la Biblioteca Maestro.</p>`;
 
         const getDimensionBadge = (dim) => {
@@ -363,6 +363,19 @@ export default function EditorEncuestas() {
           return `<span class="swal-lib-badge swal-lib-badge-gray">${dim}</span>`;
         };
 
+        const getRowActions = (p) => {
+          if (strictReturn) {
+            return `
+              <button class="swal-btn-vincular swal-lib-pill-btn swal-lib-pill-btn-add" data-id="${p.id}"><span>➕</span> Agregar</button>
+            `;
+          } else {
+            return `
+              <button class="swal-btn-editar swal-lib-pill-btn swal-lib-pill-btn-edit" data-id="${p.id}"><span>✏️</span> Editar</button>
+              <button class="swal-btn-eliminar swal-lib-pill-btn swal-lib-pill-btn-delete" data-id="${p.id}"><span>🗑️</span> Eliminar</button>
+            `;
+          }
+        };
+
         const tableRows = catalogo
           .map(
             (p) => `
@@ -370,13 +383,25 @@ export default function EditorEncuestas() {
                         <td>${getDimensionBadge(p.dimension)}</td>
                         <td style="font-size: 13px; text-align: left; color: #1e293b; line-height: 1.4;">${p.texto}</td>
                         <td style="text-align: right; white-space: nowrap;">
-                            <button class="swal-btn-editar swal-lib-pill-btn swal-lib-pill-btn-edit" data-id="${p.id}"><span>✏️</span> Editar</button>
-                            <button class="swal-btn-eliminar swal-lib-pill-btn swal-lib-pill-btn-delete" data-id="${p.id}"><span>🗑️</span> Eliminar</button>
+                            ${getRowActions(p)}
                         </td>
                     </tr>
                 `,
           )
           .join("");
+
+        const searchBar = strictReturn
+          ? `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                <input id="swal-lib-search" type="text" placeholder="Buscar pregunta..." class="swal-lib-search-input" style="width: 100%;" />
+            </div>
+          `
+          : `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                <input id="swal-lib-search" type="text" placeholder="Buscar pregunta..." class="swal-lib-search-input" />
+                <button id="swal-btn-crear-nueva" class="swal-lib-btn-primary">+ Nueva Pregunta</button>
+            </div>
+          `;
 
         const htmlContent = `
                     <style>
@@ -499,6 +524,16 @@ export default function EditorEncuestas() {
                             background: #fcd3d3;
                             transform: scale(1.03);
                         }
+                        
+                        .swal-lib-pill-btn-add {
+                            background: #ecfdf5;
+                            border-color: #a7f3d0;
+                            color: #059669;
+                        }
+                        .swal-lib-pill-btn-add:hover {
+                            background: #d1fae5;
+                            transform: scale(1.03);
+                        }
  
                         .swal-lib-badge {
                             display: inline-block;
@@ -560,10 +595,7 @@ export default function EditorEncuestas() {
  
                     <div class="swal-lib-container">
                         ${templateHeader}
-                        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
-                            <input id="swal-lib-search" type="text" placeholder="Buscar pregunta..." class="swal-lib-search-input" />
-                            <button id="swal-btn-crear-nueva" class="swal-lib-btn-primary">+ Nueva Pregunta</button>
-                        </div>
+                        ${searchBar}
                         <div class="swal-lib-scroll" style="max-height: 400px; overflow-y: auto; border: 1.5px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
                             <table class="swal-lib-table" style="width: 100%; border-collapse: collapse;">
                                 <thead>
@@ -582,7 +614,7 @@ export default function EditorEncuestas() {
                 `;
 
         const result = await Swal.fire({
-          title: "🔍 Biblioteca Maestro",
+          title: strictReturn ? "🔍 Vincular Pregunta" : "🔍 Biblioteca Maestro",
           html: htmlContent,
           width: "750px",
           showConfirmButton: false,
@@ -602,70 +634,96 @@ export default function EditorEncuestas() {
               });
             });
 
-            const editarBtns = document.querySelectorAll(".swal-btn-editar");
-            editarBtns.forEach((btn) => {
-              btn.addEventListener("click", async () => {
-                const preguntaId = btn.getAttribute("data-id");
-                const preguntaObj = catalogo.find(
-                  (p) => p.id === parseInt(preguntaId),
-                );
-                transitioning = true;
-                await handleEditPreguntaDirecta(preguntaObj, strictReturn);
-              });
-            });
-
-            const eliminarBtns =
-              document.querySelectorAll(".swal-btn-eliminar");
-            eliminarBtns.forEach((btn) => {
-              btn.addEventListener("click", async () => {
-                const preguntaId = btn.getAttribute("data-id");
-                transitioning = true;
-                const confirm = await Swal.fire({
-                  title: "¿Retirar de la Biblioteca?",
-                  text: 'Esta acción cambiará el estado de la pregunta a "eliminado". Se mantendrá el histórico de respuestas y encuestas contestadas, pero se desvinculará de todos los templates activos y dejará de estar disponible en el catálogo.',
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonColor: "#ef4444",
-                  cancelButtonColor: "#64748b",
-                  confirmButtonText: "Sí, retirar de la biblioteca",
-                  cancelButtonText: "Cancelar",
-                });
-
-                if (confirm.isConfirmed) {
+            if (strictReturn) {
+              const vincularBtns = document.querySelectorAll(".swal-btn-vincular");
+              vincularBtns.forEach((btn) => {
+                btn.addEventListener("click", async () => {
+                  const preguntaId = btn.getAttribute("data-id");
+                  transitioning = true;
+                  Swal.close();
                   try {
-                    await axios.delete(
-                      `http://localhost:8080/encuestas/editor/catalogo-preguntas/${preguntaId}`,
-                    );
-                    if (selectedTemplate) {
-                      loadPreguntas(selectedTemplate.id);
-                    }
-                    Swal.fire(
-                      "Retirada",
-                      'La pregunta ha sido marcada como "eliminado" y retirada del catálogo.',
-                      "success",
-                    ).then(() => {
-                      handleSelectFromLibrary(strictReturn);
+                    await axios.post(`${API_BASE}/preguntas/vincular`, {
+                      templateId: selectedTemplate.id,
+                      preguntaId: parseInt(preguntaId),
                     });
+                    await loadPreguntas(selectedTemplate.id);
+                    handleOpenTemplateManager(selectedTemplate);
                   } catch (err) {
-                    Swal.fire(
-                      "Error",
-                      "No se pudo retirar la pregunta.",
-                      "error",
-                    ).then(() => {
-                      handleSelectFromLibrary(strictReturn);
+                    console.error("Error linking question:", err);
+                    Swal.fire("Error", "No se pudo vincular la pregunta.", "error").then(() => {
+                      handleOpenTemplateManager(selectedTemplate);
                     });
                   }
-                } else {
-                  handleSelectFromLibrary(strictReturn);
-                }
+                });
               });
-            });
+            } else {
+              const editarBtns = document.querySelectorAll(".swal-btn-editar");
+              editarBtns.forEach((btn) => {
+                btn.addEventListener("click", async () => {
+                  const preguntaId = btn.getAttribute("data-id");
+                  const preguntaObj = catalogo.find(
+                    (p) => p.id === parseInt(preguntaId),
+                  );
+                  transitioning = true;
+                  await handleEditPreguntaDirecta(preguntaObj, strictReturn);
+                });
+              });
 
-            const crearBtn = document.getElementById("swal-btn-crear-nueva");
-            crearBtn.addEventListener("click", async () => {
-              transitioning = true;
-              await handleEditPreguntaDirecta(null, strictReturn);
-            });
+              const eliminarBtns =
+                document.querySelectorAll(".swal-btn-eliminar");
+              eliminarBtns.forEach((btn) => {
+                btn.addEventListener("click", async () => {
+                  const preguntaId = btn.getAttribute("data-id");
+                  transitioning = true;
+                  const confirm = await Swal.fire({
+                    title: "¿Retirar de la Biblioteca?",
+                    text: 'Esta acción cambiará el estado de la pregunta a "eliminado". Se mantendrá el histórico de respuestas y encuestas contestadas, pero se desvinculará de todos los templates activos y dejará de estar disponible en el catálogo.',
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonColor: "#ef4444",
+                    cancelButtonColor: "#64748b",
+                    confirmButtonText: "Sí, retirar de la biblioteca",
+                    cancelButtonText: "Cancelar",
+                  });
+
+                  if (confirm.isConfirmed) {
+                    try {
+                      await axios.delete(
+                        `http://localhost:8080/encuestas/editor/catalogo-preguntas/${preguntaId}`,
+                      );
+                      if (selectedTemplate) {
+                        loadPreguntas(selectedTemplate.id);
+                      }
+                      Swal.fire(
+                        "Retirada",
+                        'La pregunta ha sido marcada como "eliminado" y retirada del catálogo.',
+                        "success",
+                      ).then(() => {
+                        handleSelectFromLibrary(strictReturn);
+                      });
+                    } catch (err) {
+                      Swal.fire(
+                        "Error",
+                        "No se pudo retirar la pregunta.",
+                        "error",
+                      ).then(() => {
+                        handleSelectFromLibrary(strictReturn);
+                      });
+                    }
+                  } else {
+                    handleSelectFromLibrary(strictReturn);
+                  }
+                });
+              });
+
+              const crearBtn = document.getElementById("swal-btn-crear-nueva");
+              if (crearBtn) {
+                crearBtn.addEventListener("click", async () => {
+                  transitioning = true;
+                  await handleEditPreguntaDirecta(null, strictReturn);
+                });
+              }
+            }
           },
         });
 
@@ -805,6 +863,7 @@ export default function EditorEncuestas() {
   const handleEditPregunta = async (
     pregunta = null,
     returnToManager = false,
+    suggestedOrden = null,
   ) => {
     if (!selectedTemplate) return;
 
@@ -821,7 +880,7 @@ export default function EditorEncuestas() {
     }
 
     const { value: formValues } = await Swal.fire({
-      title: isNew ? "Nueva Pregunta" : "Editar Pregunta",
+      title: `<div style="text-align: center; font-size: 22px; font-weight: 800; color: #0f172a;">${isNew ? "Nueva Pregunta" : "Editar Pregunta"}</div>`,
       html: `
                 <div style="text-align: left; max-height: 500px; overflow-y: auto; padding: 15px;">
                     ${
@@ -886,15 +945,9 @@ export default function EditorEncuestas() {
                         <input id="swal-opciones" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; font-size: 13px;" value="${opcionesStr}" placeholder="Ej: Muy Bueno, Bueno, Regular, Malo">
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: center;">
-                         <div>
-                            <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Orden</label>
-                            <input id="swal-orden" type="number" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; height: 40px;" value="${pregunta?.orden || preguntas.length + 1}">
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 20px; background: #f8fafc; padding: 10px; border-radius: 8px;">
-                            <input type="checkbox" id="swal-nps-check" style="width: 18px; height: 18px;" ${pregunta?.es_nps ? "checked" : ""}>
-                            <label for="swal-nps-check" style="margin: 0; font-size: 11px; font-weight: bold; color: #1e3a8a;">MARCAR COMO KPI NPS</label>
-                        </div>
+                    <div style="margin-top: 20px; background: #f8fafc; padding: 10px 15px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="swal-nps-check" style="width: 18px; height: 18px;" ${pregunta?.es_nps ? "checked" : ""}>
+                        <label for="swal-nps-check" style="margin: 0; font-size: 11px; font-weight: bold; color: #1e3a8a; cursor: pointer;">MARCAR COMO KPI NPS</label>
                     </div>
                 </div>
             `,
@@ -915,7 +968,7 @@ export default function EditorEncuestas() {
           tipo: document.getElementById("swal-tipo").value,
           escala: document.getElementById("swal-escala").value,
           es_nps: document.getElementById("swal-nps-check").checked ? 1 : 0,
-          orden: document.getElementById("swal-orden").value,
+          orden: pregunta?.orden || suggestedOrden || null,
           solo_este_template: cloneLogic === "clone",
           opciones_json: rawOpciones
             ? rawOpciones
@@ -1059,29 +1112,37 @@ export default function EditorEncuestas() {
       .join("");
 
     const htmlContent = `
-            <div class="swal-lib-container" style="font-family: 'Inter', system-ui, -apple-system, sans-serif;">
+            <style>
+              .swal-template-title-input:hover {
+                border-color: #cbd5e1 !important;
+                background-color: #f8fafc !important;
+              }
+              .swal-template-title-input:focus {
+                border-color: var(--secondary-color, #3b82f6) !important;
+                background-color: #ffffff !important;
+                box-shadow: 0 0 0 3px rgba(66, 108, 165, 0.15) !important;
+                outline: none !important;
+              }
+            </style>
+            <div class="swal-lib-container" style="font-family: 'Inter', system-ui, -apple-system, sans-serif; padding-top: 12px;">
                 
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
-                    <div style="text-align: left;">
-                        <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Template Seleccionado</div>
-                        <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${template.nombre}</div>
-                        <div style="font-size: 12px; color: ${template.activo ? "#059669" : "#dc2626"}; font-weight: bold; display: flex; align-items: center; gap: 4px;">
-                            <span style="font-size: 8px;">●</span> ${template.activo ? "ACTIVO (Visible para envíos)" : "INACTIVO (Oculto)"}
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-shrink: 0;">
-                        <button id="swal-mgr-btn-rename" class="swal-lib-pill-btn swal-lib-pill-btn-edit" style="padding: 8px 14px; font-size: 12px;">✏️ Cambiar Nombre/Estado</button>
-                        <button id="swal-mgr-btn-delete-template" class="swal-lib-pill-btn swal-lib-pill-btn-delete" style="padding: 8px 14px; font-size: 12px;">🗑️ Eliminar Template</button>
-                    </div>
+                <!-- Center, editable template name header inside HTML container with premium alignment -->
+                <div style="text-align: center; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; border-bottom: 2px solid var(--secondary-color, #3b82f6); padding-bottom: 15px; margin-bottom: 20px; position: relative;">
+                  <input id="swal-template-name-input" type="text" value="${template.nombre}" 
+                         placeholder="Nombre del template"
+                         class="swal2-input swal-template-title-input" 
+                         style="text-align: center; font-size: 26px; font-weight: 800; color: #0f172a; border: 1.5px solid transparent; background: transparent; padding: 6px 12px; margin: 0; width: 90%; max-width: 480px; border-radius: 8px; transition: all 0.3s;" />
+                  <div id="swal-template-name-feedback" style="font-size: 11px; color: #10b981; font-weight: bold; margin-top: 4px; opacity: 0; transition: opacity 0.3s; height: 14px;">✓ Guardado con éxito</div>
                 </div>
 
-                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
-                    <div style="font-size: 14px; font-weight: 700; color: #334155; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1.5px solid #e2e8f0;">
+                    <div style="font-size: 14px; font-weight: 700; color: #475569; text-align: left;">
                         Preguntas Vinculadas (${currentQuestions.length})
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button id="swal-mgr-btn-link-existing" class="swal-lib-btn-primary" style="background: #10b981; padding: 8px 14px; font-size: 12px;">🔍 Vincular Pregunta</button>
-                        <button id="swal-mgr-btn-create-question" class="swal-lib-btn-primary" style="background: #4f46e5; padding: 8px 14px; font-size: 12px;">➕ Crear Nueva Pregunta</button>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button id="swal-mgr-btn-change-state" class="swal-lib-pill-btn swal-lib-pill-btn-edit" style="padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; background: #64748b; color: white; border: none;">⚙️ Cambiar Estado</button>
+                        <button id="swal-mgr-btn-link-existing" class="swal-lib-pill-btn" style="background: #10b981; color: white; border: none; padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; font-weight: 600; cursor: pointer;">🔍 Vincular</button>
+                        <button id="swal-mgr-btn-create-question" class="swal-lib-pill-btn" style="background: #4f46e5; color: white; border: none; padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; font-weight: 600; cursor: pointer;">➕ Nueva Pregunta</button>
                     </div>
                 </div>
 
@@ -1105,33 +1166,134 @@ export default function EditorEncuestas() {
         `;
 
     Swal.fire({
-      title: "⚙️ Panel de Control de Template",
       html: htmlContent,
       width: "850px",
       showConfirmButton: false,
       showCloseButton: true,
       didOpen: () => {
-        document
-          .getElementById("swal-mgr-btn-rename")
-          .addEventListener("click", async () => {
-            Swal.close();
-            await handleEditTemplate(template);
-            const latestTemplates = await axios.get(`${API_BASE}/templates`);
-            const freshTemplate = latestTemplates.data.find(
-              (t) => t.id === template.id,
-            );
-            setTemplates(latestTemplates.data);
-            if (freshTemplate) {
-              setSelectedTemplate(freshTemplate);
-              setTimeout(() => handleOpenTemplateManager(freshTemplate), 300);
+        const nameInput = document.getElementById("swal-template-name-input");
+        if (nameInput) {
+          const saveName = async () => {
+            const nuevoNombre = nameInput.value.trim();
+            if (nuevoNombre && nuevoNombre !== template.nombre) {
+              try {
+                const updatedFields = {
+                  id: template.id,
+                  nombre: nuevoNombre,
+                  activo: template.activo
+                };
+                await axios.patch(`${API_BASE}/templates`, updatedFields);
+                
+                // Update local states immediately
+                const freshTemplates = templates.map(t => t.id === template.id ? { ...t, nombre: nuevoNombre } : t);
+                setTemplates(freshTemplates);
+                setSelectedTemplate({ ...template, nombre: nuevoNombre });
+                
+                // Show in-modal animated confirmation border and message, keeping the modal perfectly open!
+                nameInput.style.borderColor = "#10b981";
+                nameInput.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.15)";
+                
+                const feedback = document.getElementById("swal-template-name-feedback");
+                if (feedback) {
+                  feedback.style.opacity = "1";
+                }
+                
+                setTimeout(() => {
+                  nameInput.style.borderColor = "transparent";
+                  nameInput.style.boxShadow = "none";
+                  if (feedback) {
+                    feedback.style.opacity = "0";
+                  }
+                }, 1800);
+              } catch (err) {
+                console.error(err);
+                nameInput.value = template.nombre; // Restore old name
+                nameInput.style.borderColor = "#ef4444";
+                Swal.fire("Error", "No se pudo actualizar el nombre.", "error");
+              }
+            }
+          };
+
+          nameInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              nameInput.blur();
             }
           });
+          nameInput.addEventListener("blur", saveName);
+        }
 
         document
-          .getElementById("swal-mgr-btn-delete-template")
+          .getElementById("swal-mgr-btn-change-state")
           .addEventListener("click", async () => {
             Swal.close();
-            await handleEliminarTemplate(template);
+            
+            const updateTemplateState = async (nuevoEstado) => {
+              try {
+                const updatedFields = {
+                  id: template.id,
+                  nombre: template.nombre,
+                  activo: nuevoEstado
+                };
+                await axios.patch(`${API_BASE}/templates`, updatedFields);
+                
+                const latestTemplates = await axios.get(`${API_BASE}/templates`);
+                setTemplates(latestTemplates.data);
+                const freshTemplate = latestTemplates.data.find(t => t.id === template.id);
+                if (freshTemplate) {
+                  setSelectedTemplate(freshTemplate);
+                  Swal.fire({
+                    title: 'Estado actualizado',
+                    icon: 'success',
+                    timer: 1000,
+                    showConfirmButton: false
+                  }).then(() => {
+                    handleOpenTemplateManager(freshTemplate);
+                  });
+                }
+              } catch (err) {
+                console.error(err);
+                Swal.fire("Error", "No se pudo cambiar el estado.", "error").then(() => {
+                  handleOpenTemplateManager(template);
+                });
+              }
+            };
+
+            const result = await Swal.fire({
+              title: '<div style="font-size: 20px; font-weight: 800; color: #0f172a; text-align: center;">Cambiar Estado del Template</div>',
+              html: `
+                <div style="font-size: 14px; color: #64748b; margin-bottom: 20px; text-align: center;">
+                  Selecciona el nuevo estado para el template: <strong>${template.nombre}</strong>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <button id="state-btn-active" class="swal-option-btn primary" style="background-color: #10b981 !important; margin-bottom: 10px;">🟢 ACTIVO (Visible para envíos)</button>
+                  <button id="state-btn-inactive" class="swal-option-btn outline" style="border-color: #cbd5e1 !important; color: #334155 !important; margin-bottom: 10px; border: 1.5px solid !important;">🟡 INACTIVO (Archivado)</button>
+                  <button id="state-btn-delete" class="swal-option-btn danger" style="background-color: #fee2e2 !important; border: 1.5px solid #fecaca !important; color: #dc2626 !important; margin-bottom: 10px; font-weight: 700; cursor: pointer;">🔴 ELIMINAR TEMPLATE</button>
+                </div>
+              `,
+              showConfirmButton: false,
+              showCancelButton: true,
+              cancelButtonText: 'Cancelar',
+              cancelButtonColor: '#64748b',
+              width: '400px',
+              didOpen: () => {
+                document.getElementById("state-btn-active").addEventListener("click", async () => {
+                  Swal.close();
+                  await updateTemplateState(1);
+                });
+                document.getElementById("state-btn-inactive").addEventListener("click", async () => {
+                  Swal.close();
+                  await updateTemplateState(0);
+                });
+                document.getElementById("state-btn-delete").addEventListener("click", async () => {
+                  Swal.close();
+                  await handleEliminarTemplate(template);
+                });
+              }
+            });
+
+            if (result.dismiss === Swal.DismissReason.cancel) {
+              handleOpenTemplateManager(template);
+            }
           });
 
         document
@@ -1145,7 +1307,7 @@ export default function EditorEncuestas() {
           .getElementById("swal-mgr-btn-create-question")
           .addEventListener("click", async () => {
             Swal.close();
-            await handleEditPregunta(null, true);
+            await handleEditPregunta(null, true, currentQuestions.length + 1);
           });
 
         const editBtns = document.querySelectorAll(".swal-mgr-btn-edit");
@@ -1154,7 +1316,7 @@ export default function EditorEncuestas() {
             const index = btn.getAttribute("data-index");
             const p = currentQuestions[index];
             Swal.close();
-            await handleEditPregunta(p, true);
+            await handleEditPregunta(p, true, p.orden);
           });
         });
 
@@ -1350,22 +1512,6 @@ export default function EditorEncuestas() {
                             }}
                           >
                             {t.nombre}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "9px",
-                              color: t.activo
-                                ? "var(--success-color)"
-                                : "var(--danger-color)",
-                              fontWeight: "bold",
-                              marginTop: "3px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            <span style={{ fontSize: "7px" }}>●</span>{" "}
-                            {t.activo ? "ACTIVO" : "INACTIVO"}
                           </div>
                         </div>
                       </div>

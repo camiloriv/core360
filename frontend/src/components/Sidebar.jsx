@@ -419,6 +419,7 @@ const Sidebar = () => {
         <button
           onClick={() => {
             localStorage.removeItem("usuario");
+            localStorage.removeItem("ultimoAcceso");
             window.location.href = "/login";
           }}
           style={{

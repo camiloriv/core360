@@ -119,11 +119,17 @@ const guardarPregunta = async (data) => {
 
     // 2. LÓGICA DE ASIGNACIÓN (TEMPLATE-PREGUNTA)
     // Asegurar que existe el vínculo (para nuevos) o actualizar orden/requerida
+    let finalOrden = orden;
+    if (!pregunta_id) {
+        const [[lastOrder]] = await db.query("SELECT MAX(orden) as max_o FROM encuesta_template_preguntas WHERE template_id = ?", [template_id]);
+        finalOrden = (lastOrder?.max_o || 0) + 1;
+    }
+
     await db.query(`
         INSERT INTO encuesta_template_preguntas (template_id, pregunta_id, orden, requerida)
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE orden = ?, requerida = ?
-    `, [template_id, finalPreguntaId, orden || 1, requerida !== undefined ? requerida : 1, orden || 1, requerida !== undefined ? requerida : 1]);
+    `, [template_id, finalPreguntaId, finalOrden || 1, requerida !== undefined ? requerida : 1, finalOrden || 1, requerida !== undefined ? requerida : 1]);
 
     return { id: finalPreguntaId };
 };

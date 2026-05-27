@@ -39,13 +39,21 @@ const obtenerPromediosPorDimension = async (usuario_id, rol) => {
   let params = [];
 
   if (rol === 'ejecutiva') {
-      whereClause += " AND e.ejecutiva_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (
+          emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+          OR emp.jefatura_id IN (
+              SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+          )
+          OR e.ejecutiva_id = ?
+      )`;
+      params.push(usuario_id, usuario_id, usuario_id);
   } else if (rol === 'jefatura') {
-      whereClause += " AND emp.jefatura_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
+          SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+      ))`;
+      params.push(usuario_id, usuario_id);
   } else if (rol === 'gerencia') {
-      whereClause += ` AND j.id IN (
+      whereClause += ` AND (j.id IN (
           SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
           UNION
           SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -53,8 +61,8 @@ const obtenerPromediosPorDimension = async (usuario_id, rol) => {
               JOIN usuarios u ON ug.usuario_id = u.id 
               WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
           )
-      )`;
-      params.push(usuario_id, usuario_id);
+      ) OR emp.jefatura_id = ?)`;
+      params.push(usuario_id, usuario_id, usuario_id);
   }
 
   const sql = `
@@ -80,13 +88,21 @@ const obtenerRankingEjecutivas = async (usuario_id, rol) => {
   let params = [];
 
   if (rol === 'ejecutiva') {
-      whereClause += " AND e.ejecutiva_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (
+          emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+          OR emp.jefatura_id IN (
+              SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+          )
+          OR e.ejecutiva_id = ?
+      )`;
+      params.push(usuario_id, usuario_id, usuario_id);
   } else if (rol === 'jefatura') {
-      whereClause += " AND emp.jefatura_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
+          SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+      ))`;
+      params.push(usuario_id, usuario_id);
   } else if (rol === 'gerencia') {
-      whereClause += ` AND j.id IN (
+      whereClause += ` AND (j.id IN (
           SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
           UNION
           SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -94,8 +110,8 @@ const obtenerRankingEjecutivas = async (usuario_id, rol) => {
               JOIN usuarios u ON ug.usuario_id = u.id 
               WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
           )
-      )`;
-      params.push(usuario_id, usuario_id);
+      ) OR emp.jefatura_id = ?)`;
+      params.push(usuario_id, usuario_id, usuario_id);
   }
 
   const sql = `
@@ -128,13 +144,21 @@ const obtenerDetalleRespuestas = async (usuario_id, rol) => {
   let params = [];
 
   if (rol === 'ejecutiva') {
-      whereClause += " AND e.ejecutiva_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (
+          emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+          OR emp.jefatura_id IN (
+              SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+          )
+          OR e.ejecutiva_id = ?
+      )`;
+      params.push(usuario_id, usuario_id, usuario_id);
   } else if (rol === 'jefatura') {
-      whereClause += " AND emp.jefatura_id = ?";
-      params.push(usuario_id);
+      whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
+          SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+      ))`;
+      params.push(usuario_id, usuario_id);
   } else if (rol === 'gerencia') {
-      whereClause += ` AND j.id IN (
+      whereClause += ` AND (j.id IN (
           SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
           UNION
           SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -142,8 +166,8 @@ const obtenerDetalleRespuestas = async (usuario_id, rol) => {
               JOIN usuarios u ON ug.usuario_id = u.id 
               WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
           )
-      )`;
-      params.push(usuario_id, usuario_id);
+      ) OR emp.jefatura_id = ?)`;
+      params.push(usuario_id, usuario_id, usuario_id);
   }
 
   const sql = `

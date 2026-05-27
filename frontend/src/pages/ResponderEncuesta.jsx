@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import "../styles/agoras-theme.css";
+import "../styles/core360-theme.css";
 import {
   obtenerEncuesta,
   responderEncuesta,
@@ -126,7 +126,7 @@ function ResponderEncuesta() {
   if (encuesta.completada) {
     return (
       <div className="encuesta-page">
-        <header className="agoras-header" style={{ justifyContent: 'flex-end' }}>
+        <header className="core360-header" style={{ justifyContent: 'flex-end' }}>
           <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary-color)', textAlign: 'right', textTransform: 'uppercase' }}>
             {encuesta.empresa}
           </div>
@@ -144,13 +144,12 @@ function ResponderEncuesta() {
   }
 
   const total = encuesta.preguntas.length;
-  const respondidas = Object.keys(respuestas).length;
-  const progreso = (respondidas / total) * 100;
+  const progreso = (index / total) * 100;
   const pregunta = encuesta.preguntas[index];
 
   return (
     <div className="encuesta-page">
-      <header className="agoras-header" style={{ justifyContent: 'flex-end' }}>
+      <header className="core360-header" style={{ justifyContent: 'flex-end' }}>
         <div className="cek-logo" style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary-color)', textAlign: 'right', textTransform: 'uppercase' }}>
           {encuesta.empresa}
         </div>
@@ -183,7 +182,7 @@ function ResponderEncuesta() {
           {/* TEXTO (LIBRE) */}
           {pregunta.tipo === "texto" && (
             <textarea
-              className="agoras-textarea"
+              className="core360-textarea"
               placeholder="Escribe tu comentario aquí..."
               value={respuestas[pregunta.id] || ""}
               onChange={(e) => handleChange(pregunta.id, e.target.value)}

@@ -41,11 +41,11 @@ const Login = () => {
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
               <span>📞 <strong>Teléfono:</strong></span>
-              <span><strong>+56 9 1234 5678</strong></span>
+              <span><strong>+56 9 3182 7029</strong></span>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span>⏰ <strong>Horario:</strong></span>
-              <span><strong>Lun - Vie / 09:00 - 18:00</strong></span>
+              <span><strong>Lun - Vie / 09:30 - 19:00</strong></span>
             </div>
           </div>
         </div>

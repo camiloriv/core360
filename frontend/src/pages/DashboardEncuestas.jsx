@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../services/api";
 import Swal from "sweetalert2";
 import {
   BarChart,
@@ -21,43 +21,11 @@ import styles from "../styles/DashboardStyles";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import KpiCard from "../components/dashboard/KpiCard";
 import { exportToExcel } from "../utils/exportExcel";
+import "../styles/core360-theme.css";
 
 // =============================================================================
 // 🏗️ SUBCOMPONENTES (Modularización)
 // =============================================================================
-
-const FilterSection = ({ filters, options, onChange }) => (
-  <div style={styles.filterPanel}>
-    {/* 🔍 EMPRESA (Buscador) */}
-    <SearchableFilter
-      label="Empresa"
-      value={filters.empresa}
-      options={options.empresas}
-      onChange={(val) => onChange("empresa", val)}
-      placeholder="Filtrar por empresa..."
-    />
-
-    {/* Otros filtros (Selects normales por ahora) */}
-    {["jefatura", "tipo", "estado"].map((key) => (
-      <div key={key} style={styles.filterGroup}>
-        <label style={styles.label}>
-          {key === "tipo" ? "Tipo de Encuesta" : "Jefatura"}
-        </label>
-        <select
-          style={styles.select}
-          value={filters[key]}
-          onChange={(e) => onChange(key, e.target.value)}
-        >
-          {options[key === "tipo" ? "tipos" : key + "s"].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      </div>
-    ))}
-  </div>
-);
 
 const SurveyRow = ({ r, onToggleStatus, onResend, onShowDetail }) => (
   <tr style={{ ...styles.tr, opacity: r.activo === 0 ? 0.6 : 1 }}>
@@ -158,64 +126,143 @@ const SurveyRow = ({ r, onToggleStatus, onResend, onShowDetail }) => (
 // =============================================================================
 
 export default function DashboardEncuestas() {
+  const user = JSON.parse(localStorage.getItem("usuario") || "null");
+  const userRol = user?.permisos;
+
   const [respuestas, setRespuestas] = useState([]);
   const [programadas, setProgramadas] = useState([]);
+  const [jefaturas, setJefaturas] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
   const [totalEnvios, setTotalEnvios] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dimensionData, setDimensionData] = useState([]);
   const [rankingData, setRankingData] = useState([]);
   const navigate = useNavigate();
 
-  const [filters, setFilters] = useState({
-    empresa: "Todas",
-    jefatura: "Todas",
-    tipo: "Todas",
-    estado: "Todas",
-  });
+  const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
+  const [filtroJefatura, setFiltroJefatura] = useState("");
+  const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
+  const [filtroTipo, setFiltroTipo] = useState("Todas");
+  const [filtroEstado, setFiltroEstado] = useState("Todas");
 
-  const [options, setOptions] = useState({
-    empresas: ["Todas"],
-    jefaturas: ["Todas"],
-    tipos: ["Todas"],
-    estados: ["Todas", "Pendientes", "Respondidas", "Activas", "Inactivas"],
-  });
+  const [optionsEstados] = useState(["Todas", "Pendientes", "Respondidas", "Activas", "Inactivas"]);
+
+  // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
+  const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
+  // Solo admin, gerencia_general y gerencia pueden ver y cambiar el filtro de Jefatura
+  const mostrarFiltroJefatura = userRol === 'admin' || userRol === 'gerencia_general' || userRol === 'gerencia';
 
   // 🔹 Fetch inicial de datos
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem("usuario") || "null");
-        const queryParams = user
-          ? `?usuario_id=${user.id}&rol=${user.permisos}`
-          : "";
+        const rol = userRol;
+        const id = user?.id;
+        const jefaturaId = user?.jefatura_id;
 
-        const [respRes, statsRes, kpiRes, reuniRes] = await Promise.all([
-          axios.get(
-            `http://localhost:8080/encuestas/respuestas/all${queryParams}`,
-          ),
-          axios.get(
-            `http://localhost:8080/encuestas/stats/summary${queryParams}`,
-          ),
-          axios.get(`http://localhost:8080/encuestas/stats/kpis${queryParams}`),
-          axios.get(`http://localhost:8080/reuniones${queryParams}`),
+        // Parámetros según rol
+        let jefaturasUrl = "/jefaturas";
+        let empresasUrl = "/empresas";
+        let queryParams = `?usuario_id=${id}&rol=${rol}`;
+
+        if (rol === "gerencia" && id) {
+          jefaturasUrl = `/jefaturas?gerencia_id=${id}`;
+          empresasUrl = `/empresas?gerencia_id=${id}`;
+        } else if (rol === "jefatura" && id) {
+          jefaturasUrl = `/jefaturas?jefatura_id=${id}`;
+          empresasUrl = `/empresas?jefatura_id=${id}`;
+        } else if (rol === "ejecutiva" && id) {
+          const targetJefId = jefaturaId || id;
+          jefaturasUrl = `/jefaturas?jefatura_id=${targetJefId}`;
+          empresasUrl = `/empresas?jefatura_id=${targetJefId}`;
+        }
+
+        const [respRes, statsRes, kpiRes, reuniRes, jefRes, empRes] = await Promise.all([
+          api.get(`/encuestas/respuestas/all${queryParams}`),
+          api.get(`/encuestas/stats/summary${queryParams}`),
+          api.get(`/encuestas/stats/kpis${queryParams}`),
+          api.get(`/reuniones${queryParams}`),
+          api.get(jefaturasUrl),
+          api.get(empresasUrl),
         ]);
 
-        const masterData = respRes.data.map((r) => ({
+        const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
+                           user?.nombre?.toLowerCase().includes("demo") ||
+                           user?.correo?.toLowerCase().includes("prueba") ||
+                           user?.correo?.toLowerCase().includes("demo") ||
+                           user?.cargos?.toLowerCase().includes("prueba") ||
+                           user?.cargos?.toLowerCase().includes("demo");
+
+        let filteredJefaturas = (jefRes.data || []).filter(j => {
+          const jDemo = j.nombre?.toLowerCase().includes("prueba") || 
+                        j.nombre?.toLowerCase().includes("demo") ||
+                        j.correo?.toLowerCase().includes("prueba") ||
+                        j.correo?.toLowerCase().includes("demo");
+          return isUserDemo ? jDemo : !jDemo;
+        });
+
+        let filteredEmpresas = (empRes.data || []).filter(emp => {
+          const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
+                          emp.nombre?.toLowerCase().includes("prueba") ||
+                          emp.jefatura_id === 28;
+          return isUserDemo ? empDemo : !empDemo;
+        });
+
+        if (rol === "jefatura" && id) {
+          filteredJefaturas = filteredJefaturas.filter(j => j.id === id);
+          // Keep all companies returned by the backend (includes direct and managing Gerencia companies)
+        } else if (rol === "ejecutiva" && (jefaturaId || id)) {
+          const targetJefId = jefaturaId || id;
+          filteredJefaturas = filteredJefaturas.filter(j => j.id === targetJefId);
+          // Keep all companies returned by the backend
+        }
+
+        const filteredResponses = (respRes.data || []).filter(r => {
+          const isDemoEmp = r.empresa?.toLowerCase().includes("demo") || 
+                            r.empresa?.toLowerCase().includes("prueba") ||
+                            r.jefatura?.toLowerCase().includes("prueba") ||
+                            r.jefatura?.toLowerCase().includes("demo");
+          return isUserDemo ? isDemoEmp : !isDemoEmp;
+        });
+
+        const filteredReuniones = (reuniRes.data || []).filter(r => {
+          const isDemoEmp = r.empresa_nombre?.toLowerCase().includes("demo") || 
+                            r.empresa_nombre?.toLowerCase().includes("prueba") ||
+                            r.ejecutiva_nombre?.toLowerCase().includes("prueba") ||
+                            r.ejecutiva_nombre?.toLowerCase().includes("demo") ||
+                            r.jefatura_nombre?.toLowerCase().includes("prueba") ||
+                            r.jefatura_nombre?.toLowerCase().includes("demo");
+          return isUserDemo ? isDemoEmp : !isDemoEmp;
+        });
+
+        const filteredRanking = (kpiRes.data.ranking || []).filter(r => {
+          const isDemoJef = r.jefatura?.toLowerCase().includes("prueba") || 
+                            r.jefatura?.toLowerCase().includes("demo");
+          return isUserDemo ? isDemoJef : !isDemoJef;
+        });
+
+        const filteredDetalles = (kpiRes.data.detalles || []).filter(d => {
+          const isDemoEmp = d.empresa?.toLowerCase().includes("demo") || 
+                            d.empresa?.toLowerCase().includes("prueba") ||
+                            d.jefatura?.toLowerCase().includes("prueba") ||
+                            d.jefatura?.toLowerCase().includes("demo");
+          return isUserDemo ? isDemoEmp : !isDemoEmp;
+        });
+
+        const masterData = filteredResponses.map((r) => ({
           ...r,
-          detalles: kpiRes.data.detalles.filter((d) => d.encuesta_id === r.id),
+          detalles: filteredDetalles.filter((d) => d.encuesta_id === r.id),
         }));
 
         setRespuestas(masterData);
-        setTotalEnvios(statsRes.data.total_envios);
+        setTotalEnvios(filteredResponses.length);
 
-        // Filtrar reuniones que tienen encuesta programada pendiente
-        const prog = reuniRes.data.filter(
+        const prog = filteredReuniones.filter(
           (r) =>
             r.programar_encuesta && r.encuesta_estado_envio === "pendiente",
         );
         setProgramadas(prog);
 
-        // --- PROCESAMIENTO RADAR (Dimensiones) ---
         const radar = (kpiRes.data.dimensiones || []).map((dimObj) => {
           const dimName = dimObj.nombre;
           const found = kpiRes.data.promedios.find(
@@ -227,31 +274,17 @@ export default function DashboardEncuestas() {
             fullMark: 10,
           };
         });
-
         setDimensionData(radar);
 
         setRankingData(
-          kpiRes.data.ranking.map((r) => ({
+          filteredRanking.map((r) => ({
             name: r.jefatura,
             nps: Math.round(r.promedio * 20),
           })),
         );
 
-        setOptions((prev) => ({
-          ...prev,
-          empresas: [
-            "Todas",
-            ...new Set(respRes.data.map((r) => r.empresa).filter(Boolean)),
-          ],
-          jefaturas: [
-            "Todas",
-            ...new Set(respRes.data.map((r) => r.jefatura).filter(Boolean)),
-          ],
-          tipos: [
-            "Todas",
-            ...new Set(respRes.data.map((r) => r.titulo).filter(Boolean)),
-          ],
-        }));
+        setJefaturas(filteredJefaturas);
+        setEmpresas(filteredEmpresas);
       } catch (err) {
         console.error("Error cargando datos:", err);
       } finally {
@@ -261,15 +294,75 @@ export default function DashboardEncuestas() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    setFiltroEmpresa("Todas");
+  }, [filtroJefatura]);
+
+  useEffect(() => {
+    setFiltroJefatura("");
+    setFiltroEmpresa("Todas");
+  }, [filtroMacroZona]);
+
+  // Jefaturas que tienen al menos una empresa en la macro-zona seleccionada
+  const jefaturasFiltradas = jefaturas.filter(j =>
+    empresas.some(e => {
+      if (e.jefatura_id !== j.id) return false;
+      if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
+      if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
+      return true;
+    })
+  );
+
+  const esJefaturaMatriz = (jefId) => {
+    return empresas.some(e => e.jefatura_id === jefId && e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz"));
+  };
+
+  const jefaturasFiltradasOrdenadas = [...jefaturasFiltradas].sort((a, b) => {
+    const aEsMatriz = esJefaturaMatriz(a.id);
+    const bEsMatriz = esJefaturaMatriz(b.id);
+    if (aEsMatriz && !bEsMatriz) return -1;
+    if (!aEsMatriz && bEsMatriz) return 1;
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  const optionsMacroZona = ["TODAS", "MATRIZ", "REGIONES"];
+  const optionsJefaturas = [
+    "TODAS",
+    ...jefaturasFiltradasOrdenadas.map(j => j.nombre.toUpperCase())
+  ];
+
+  const empresasPorJefatura = empresas.filter(emp => {
+    const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
+    
+    let pasaMacroZona = true;
+    if (filtroMacroZona === "Matriz") {
+      pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
+    } else if (filtroMacroZona === "Regiones") {
+      pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
+    }
+
+    return pasaJefatura && pasaMacroZona;
+  });
+
+  const optionsEmpresas = [
+    "Todas",
+    ...[...new Set(empresasPorJefatura.map(emp => emp.nombre))].sort()
+  ];
+
+  const optionsTipos = [
+    "Todas",
+    ...[...new Set(respuestas.map(r => r.titulo).filter(Boolean))].sort()
+  ];
+
   // 🔹 MEMOIZACIÓN: Filtrado y Estadísticas
-  const { filteredTableData, availableEmpresas, stats } = useMemo(() => {
+  const { filteredTableData, stats } = useMemo(() => {
     // 1. Filtro base
     const baseFiltered = respuestas.filter((r) => {
-      return (
-        (filters.empresa === "Todas" || r.empresa === filters.empresa) &&
-        (filters.jefatura === "Todas" || r.jefatura === filters.jefatura) &&
-        (filters.tipo === "Todas" || r.titulo === filters.tipo)
-      );
+      const pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa === filtroEmpresa;
+      const pasaTipo = filtroTipo === "Todas" || r.titulo === filtroTipo;
+
+      return pasaMacroYJef && pasaEmpresa && pasaTipo;
     });
 
     // 2. Stats sobre base
@@ -296,32 +389,17 @@ export default function DashboardEncuestas() {
 
     // 3. Filtro visual para la tabla
     const visualFiltered = baseFiltered.filter((r) => {
-      if (filters.estado === "Todas") return true;
-      if (filters.estado === "Pendientes")
+      if (filtroEstado === "Todas") return true;
+      if (filtroEstado === "Pendientes")
         return r.estado === "pendiente" && r.activo === 1;
-      if (filters.estado === "Respondidas") return r.estado === "completada";
-      if (filters.estado === "Activas") return r.activo === 1;
-      if (filters.estado === "Inactivas") return r.activo === 0;
+      if (filtroEstado === "Respondidas") return r.estado === "completada";
+      if (filtroEstado === "Activas") return r.activo === 1;
+      if (filtroEstado === "Inactivas") return r.activo === 0;
       return true;
     });
 
-    // 4. Filtrado dinámico de opciones de empresa según Jefatura
-    const empresasDisponibles = [
-      "Todas",
-      ...new Set(
-        respuestas
-          .filter(
-            (r) =>
-              filters.jefatura === "Todas" || r.jefatura === filters.jefatura,
-          )
-          .map((r) => r.empresa)
-          .filter(Boolean),
-      ),
-    ];
-
     return {
       filteredTableData: visualFiltered,
-      availableEmpresas: empresasDisponibles,
       stats: {
         creadas,
         respondidas,
@@ -332,12 +410,18 @@ export default function DashboardEncuestas() {
           countValores > 0 ? (sumaValores / countValores).toFixed(1) : 0,
       },
     };
-  }, [filters, respuestas]);
+  }, [respuestas, filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroEstado, empresasPorJefatura]);
+
+  const filteredProgramadas = programadas.filter((p) => {
+    const pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === p.empresa_id);
+    const pasaEmpresa = filtroEmpresa === "Todas" || p.empresa_nombre === filtroEmpresa;
+    return pasaMacroYJef && pasaEmpresa;
+  });
 
   // 🔹 Handlers
   const toggleActivo = async (id, currentStatus) => {
     try {
-      await axios.patch("http://localhost:8080/encuestas/toggle-estado", {
+      await api.patch("/encuestas/toggle-estado", {
         id,
         activo: !currentStatus,
       });
@@ -395,7 +479,7 @@ export default function DashboardEncuestas() {
 
     if (result) {
       try {
-        await axios.post("http://localhost:8080/encuestas/enviar-correo", {
+        await api.post("/encuestas/enviar-correo", {
           email: result,
           url,
           encuesta_id: encuesta.id,
@@ -475,18 +559,100 @@ export default function DashboardEncuestas() {
           <p className="page-subtitle">ANÁLISIS DE DATOS OBTENIDOS</p>
         </div>
 
-        <FilterSection
-          filters={filters}
-          options={{ ...options, empresas: availableEmpresas }}
-          onChange={(k, v) =>
-            setFilters((p) => {
-              const newFilters = { ...p, [k]: v };
-              // Reset empresa if Jefatura changes and current empresa is not in new list
-              if (k === "jefatura") newFilters.empresa = "Todas";
-              return newFilters;
-            })
-          }
-        />
+        {/* CONTENEDOR DE FILTROS HOMOLOGADO CON COBERTURA */}
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "column",
+          background: "white", 
+          padding: "25px", 
+          borderRadius: "12px", 
+          boxShadow: "0 4px 18px rgba(0, 0, 0, 0.03)", 
+          marginBottom: "30px",
+          gap: "20px"
+        }}>
+          <div style={{ 
+            display: "flex", 
+            flexWrap: "wrap", 
+            alignItems: "flex-end", 
+            gap: "25px",
+            width: "100%"
+          }}>
+            {/* Filtro Macro-Zona */}
+            {mostrarFiltroMacroZona && (
+              <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+                <SearchableFilter 
+                  label="Macro-Zona"
+                  value={filtroMacroZona.toUpperCase()}
+                  options={optionsMacroZona}
+                  onChange={(val) => {
+                    if (val === "TODAS" || !val) setFiltroMacroZona("Todas");
+                    else if (val === "MATRIZ") setFiltroMacroZona("Matriz");
+                    else if (val === "REGIONES") setFiltroMacroZona("Regiones");
+                  }}
+                  placeholder="Escribe para buscar..."
+                />
+              </div>
+            )}
+
+            {/* Seleccionar Jefatura */}
+            {mostrarFiltroJefatura && (
+              <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+                <SearchableFilter 
+                  label="Seleccionar Jefatura / Ejecutiva"
+                  value={
+                    filtroJefatura
+                      ? (jefaturas.find(j => j.id.toString() === filtroJefatura)?.nombre?.toUpperCase() || "TODAS")
+                      : "TODAS"
+                  }
+                  options={optionsJefaturas}
+                  onChange={(val) => {
+                    if (val === "TODAS" || !val) {
+                      setFiltroJefatura("");
+                    } else {
+                      const found = jefaturas.find(j => j.nombre.toUpperCase() === val.toUpperCase());
+                      if (found) setFiltroJefatura(found.id.toString());
+                      else setFiltroJefatura("");
+                    }
+                  }}
+                  placeholder="Escribe para buscar..."
+                />
+              </div>
+            )}
+
+            {/* Buscar Empresa */}
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+              <SearchableFilter 
+                label="Buscar Empresa"
+                value={filtroEmpresa}
+                options={optionsEmpresas}
+                onChange={(val) => setFiltroEmpresa(val)}
+                placeholder="Escribe para buscar..."
+              />
+            </div>
+
+            {/* Tipo de Encuesta */}
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+              <SearchableFilter 
+                label="Tipo de Encuesta"
+                value={filtroTipo}
+                options={optionsTipos}
+                onChange={(val) => setFiltroTipo(val)}
+                placeholder="Escribe para buscar..."
+              />
+            </div>
+
+            {/* Estado */}
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+              <SearchableFilter 
+                label="Estado"
+                value={filtroEstado}
+                options={optionsEstados}
+                onChange={(val) => setFiltroEstado(val)}
+                placeholder="Escribe para buscar..."
+              />
+            </div>
+          </div>
+        </div>
 
         <div style={styles.kpiGrid}>
           <KpiCard
@@ -697,7 +863,7 @@ export default function DashboardEncuestas() {
                 </h3>
               </div>
               <div style={{ overflowX: "auto" }}>
-                {programadas.length > 0 ? (
+                {filteredProgramadas.length > 0 ? (
                   <table style={styles.table}>
                     <thead>
                       <tr style={styles.th}>
@@ -708,7 +874,7 @@ export default function DashboardEncuestas() {
                       </tr>
                     </thead>
                     <tbody>
-                      {programadas.map((p) => (
+                      {filteredProgramadas.map((p) => (
                         <tr key={p.id} style={styles.tr}>
                           <td style={styles.tdCell}>
                             <div style={{ fontWeight: "bold" }}>

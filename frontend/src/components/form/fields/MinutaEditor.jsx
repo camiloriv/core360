@@ -137,6 +137,8 @@ const templateAgoras = `<h4>Inducción Ágoras</h4>
   <li><b>KPIG:</b> Información más detallada de proveedores, cursos y personas.</li>
 </ol>`.trim();
 
+const templatePreContrato = `<h4>1. PreContratos:</h4><ul><li>Se usa para Capacitar personas que NO pertenecen a la Empresa.</li><li>No existe obligación de Contratar a los Participantes.</li><li>No genera Costo Empresa.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Se pueden Capacitar a personas contratadas en otras Razones Sociales del Holding Sodexo.</li></ul><h4>2. PreContratos Modulares:</h4><ul><li>Se puede realizar más de un Curso.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Todos los Cursos deben ser Inscritos el mismo día y con la misma cantidad de Participantes.</li><li>Toda la Documentación debe ser enviada el ultimo día de Clases del Primer Modulo.</li></ul><h4>3. Consideraciones:</h4><ul><li>Tope de 10% de la Dotación permanente, en caso de super este porcentaje se deberá acreditar vulnerabilidad o discapacidad del Participantes (con Documentación que lo respalde).</li><li>La documentación a enviar es: PreContrato Firmado por ambas partes (Participantes y Empresa), DJ Dotación del mes correspondiente, personeria y/o poderes de firma de quien firma por parte de la emrpesa, cedulas de Identidad vigentes (Participantes y Representante Legal).</li><li>En caso de Capacitar a menores de edad (de 15 hasta menos de 18 años) se deberá adjuntar Autorización y Cedula del Padre o Tutor Legal del Participante.</li><li>Toda la Documentación debe ser enviada a más tardar el último día de Clases o al Termino del Primer Modulo para PreContratos Modulares.</li><li>Todo PreContrato no puede superar el máximo de 60 días corridos de duración.</li></ul>`.trim();
+
 const MenuBar = ({ editor }) => {
   if (!editor) return null;
   const [showTableMenu, setShowTableMenu] = useState(false);
@@ -538,9 +540,10 @@ function MinutaEditor({ form, setForm }) {
         <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Editor de Minuta (Avanzado)</label>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
-          <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>Borrador Completo</button>
-          <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>+ Inducción Franquicia</button>
-          <button onClick={(e) => insertTemplate(e, templateAgoras)} style={btnStyle('#dcfce7', '#166534')}>+ Inducción Ágoras</button>
+          <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>borrar</button>
+          <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>Franquicia</button>
+          <button onClick={(e) => insertTemplate(e, templateAgoras)} style={btnStyle('#dcfce7', '#166534')}>Ágoras</button>
+          <button onClick={(e) => insertTemplate(e, templatePreContrato)} style={btnStyle('#f5f3ff', '#6d28d9')}>Pre-contrato</button>
         </div>
       </div>
       <div className="tiptap-editor-container" style={{

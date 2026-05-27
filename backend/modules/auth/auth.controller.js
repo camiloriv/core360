@@ -15,7 +15,8 @@ exports.login = async (req, res) => {
       correo: usuario.correo,
       permisos: usuario.permisos,
       cargos: usuario.cargos,
-      jefatura_id: usuario.jefatura_id
+      jefatura_id: usuario.jefatura_id,
+      vistas_permitidas: usuario.vistas_permitidas
     });
   } catch (err) {
     console.error(err);

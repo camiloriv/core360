@@ -6,7 +6,7 @@ exports.listarEmpresas = async (req, res) => {
     let whereClause = "";
     const params = [];
     if (gerencia_id) {
-      whereClause = ` WHERE j.id IN (
+      whereClause = ` WHERE (j.id IN (
         SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
         UNION
         SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -14,11 +14,13 @@ exports.listarEmpresas = async (req, res) => {
           JOIN usuarios u ON ug.usuario_id = u.id 
           WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
         )
-      )`;
-      params.push(gerencia_id, gerencia_id);
+      ) OR e.jefatura_id = ?)`;
+      params.push(gerencia_id, gerencia_id, gerencia_id);
     } else if (jefatura_id) {
-      whereClause = " WHERE e.jefatura_id = ?";
-      params.push(jefatura_id);
+      whereClause = ` WHERE (e.jefatura_id = ? OR e.jefatura_id IN (
+        SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+      ))`;
+      params.push(jefatura_id, jefatura_id);
     }
     const [rows] = await db.query(`
       SELECT e.*, j.nombre as jefatura_nombre, z.nombre as zona_nombre
@@ -40,7 +42,12 @@ exports.obtenerEmpresasPorEjecutiva = async (req, res) => {
     const [rows] = await db.query(
       `SELECT emp.* 
        FROM empresas emp
-       JOIN usuarios e ON emp.jefatura_id = e.jefatura_id
+       JOIN usuarios e ON (
+         emp.jefatura_id = e.jefatura_id 
+         OR emp.jefatura_id IN (
+           SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = e.jefatura_id
+         )
+       )
        WHERE e.id = ?
        ORDER BY emp.nombre ASC`,
       [id_ejecutiva]
@@ -55,8 +62,12 @@ exports.obtenerEmpresasPorJefatura = async (req, res) => {
   try {
     const { id_jefatura } = req.params;
     const [rows] = await db.query(
-      "SELECT * FROM empresas WHERE jefatura_id = ? ORDER BY nombre ASC",
-      [id_jefatura]
+      `SELECT * FROM empresas 
+       WHERE jefatura_id = ? OR jefatura_id IN (
+         SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+       ) 
+       ORDER BY nombre ASC`,
+      [id_jefatura, id_jefatura]
     );
     res.json(rows);
   } catch (err) {
@@ -78,30 +89,95 @@ exports.actualizarEmpresa = async (req, res) => {
 
 exports.actualizarEstadoEmpresa = async (req, res) => {
   const { id } = req.params;
-  const { estado_seguimiento } = req.body;
+  const { estado_seguimiento, fecha, usuario_id } = req.body;
   try {
     let query = "UPDATE empresas SET estado_seguimiento = ? WHERE id = ?";
     let params = [estado_seguimiento, id];
 
     if (estado_seguimiento === 'solicitada') {
-      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = NOW(), fecha_concretada = NULL WHERE id = ?";
-      params = [estado_seguimiento, id];
+      const fechaVal = fecha || new Date().toISOString().split('T')[0];
+      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = ?, fecha_concretada = NULL WHERE id = ?";
+      params = [estado_seguimiento, fechaVal, id];
+      // Insert log entry
+      await db.query(
+        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id) VALUES (?, 'solicitada', ?, ?)",
+        [id, fechaVal, usuario_id || null]
+      );
     } else if (estado_seguimiento === 'concretada') {
-      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = COALESCE(fecha_solicitada, NOW()), fecha_concretada = NOW() WHERE id = ?";
-      params = [estado_seguimiento, id];
+      const fechaVal = fecha || new Date().toISOString().split('T')[0];
+      query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = COALESCE(fecha_solicitada, ?), fecha_concretada = ? WHERE id = ?";
+      params = [estado_seguimiento, fechaVal, fechaVal, id];
+      // Insert log entry
+      await db.query(
+        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id) VALUES (?, 'concretada', ?, ?)",
+        [id, fechaVal, usuario_id || null]
+      );
     } else if (estado_seguimiento === 'pendiente') {
+      // Reset for new cycle — do NOT delete historical logs
       query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = NULL, fecha_concretada = NULL WHERE id = ?";
       params = [estado_seguimiento, id];
     }
 
     await db.query(query, params);
+
+    // Return updated empresa + historial
     const [[updatedEmp]] = await db.query("SELECT fecha_solicitada, fecha_concretada FROM empresas WHERE id = ?", [id]);
+    const [historial] = await db.query(
+      "SELECT * FROM empresa_seguimiento_log WHERE empresa_id = ? ORDER BY fecha DESC, created_at DESC",
+      [id]
+    );
     res.json({ 
       msg: "Estado actualizado", 
       fecha_solicitada: updatedEmp ? updatedEmp.fecha_solicitada : null, 
-      fecha_concretada: updatedEmp ? updatedEmp.fecha_concretada : null 
+      fecha_concretada: updatedEmp ? updatedEmp.fecha_concretada : null,
+      historial
     });
   } catch (err) {
+    console.error("Error actualizando estado empresa:", err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+// Obtener historial de seguimiento de una empresa
+exports.obtenerHistorialSeguimiento = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM empresa_seguimiento_log WHERE empresa_id = ? ORDER BY fecha DESC, created_at DESC",
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error obteniendo historial:", err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+// Obtener todos los logs de seguimiento filtrados por período
+// Query params: periodo=2026-05 (mes) o anio=2026 (año completo)
+exports.obtenerLogsEmpresas = async (req, res) => {
+  try {
+    const { periodo, anio } = req.query;
+    let whereClause = "";
+    let params = [];
+
+    if (periodo) {
+      // periodo format: "2026-05" → filter by that month
+      whereClause = "WHERE DATE_FORMAT(fecha, '%Y-%m') = ?";
+      params = [periodo];
+    } else if (anio) {
+      // anio format: "2026" → filter by that year
+      whereClause = "WHERE YEAR(fecha) = ?";
+      params = [parseInt(anio)];
+    }
+
+    const [rows] = await db.query(
+      `SELECT * FROM empresa_seguimiento_log ${whereClause} ORDER BY fecha DESC, created_at DESC`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error obteniendo logs:", err);
     res.status(500).json({ error: "Error en la BD" });
   }
 };

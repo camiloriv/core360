@@ -3,10 +3,10 @@ const db = require("../../database/connection");
 exports.obtenerJefaturas = async (req, res) => {
   try {
     const { gerencia_id, jefatura_id } = req.query;
-    let query = "SELECT * FROM usuarios WHERE permisos = 'jefatura'";
+    let query = "SELECT * FROM usuarios WHERE (permisos = 'jefatura' OR permisos = 'gerencia')";
     const params = [];
     if (gerencia_id) {
-      query += ` AND id IN (
+      query += ` AND (id = ? OR id IN (
         SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
         UNION
         SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -14,8 +14,8 @@ exports.obtenerJefaturas = async (req, res) => {
           JOIN usuarios u ON ug.usuario_id = u.id 
           WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
         )
-      )`;
-      params.push(gerencia_id, gerencia_id);
+      ))`;
+      params.push(gerencia_id, gerencia_id, gerencia_id);
     } else if (jefatura_id) {
       query += " AND id = ?";
       params.push(jefatura_id);

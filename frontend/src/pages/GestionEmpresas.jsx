@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import api from "../services/api";
 import * as XLSX from "xlsx";
-import "../styles/agoras-theme.css";
+import "../styles/core360-theme.css";
 
 export default function GestionEmpresas() {
+  const user = JSON.parse(localStorage.getItem("usuario") || "null");
   const [ejecutivas, setEjecutivas] = useState([]);
   const [jefaturas, setJefaturas] = useState([]);
   const [empresas, setEmpresas] = useState([]);
@@ -32,15 +33,43 @@ export default function GestionEmpresas() {
     setLoading(true);
     try {
       const resE = await api.get("/ejecutivas");
-      setEjecutivas(resE.data || []);
-
       const resJ = await api.get("/jefaturas");
-      setJefaturas(resJ.data || []);
-
       const resEmp = await api.get("/empresas");
-      setEmpresas(resEmp.data || []);
-
       const resZonas = await api.get("/zonas");
+
+      const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
+                         user?.nombre?.toLowerCase().includes("demo") ||
+                         user?.correo?.toLowerCase().includes("prueba") ||
+                         user?.correo?.toLowerCase().includes("demo") ||
+                         user?.cargos?.toLowerCase().includes("prueba") ||
+                         user?.cargos?.toLowerCase().includes("demo");
+
+      const filteredEjecutivas = (resE.data || []).filter(ej => {
+        const ejDemo = ej.nombre?.toLowerCase().includes("prueba") || 
+                       ej.nombre?.toLowerCase().includes("demo") ||
+                       ej.correo?.toLowerCase().includes("prueba") ||
+                       ej.correo?.toLowerCase().includes("demo");
+        return isUserDemo ? ejDemo : !ejDemo;
+      });
+
+      const filteredJefaturas = (resJ.data || []).filter(j => {
+        const jDemo = j.nombre?.toLowerCase().includes("prueba") || 
+                      j.nombre?.toLowerCase().includes("demo") ||
+                      j.correo?.toLowerCase().includes("prueba") ||
+                      j.correo?.toLowerCase().includes("demo");
+        return isUserDemo ? jDemo : !jDemo;
+      });
+
+      const filteredEmpresas = (resEmp.data || []).filter(emp => {
+        const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
+                        emp.nombre?.toLowerCase().includes("prueba") ||
+                        emp.jefatura_id === 28;
+        return isUserDemo ? empDemo : !empDemo;
+      });
+
+      setEjecutivas(filteredEjecutivas);
+      setJefaturas(filteredJefaturas);
+      setEmpresas(filteredEmpresas);
       setZonas(resZonas.data || []);
     } catch (err) {
       console.error(err);

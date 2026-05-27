@@ -1,9 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../services/api";
 import styles from "../styles/DashboardStyles";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
-import "../styles/agoras-theme.css";
+import "../styles/core360-theme.css";
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function getPeriodoActual() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+function buildPeriodoOptions() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const opts = [{ value: `anio-${y}`, label: `AÑO ${y}` }];
+  for (let i = 0; i < 12; i++) {
+    const m = String(i + 1).padStart(2, '0');
+    opts.push({ value: `${y}-${m}`, label: `${MESES[i].toUpperCase()} ${y}` });
+  }
+  return opts;
+}
 
 export default function SeguimientoEmpresas() {
   const user = JSON.parse(localStorage.getItem("usuario") || "null");
@@ -12,11 +32,14 @@ export default function SeguimientoEmpresas() {
   const [jefaturas, setJefaturas] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [reuniones, setReuniones] = useState([]);
+  const [seguimientoLogs, setSeguimientoLogs] = useState([]);
   const [filtroJefatura, setFiltroJefatura] = useState("");
   const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
+  const [filtroPeriodo, setFiltroPeriodo] = useState(getPeriodoActual());
   const [viewMode, setViewMode] = useState("grid");
   const [loading, setLoading] = useState(true);
+  const periodoOptions = buildPeriodoOptions();
 
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
@@ -60,23 +83,44 @@ export default function SeguimientoEmpresas() {
           api.get(reunionesUrl)
         ]);
 
-        let filteredJefaturas = resJ.data || [];
-        let filteredEmpresas = resE.data || [];
+        const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
+                           user?.nombre?.toLowerCase().includes("demo") ||
+                           user?.correo?.toLowerCase().includes("prueba") ||
+                           user?.correo?.toLowerCase().includes("demo") ||
+                           user?.cargos?.toLowerCase().includes("prueba") ||
+                           user?.cargos?.toLowerCase().includes("demo");
+
+        let filteredJefaturas = (resJ.data || []).filter(j => {
+          const jDemo = j.nombre?.toLowerCase().includes("prueba") || 
+                        j.nombre?.toLowerCase().includes("demo") ||
+                        j.correo?.toLowerCase().includes("prueba") ||
+                        j.correo?.toLowerCase().includes("demo");
+          return isUserDemo ? jDemo : !jDemo;
+        });
+
+        let filteredEmpresas = (resE.data || []).filter(emp => {
+          const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
+                          emp.nombre?.toLowerCase().includes("prueba") ||
+                          emp.jefatura_id === 28;
+          return isUserDemo ? empDemo : !empDemo;
+        });
 
         if (rol === "jefatura" && id) {
           filteredJefaturas = filteredJefaturas.filter(j => j.id === id);
-          filteredEmpresas = filteredEmpresas.filter(e => e.jefatura_id === id);
           setFiltroJefatura(id.toString());
         } else if (rol === "ejecutiva" && (jefaturaId || id)) {
           const targetJefId = jefaturaId || id;
           filteredJefaturas = filteredJefaturas.filter(j => j.id === targetJefId);
-          filteredEmpresas = filteredEmpresas.filter(e => e.jefatura_id === targetJefId);
           setFiltroJefatura(targetJefId.toString());
         }
 
+        let filteredReuniones = (resR.data || []).filter(r => {
+          return filteredEmpresas.some(emp => emp.id === r.empresa_id);
+        });
+
         setJefaturas(filteredJefaturas);
         setEmpresas(filteredEmpresas);
-        setReuniones(resR.data || []);
+        setReuniones(filteredReuniones);
       } catch (err) {
         console.error("Error cargando datos:", err);
       } finally {
@@ -85,6 +129,27 @@ export default function SeguimientoEmpresas() {
     };
     fetchData();
   }, []);
+
+  // Load seguimiento logs when period filter changes
+  const cargarLogs = useCallback(async () => {
+    try {
+      const isAnio = filtroPeriodo.startsWith('anio-');
+      let url;
+      if (isAnio) {
+        url = `/empresas/seguimiento-logs?anio=${filtroPeriodo.replace('anio-', '')}`;
+      } else {
+        url = `/empresas/seguimiento-logs?periodo=${filtroPeriodo}`;
+      }
+      const res = await api.get(url);
+      setSeguimientoLogs(res.data || []);
+    } catch (err) {
+      console.error("Error cargando logs de seguimiento:", err);
+    }
+  }, [filtroPeriodo]);
+
+  useEffect(() => {
+    if (!loading) cargarLogs();
+  }, [filtroPeriodo, loading, cargarLogs]);
 
   useEffect(() => {
     setFiltroEmpresa("Todas");
@@ -95,8 +160,19 @@ export default function SeguimientoEmpresas() {
     setFiltroEmpresa("Todas");
   }, [filtroMacroZona]);
 
-  const tieneReunion = (empresaId) => {
-    return reuniones.some(r => r.empresa_id === empresaId && r.estado_envio !== 'pendiente');
+
+
+  // Temporal state resolution: determines the state of an empresa based on the filtered period logs
+  const getEstadoTemporal = (empresaId) => {
+    const logs = seguimientoLogs.filter(l => l.empresa_id === empresaId);
+    if (logs.some(l => l.estado === 'gestionada')) return 'gestionada';
+    if (logs.some(l => l.estado === 'concretada')) return 'concretada';
+    if (logs.some(l => l.estado === 'solicitada')) return 'solicitada';
+    return 'pendiente';
+  };
+
+  const getLogsSolicitada = (empresaId) => {
+    return seguimientoLogs.filter(l => l.empresa_id === empresaId && l.estado === 'solicitada');
   };
 
   const getReunionInfo = (empresaId) => {
@@ -132,7 +208,7 @@ export default function SeguimientoEmpresas() {
   };
 
   const empresasPorJefatura = empresas.filter(emp => {
-    const pasaJefatura = filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
+    const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
     
     let pasaMacroZona = true;
     if (filtroMacroZona === "Matriz") {
@@ -147,19 +223,13 @@ export default function SeguimientoEmpresas() {
   const empresasFiltradas = empresasPorJefatura.filter(emp =>
     filtroEmpresa === "Todas" || emp.nombre === filtroEmpresa
   ).sort((a, b) => {
-    const gestionadaA = tieneReunion(a.id);
-    const gestionadaB = tieneReunion(b.id);
+    const estadoA = getEstadoTemporal(a.id);
+    const estadoB = getEstadoTemporal(b.id);
     
     // Prioridad: 1. concretada, 2. solicitada, 3. pendiente, 4. gestionada
-    let prioA = 3; // Pendiente por defecto
-    if (gestionadaA) prioA = 4;
-    else if (a.estado_seguimiento === 'concretada') prioA = 1;
-    else if (a.estado_seguimiento === 'solicitada') prioA = 2;
-
-    let prioB = 3; // Pendiente por defecto
-    if (gestionadaB) prioB = 4;
-    else if (b.estado_seguimiento === 'concretada') prioB = 1;
-    else if (b.estado_seguimiento === 'solicitada') prioB = 2;
+    const prioMap = { concretada: 1, solicitada: 2, pendiente: 3, gestionada: 4 };
+    const prioA = prioMap[estadoA] || 3;
+    const prioB = prioMap[estadoB] || 3;
 
     if (prioA !== prioB) return prioA - prioB;
     return a.nombre.localeCompare(b.nombre);
@@ -171,45 +241,108 @@ export default function SeguimientoEmpresas() {
   ];
 
   const handleEstadoClick = async (emp) => {
-    if (tieneReunion(emp.id)) {
-      Swal.fire('Aviso', 'Esta empresa ya tiene una minuta registrada y está GESTIONADA.', 'info');
-      return;
-    }
+    const estadoActual = getEstadoTemporal(emp.id);
 
-    const { value: nuevoEstado } = await Swal.fire({
-      title: `<div style="font-size: 22px;">Estado de seguimiento</div>`,
-      html: `<div style="font-size: 15px; color: var(--text-muted);">${emp.nombre}</div>`,
-      input: 'select',
-      inputOptions: {
-        pendiente: 'Pendiente',
-        solicitada: 'Solicitada',
-        concretada: 'Concretada'
-      },
+    // Load historial for this empresa
+    let historial = [];
+    try {
+      const hRes = await api.get(`/empresas/${emp.id}/historial`);
+      historial = hRes.data || [];
+    } catch (e) { /* ignore */ }
+
+    const historialHtml = historial.length > 0
+      ? `<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">📋 Historial de seguimiento</div>
+          <div style="max-height:150px;overflow-y:auto;font-size:12px;">
+            ${historial.slice(0, 15).map(h => {
+              const fecha = h.fecha ? new Date(h.fecha).toLocaleDateString('es-CL') : '';
+              const colorMap = { solicitada: '#f97316', concretada: '#ca8a04', gestionada: '#10b981' };
+              const color = colorMap[h.estado] || '#64748b';
+              const reunionTag = h.reunion_id ? ` <span style="color:#3b82f6;font-size:10px;">(${h.reunion_id})</span>` : '';
+              return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f8fafc;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+                <span style="font-weight:600;color:${color};min-width:80px;">${h.estado.toUpperCase()}</span>
+                <span style="color:#64748b;">${fecha}</span>
+                ${reunionTag}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`
+      : '';
+
+    const solicitudesCount = historial.filter(h => h.estado === 'solicitada').length;
+    const intentoLabel = solicitudesCount > 0 ? ` (${solicitudesCount} solicitud${solicitudesCount > 1 ? 'es' : ''} previa${solicitudesCount > 1 ? 's' : ''})` : '';
+
+    const { value: formValues } = await Swal.fire({
+      title: `<div style="font-size:20px;font-weight:700;">Estado de seguimiento</div>`,
+      html: `
+        <div style="font-size:15px;color:var(--text-muted);margin-bottom:16px;">${emp.nombre}${intentoLabel}</div>
+        <div style="text-align:left;">
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Estado</label>
+          <select id="swal-estado" class="swal2-select" style="width:100%;max-width:300px;margin:0 auto;display:block;font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid #cbd5e1;">
+            <option value="pendiente" ${estadoActual === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+            <option value="solicitada" ${estadoActual === 'solicitada' ? 'selected' : ''}>Solicitada</option>
+            <option value="concretada" ${estadoActual === 'concretada' ? 'selected' : ''}>Concretada</option>
+          </select>
+        </div>
+        <div id="swal-fecha-container" style="text-align:left;margin-top:14px;display:none;">
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;" id="swal-fecha-label">Fecha</label>
+          <input type="date" id="swal-fecha" class="swal2-input" style="width:100%;max-width:300px;margin:0 auto;display:block;font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid #cbd5e1;" value="${new Date().toISOString().split('T')[0]}" />
+        </div>
+        ${historialHtml}
+      `,
       showCancelButton: true,
-      confirmButtonColor: 'var(--primary-color)',
+      confirmButtonColor: '#1e40af',
       cancelButtonText: 'Cancelar',
       confirmButtonText: 'Guardar',
-      inputValue: emp.estado_seguimiento || 'pendiente',
-      width: '350px',
+      width: '420px',
       didOpen: () => {
-        const select = Swal.getInput();
-        select.style.width = '100%';
-        select.style.maxWidth = '260px';
-        select.style.margin = '15px auto 0';
-        select.style.fontSize = '14px';
+        const selectEl = document.getElementById('swal-estado');
+        const fechaContainer = document.getElementById('swal-fecha-container');
+        const fechaLabel = document.getElementById('swal-fecha-label');
+        
+        const toggleFecha = () => {
+          const val = selectEl.value;
+          if (val === 'solicitada') {
+            fechaContainer.style.display = 'block';
+            fechaLabel.textContent = '📅 Fecha de solicitud';
+          } else if (val === 'concretada') {
+            fechaContainer.style.display = 'block';
+            fechaLabel.textContent = '📅 Fecha de reunión acordada';
+          } else {
+            fechaContainer.style.display = 'none';
+          }
+        };
+        selectEl.addEventListener('change', toggleFecha);
+        toggleFecha();
+      },
+      preConfirm: () => {
+        const estado = document.getElementById('swal-estado').value;
+        const fecha = document.getElementById('swal-fecha').value;
+        if ((estado === 'solicitada' || estado === 'concretada') && !fecha) {
+          Swal.showValidationMessage('Debes ingresar una fecha');
+          return false;
+        }
+        return { estado, fecha };
       }
     });
 
-    if (nuevoEstado && nuevoEstado !== (emp.estado_seguimiento || 'pendiente')) {
+    if (formValues) {
       try {
-        const res = await api.patch(`/empresas/${emp.id}/estado`, { estado_seguimiento: nuevoEstado });
+        const res = await api.patch(`/empresas/${emp.id}/estado`, { 
+          estado_seguimiento: formValues.estado,
+          fecha: formValues.fecha,
+          usuario_id: user?.id
+        });
         const { fecha_solicitada, fecha_concretada } = res.data;
         setEmpresas(prev => prev.map(e => e.id === emp.id ? { 
           ...e, 
-          estado_seguimiento: nuevoEstado,
+          estado_seguimiento: formValues.estado,
           fecha_solicitada,
           fecha_concretada
         } : e));
+        // Reload logs for the current period
+        await cargarLogs();
         Swal.fire({ title: '¡Actualizado!', icon: 'success', timer: 1500, showConfirmButton: false });
       } catch (err) {
         Swal.fire('Error', 'No se pudo actualizar el estado', 'error');
@@ -218,7 +351,7 @@ export default function SeguimientoEmpresas() {
   };
 
   const totalEmpresas = empresasPorJefatura.length;
-  const totalGestionadas = empresasPorJefatura.filter(emp => tieneReunion(emp.id)).length;
+  const totalGestionadas = empresasPorJefatura.filter(emp => getEstadoTemporal(emp.id) === 'gestionada').length;
   const porcentajeAvance = totalEmpresas > 0 ? Math.round((totalGestionadas / totalEmpresas) * 100) : 0;
 
   // Jefaturas que tienen al menos una empresa en la macro-zona seleccionada
@@ -395,6 +528,20 @@ export default function SeguimientoEmpresas() {
                 placeholder="Escribe para buscar..."
               />
             </div>
+
+            {/* Filtro Período */}
+            <div style={{ minWidth: "200px", maxWidth: "280px", flex: "1 1 240px" }}>
+              <SearchableFilter 
+                label="📅 Período"
+                value={periodoOptions.find(o => o.value === filtroPeriodo)?.label || ''}
+                options={periodoOptions.map(o => o.label)}
+                onChange={(val) => {
+                  const found = periodoOptions.find(o => o.label === val);
+                  if (found) setFiltroPeriodo(found.value);
+                }}
+                placeholder="Seleccionar período..."
+              />
+            </div>
           </div>
 
           {/* DIVISOR SUTIL */}
@@ -477,13 +624,17 @@ export default function SeguimientoEmpresas() {
           gap: "20px" 
         }}>
           {empresasFiltradas.map(emp => {
-            const gestionada = tieneReunion(emp.id);
-            const estadoStr = gestionada ? 'gestionada' : (emp.estado_seguimiento || 'pendiente');
+            const estadoStr = getEstadoTemporal(emp.id);
+            const solCount = getLogsSolicitada(emp.id).length;
             
-            let bgColor = "#b91c1c"; // Rojo claro para pendiente (antes oscuro)
-            if (gestionada) bgColor = "#507255";
-            else if (estadoStr === 'solicitada') bgColor = "#f97316"; // Naranjo vivo
-            else if (estadoStr === 'concretada') bgColor = "#ca8a04"; // Amarillo oscuro/dorado para contraste blanco
+            const colorMap = { pendiente: '#b91c1c', solicitada: '#f97316', concretada: '#ca8a04', gestionada: '#507255' };
+            const bgColor = colorMap[estadoStr] || '#b91c1c';
+
+            // Get relevant dates from logs for this period
+            const logsEmpresa = seguimientoLogs.filter(l => l.empresa_id === emp.id);
+            const lastSolicitada = logsEmpresa.find(l => l.estado === 'solicitada');
+            const lastConcretada = logsEmpresa.find(l => l.estado === 'concretada');
+            const lastGestionada = logsEmpresa.find(l => l.estado === 'gestionada');
 
             return (
               <div 
@@ -518,30 +669,21 @@ export default function SeguimientoEmpresas() {
                   fontWeight: "bold",
                   marginBottom: "6px"
                 }}>
-                  {estadoStr.toUpperCase()}
+                  {estadoStr.toUpperCase()}{solCount > 1 && estadoStr === 'solicitada' ? ` (${solCount}°)` : ''}
                 </div>
                 <div style={{ fontSize: "10px", opacity: 0.9, marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                  {estadoStr === 'solicitada' && emp.fecha_solicitada && (
-                    <span>Sol: {formatearFecha(emp.fecha_solicitada)}</span>
+                  {estadoStr === 'solicitada' && lastSolicitada && (
+                    <span>Sol: {formatearFecha(lastSolicitada.fecha)}</span>
                   )}
                   {estadoStr === 'concretada' && (
                     <>
-                      {emp.fecha_solicitada && <span>Sol: {formatearFecha(emp.fecha_solicitada)}</span>}
-                      {emp.fecha_concretada && <span>Conc: {formatearFecha(emp.fecha_concretada)}</span>}
+                      {lastSolicitada && <span>Sol: {formatearFecha(lastSolicitada.fecha)}</span>}
+                      {lastConcretada && <span>Conc: {formatearFecha(lastConcretada.fecha)}</span>}
                     </>
                   )}
-                  {estadoStr === 'grid' && emp.fecha_solicitada && (
-                    <span>Sol: {formatearFecha(emp.fecha_solicitada)}</span>
+                  {estadoStr === 'gestionada' && lastGestionada && (
+                    <span>Reunión: {formatearFecha(lastGestionada.fecha)}</span>
                   )}
-                  {estadoStr === 'gestionada' && (() => {
-                    const reu = getReunionInfo(emp.id);
-                    return reu ? (
-                      <>
-                        {reu.fecha_reu && <span>Reunión: {formatearFecha(reu.fecha_reu)}</span>}
-                        {reu.created_at && <span>Minuta: {formatearFecha(reu.created_at)}</span>}
-                      </>
-                    ) : null;
-                  })()}
                 </div>
               </div>
             );
@@ -556,17 +698,22 @@ export default function SeguimientoEmpresas() {
           {/* PENDIENTES */}
           <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', borderTop: '4px solid #ef4444' }}>
             <h3 style={{ marginTop: 0, color: '#ef4444', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-              EMPRESAS PENDIENTES <span>{empresasFiltradas.filter(e => !tieneReunion(e.id)).length}</span>
+              EMPRESAS PENDIENTES <span>{empresasFiltradas.filter(e => getEstadoTemporal(e.id) !== 'gestionada').length}</span>
             </h3>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '500px', overflowY: 'auto' }}>
-              {empresasFiltradas.filter(e => !tieneReunion(e.id)).map(emp => {
-                const estado = emp.estado_seguimiento || 'pendiente';
+              {empresasFiltradas.filter(e => getEstadoTemporal(e.id) !== 'gestionada').map(emp => {
+                const estado = getEstadoTemporal(emp.id);
+                const solCount = getLogsSolicitada(emp.id).length;
                 let dotColor = "#dc2626"; // Rojo vivo para pendiente
                 let badgeBg = "#fee2e2";
                 let badgeText = "#991b1b";
                 
                 if (estado === 'solicitada') { dotColor = "#f97316"; badgeBg = "#ffedd5"; badgeText = "#c2410c"; } // Naranjo brillante
                 else if (estado === 'concretada') { dotColor = "#eab308"; badgeBg = "#fef08a"; badgeText = "#854d0e"; } // Tonos amarillos
+
+                const logsEmpresa = seguimientoLogs.filter(l => l.empresa_id === emp.id);
+                const lastSolicitada = logsEmpresa.find(l => l.estado === 'solicitada');
+                const lastConcretada = logsEmpresa.find(l => l.estado === 'concretada');
 
                 return (
                   <li 
@@ -581,13 +728,13 @@ export default function SeguimientoEmpresas() {
                       <div>
                         <div style={{ fontWeight: "bold" }}>{emp.nombre}</div>
                         <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          {estado === 'solicitada' && emp.fecha_solicitada && (
-                            <span>Sol: {formatearFecha(emp.fecha_solicitada)}</span>
+                          {estado === 'solicitada' && lastSolicitada && (
+                            <span>Sol: {formatearFecha(lastSolicitada.fecha)}</span>
                           )}
                           {estado === 'concretada' && (
                             <>
-                              {emp.fecha_solicitada && <span>Sol: {formatearFecha(emp.fecha_solicitada)}</span>}
-                              {emp.fecha_concretada && <span>Conc: {formatearFecha(emp.fecha_concretada)}</span>}
+                              {lastSolicitada && <span>Sol: {formatearFecha(lastSolicitada.fecha)}</span>}
+                              {lastConcretada && <span>Conc: {formatearFecha(lastConcretada.fecha)}</span>}
                             </>
                           )}
                         </div>
@@ -595,13 +742,13 @@ export default function SeguimientoEmpresas() {
                     </div>
                     {estado !== 'pendiente' && (
                       <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold', background: badgeBg, color: badgeText, textTransform: 'uppercase' }}>
-                        {estado}
+                        {estado}{estado === 'solicitada' && solCount > 1 ? ` (${solCount}°)` : ''}
                       </span>
                     )}
                   </li>
                 );
               })}
-              {empresasFiltradas.filter(e => !tieneReunion(e.id)).length === 0 && (
+              {empresasFiltradas.filter(e => getEstadoTemporal(e.id) !== 'gestionada').length === 0 && (
                 <li style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>¡Excelente! No hay empresas pendientes.</li>
               )}
             </ul>
@@ -610,27 +757,27 @@ export default function SeguimientoEmpresas() {
           {/* GESTIONADAS */}
           <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', borderTop: '4px solid #10b981' }}>
             <h3 style={{ marginTop: 0, color: '#10b981', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-              EMPRESAS GESTIONADAS <span>{empresasFiltradas.filter(e => tieneReunion(e.id)).length}</span>
+              EMPRESAS GESTIONADAS <span>{empresasFiltradas.filter(e => getEstadoTemporal(e.id) === 'gestionada').length}</span>
             </h3>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '500px', overflowY: 'auto' }}>
-              {empresasFiltradas.filter(e => tieneReunion(e.id)).map(emp => {
-                const reu = getReunionInfo(emp.id);
+              {empresasFiltradas.filter(e => getEstadoTemporal(e.id) === 'gestionada').map(emp => {
+                const logsEmpresa = seguimientoLogs.filter(l => l.empresa_id === emp.id);
+                const lastGestionada = logsEmpresa.find(l => l.estado === 'gestionada');
                 return (
                   <li key={emp.id} style={{ padding: '12px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '13px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', flexShrink: 0 }}></span>
                     <div>
                       <div style={{ fontWeight: "bold" }}>{emp.nombre}</div>
-                      {reu && (
+                      {lastGestionada && (
                         <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          {reu.fecha_reu && <span>Reunión: {formatearFecha(reu.fecha_reu)}</span>}
-                          {reu.created_at && <span>Minuta: {formatearFecha(reu.created_at)}</span>}
+                          <span>Reunión: {formatearFecha(lastGestionada.fecha)}</span>
                         </div>
                       )}
                     </div>
                   </li>
                 );
               })}
-              {empresasFiltradas.filter(e => tieneReunion(e.id)).length === 0 && (
+              {empresasFiltradas.filter(e => getEstadoTemporal(e.id) === 'gestionada').length === 0 && (
                 <li style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>Aún no hay empresas gestionadas.</li>
               )}
             </ul>
@@ -657,12 +804,17 @@ export default function SeguimientoEmpresas() {
                 </tr>
               </thead>
               <tbody>
-                {(filtroJefatura === "" ? jefaturasGeneralOrdenadas : jefaturasGeneralOrdenadas.filter(j => j.id === Number(filtroJefatura))).map(jef => {
-                  const empsJef = empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa));
-                  const pendientes = empsJef.filter(e => !tieneReunion(e.id) && (e.estado_seguimiento || 'pendiente') === 'pendiente').length;
-                  const solicitadas = empsJef.filter(e => !tieneReunion(e.id) && e.estado_seguimiento === 'solicitada').length;
-                  const concretadas = empsJef.filter(e => !tieneReunion(e.id) && e.estado_seguimiento === 'concretada').length;
-                  const gestionadas = empsJef.filter(e => tieneReunion(e.id)).length;
+                {(filtroJefatura === "" 
+                  ? jefaturasGeneralOrdenadas.filter(jef => empresas.some(e => e.jefatura_id === jef.id))
+                  : jefaturasGeneralOrdenadas.filter(j => j.id === Number(filtroJefatura))
+                ).map(jef => {
+                  const empsJef = (userRol === 'jefatura' || userRol === 'ejecutiva')
+                    ? empresas.filter(e => filtroEmpresa === "Todas" || e.nombre === filtroEmpresa)
+                    : empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa));
+                  const pendientes = empsJef.filter(e => getEstadoTemporal(e.id) === 'pendiente').length;
+                  const solicitadas = empsJef.filter(e => getEstadoTemporal(e.id) === 'solicitada').length;
+                  const concretadas = empsJef.filter(e => getEstadoTemporal(e.id) === 'concretada').length;
+                  const gestionadas = empsJef.filter(e => getEstadoTemporal(e.id) === 'gestionada').length;
                   const total = empsJef.length;
 
                   return (
@@ -684,31 +836,34 @@ export default function SeguimientoEmpresas() {
                     </tr>
                   );
                 })}
-                {(filtroJefatura === "" ? jefaturas : jefaturas.filter(j => j.id === Number(filtroJefatura))).length > 1 && (
+                {(filtroJefatura === "" 
+                  ? jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)) 
+                  : jefaturas.filter(j => j.id === Number(filtroJefatura))
+                ).length > 1 && (
                   <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0', fontWeight: 'bold' }}>
                     <td style={{ padding: '8px 12px', color: 'var(--text-main)' }}>TOTAL GENERAL</td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <span style={{ background: '#dc2626', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
-                        {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && (e.estado_seguimiento || 'pendiente') === 'pendiente').length, 0)}
+                        {jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)).reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && getEstadoTemporal(e.id) === 'pendiente').length, 0)}
                       </span>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <span style={{ background: '#f97316', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
-                        {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && e.estado_seguimiento === 'solicitada').length, 0)}
+                        {jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)).reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && getEstadoTemporal(e.id) === 'solicitada').length, 0)}
                       </span>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <span style={{ background: '#ca8a04', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
-                        {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && !tieneReunion(e.id) && e.estado_seguimiento === 'concretada').length, 0)}
+                        {jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)).reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && getEstadoTemporal(e.id) === 'concretada').length, 0)}
                       </span>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '24px' }}>
-                        {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && tieneReunion(e.id)).length, 0)}
+                        {jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)).reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa) && getEstadoTemporal(e.id) === 'gestionada').length, 0)}
                       </span>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '14px', color: 'var(--text-main)' }}>
-                      {jefaturas.reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa)).length, 0)}
+                      {jefaturas.filter(jef => empresas.some(e => e.jefatura_id === jef.id)).reduce((acc, jef) => acc + empresas.filter(e => e.jefatura_id === jef.id && (filtroEmpresa === "Todas" || e.nombre === filtroEmpresa)).length, 0)}
                     </td>
                   </tr>
                 )}

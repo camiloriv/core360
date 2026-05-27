@@ -192,18 +192,26 @@ const Sidebar = () => {
     },
   ];
 
-  if (user.permisos !== "admin") {
-    menuItems = menuItems.filter(
-      (item) => !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
-    );
-  }
+  const vistas = user.vistas_permitidas
+    ? (typeof user.vistas_permitidas === "string" ? JSON.parse(user.vistas_permitidas) : user.vistas_permitidas)
+    : null;
 
-  if (
-    user.permisos !== "jefatura" &&
-    user.permisos !== "ejecutiva" &&
-    user.permisos !== "admin"
-  ) {
-    menuItems = menuItems.filter((item) => item.path !== "/editor-encuestas");
+  if (vistas) {
+    menuItems = menuItems.filter((item) => vistas.includes(item.path));
+  } else {
+    if (user.permisos !== "admin") {
+      menuItems = menuItems.filter(
+        (item) => !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
+      );
+    }
+
+    if (
+      user.permisos !== "jefatura" &&
+      user.permisos !== "ejecutiva" &&
+      user.permisos !== "admin"
+    ) {
+      menuItems = menuItems.filter((item) => item.path !== "/editor-encuestas");
+    }
   }
 
   useEffect(() => {

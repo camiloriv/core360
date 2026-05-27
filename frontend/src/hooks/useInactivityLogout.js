@@ -22,7 +22,7 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
       localStorage.removeItem('usuario');
       localStorage.removeItem('ultimoAcceso');
       
-      // Mostrar alerta al usuario
+      // Mostrar alerta al usuario y redirigir al login al presionar Aceptar
       Swal.fire({
         title: 'Sesión Expirada',
         text: 'Tu sesión ha sido cerrada automáticamente tras 30 minutos de inactividad.',
@@ -32,8 +32,7 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
         allowOutsideClick: false,
         allowEscapeKey: false
       }).then(() => {
-        // Redirigir al login
-        navigate('/login');
+        window.location.href = '/login';
       });
     };
 

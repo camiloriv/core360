@@ -26,14 +26,20 @@ function ReunionesForm({ onSuccess }) {
 
   // Para no-admin: inicializar ejecutiva_id y enviado_por desde el usuario logueado
   useEffect(() => {
-    if (user.permisos !== "admin" && !form.jefatura_id && !form.ejecutiva_id) {
-      setField("jefatura_id", user.jefatura_id || user.id);
-      setField("ejecutiva_id", user.id);
-      setField("enviado_por", user.nombre);
-    } else if (user.permisos === "admin") {
+    if (user.permisos && user.permisos !== "admin") {
+      if (!form.jefatura_id) {
+        setField("jefatura_id", user.jefatura_id || user.id);
+      }
+      if (!form.ejecutiva_id) {
+        setField("ejecutiva_id", user.id);
+      }
+      if (!form.enviado_por) {
+        setField("enviado_por", user.nombre);
+      }
+    } else if (user.permisos === "admin" && !form.enviado_por) {
       setField("enviado_por", user.nombre);
     }
-  }, []);
+  }, [user.permisos, user.id, user.jefatura_id, user.nombre, form.ejecutiva_id, form.jefatura_id, form.enviado_por]);
 
   const { submit, loading } = useSubmitReunion({
     form,
@@ -48,8 +54,7 @@ function ReunionesForm({ onSuccess }) {
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];
     if (!form.empresa_id) missingFields.push("Empresa");
-    if (user.permisos === "admin" && !form.ejecutiva_id)
-      missingFields.push("Ejecutiva");
+    if (!form.ejecutiva_id) missingFields.push("Ejecutiva");
     if (!form.tipo_reu) missingFields.push("Tipo de Reunión");
     if (!form.motivo_reu) missingFields.push("Motivo");
     if (!form.enviado_a) missingFields.push("Enviar a");
@@ -67,6 +72,8 @@ function ReunionesForm({ onSuccess }) {
       });
     }
 
+    console.log("Submitting meeting form payload:", form);
+
     try {
       const res = await submit();
       Swal.fire({
@@ -76,11 +83,12 @@ function ReunionesForm({ onSuccess }) {
         confirmButtonColor: "#3085d6",
       });
     } catch (error) {
-      console.error(error);
+      console.error("Error creating meeting:", error);
+      const serverError = error.response?.data?.error || "Hubo un problema al crear la reunión. Por favor verifica los datos.";
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: "Hubo un problema al crear la reunión. Por favor verifica los datos.",
+        title: "Error al crear la reunión",
+        text: serverError,
         confirmButtonColor: "#d33",
       });
     }

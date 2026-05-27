@@ -31,3 +31,10 @@ export const getEmpresasByJefatura = async (id) => {
   const res = await axios.get(`${API}/empresas/jefatura/${id}`);
   return res.data;
 };
+
+// Empresas por gerencia
+export const getEmpresasByGerencia = async (id) => {
+  const res = await axios.get(`${API}/empresas?gerencia_id=${id}`);
+  return res.data;
+};
+

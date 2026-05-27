@@ -9,13 +9,21 @@ exports.listarReuniones = async (req, res) => {
     let params = [];
 
     if (rol === 'ejecutiva') {
-        whereClause += " AND r.ejecutiva_id = ?";
-        params.push(usuario_id);
+        whereClause += ` AND (
+            emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+            OR emp.jefatura_id IN (
+                SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+            )
+            OR r.ejecutiva_id = ?
+        )`;
+        params.push(usuario_id, usuario_id, usuario_id);
     } else if (rol === 'jefatura') {
-        whereClause += " AND emp.jefatura_id = ?";
-        params.push(usuario_id);
+        whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
+            SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+        ))`;
+        params.push(usuario_id, usuario_id);
     } else if (rol === 'gerencia') {
-        whereClause += ` AND j.id IN (
+        whereClause += ` AND (j.id IN (
             SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
             UNION
             SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -23,8 +31,8 @@ exports.listarReuniones = async (req, res) => {
                 JOIN usuarios u ON ug.usuario_id = u.id 
                 WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
             )
-        )`;
-        params.push(usuario_id, usuario_id);
+        ) OR emp.jefatura_id = ?)`;
+        params.push(usuario_id, usuario_id, usuario_id);
     }
 
     const sql = `
@@ -63,13 +71,21 @@ exports.obtenerStats = async (req, res) => {
     let params = [];
 
     if (rol === 'ejecutiva') {
-        whereClause += " AND r.ejecutiva_id = ?";
-        params.push(usuario_id);
+        whereClause += ` AND (
+            emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+            OR emp.jefatura_id IN (
+                SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+            )
+            OR r.ejecutiva_id = ?
+        )`;
+        params.push(usuario_id, usuario_id, usuario_id);
     } else if (rol === 'jefatura') {
-        whereClause += " AND emp.jefatura_id = ?";
-        params.push(usuario_id);
+        whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
+            SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
+        ))`;
+        params.push(usuario_id, usuario_id);
     } else if (rol === 'gerencia') {
-        whereClause += ` AND j.id IN (
+        whereClause += ` AND (j.id IN (
             SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
             UNION
             SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
@@ -77,8 +93,8 @@ exports.obtenerStats = async (req, res) => {
                 JOIN usuarios u ON ug.usuario_id = u.id 
                 WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
             )
-        )`;
-        params.push(usuario_id, usuario_id);
+        ) OR emp.jefatura_id = ?)`;
+        params.push(usuario_id, usuario_id, usuario_id);
     }
 
     try {
@@ -221,6 +237,16 @@ exports.crearReunion = async (req, res) => {
         ];
 
         await db.query(sql, values);
+
+        // Auto-mark empresa as 'gestionada' with the meeting date (NOT server date)
+        await db.query(
+          "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
+          [fecha_reu, empresa_id]
+        );
+        await db.query(
+          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id) VALUES (?, 'gestionada', ?, ?, ?)",
+          [empresa_id, fecha_reu, ejecutiva_id, id_reunion]
+        );
 
         // Enviar inmediatamente
         const sqlDetalle = `

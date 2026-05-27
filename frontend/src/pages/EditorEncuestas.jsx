@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import "../styles/agoras-theme.css";
+import "../styles/core360-theme.css";
 
 const API_BASE = "http://localhost:8080/encuestas/editor";
 
@@ -12,6 +12,7 @@ export default function EditorEncuestas() {
   const [preguntas, setPreguntas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInactives, setShowInactives] = useState(false); // 🔥 Nuevo estado para filtrar
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   useEffect(() => {
     document.title = "CORE 360 - Ajustes";
@@ -647,12 +648,15 @@ export default function EditorEncuestas() {
                       preguntaId: parseInt(preguntaId),
                     });
                     await loadPreguntas(selectedTemplate.id);
-                    handleOpenTemplateManager(selectedTemplate);
+                    Swal.fire({
+                      title: 'Pregunta vinculada',
+                      icon: 'success',
+                      timer: 1000,
+                      showConfirmButton: false
+                    });
                   } catch (err) {
                     console.error("Error linking question:", err);
-                    Swal.fire("Error", "No se pudo vincular la pregunta.", "error").then(() => {
-                      handleOpenTemplateManager(selectedTemplate);
-                    });
+                    Swal.fire("Error", "No se pudo vincular la pregunta.", "error");
                   }
                 });
               });
@@ -733,7 +737,7 @@ export default function EditorEncuestas() {
           strictReturn &&
           selectedTemplate
         ) {
-          handleOpenTemplateManager(selectedTemplate);
+          // Keep user on the main view
         }
       };
 
@@ -1018,6 +1022,148 @@ export default function EditorEncuestas() {
       );
       loadPreguntas(selectedTemplate.id);
     }
+  };
+
+  const handleCambiarEstado = async (template) => {
+    if (!template) return;
+    const nuevoEstado = template.activo === 1 ? 0 : 1;
+    const { isConfirmed } = await Swal.fire({
+      title: template.activo === 1 ? "¿Desactivar Template?" : "¿Activar Template?",
+      text: template.activo === 1 
+        ? "El template dejará de estar disponible para crear encuestas nuevas."
+        : "El template volverá a estar disponible para crear encuestas.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "var(--primary-color)",
+      cancelButtonText: "Cancelar",
+      confirmButtonText: template.activo === 1 ? "Sí, desactivar" : "Sí, activar"
+    });
+
+    if (isConfirmed) {
+      try {
+        const updatedFields = {
+          id: template.id,
+          nombre: template.nombre,
+          activo: nuevoEstado
+        };
+        await axios.patch(`${API_BASE}/templates`, updatedFields);
+        
+        // Refresh templates list
+        const latestTemplates = await axios.get(`${API_BASE}/templates`);
+        setTemplates(latestTemplates.data);
+        const freshTemplate = latestTemplates.data.find(t => t.id === template.id);
+        if (freshTemplate) {
+          setSelectedTemplate(freshTemplate);
+        } else {
+          setSelectedTemplate(null);
+        }
+        Swal.fire({
+          title: 'Estado actualizado',
+          icon: 'success',
+          timer: 1000,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Error", "No se pudo cambiar el estado.", "error");
+      }
+    }
+  };
+
+  const handleUnlinkPregunta = async (pregunta) => {
+    if (!selectedTemplate) return;
+    const confirm = await Swal.fire({
+      title: "¿Desvincular Pregunta?",
+      text: `¿Estás seguro de desvincular la pregunta "${pregunta.texto}" del template? Permanecerá disponible en la Biblioteca Maestro.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Sí, desvincular",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (confirm.isConfirmed) {
+      try {
+        await axios.post(`${API_BASE}/templates/unlink`, {
+          template_id: selectedTemplate.id,
+          pregunta_id: pregunta.pregunta_id || pregunta.id
+        });
+        
+        // Refresh templates and questions
+        const latestTemplates = await axios.get(`${API_BASE}/templates`);
+        setTemplates(latestTemplates.data);
+        
+        const res = await axios.get(`${API_BASE}/preguntas/${selectedTemplate.id}`);
+        setPreguntas(res.data);
+        
+        Swal.fire({
+          title: 'Desvinculada',
+          icon: 'success',
+          timer: 1000,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Error", "No se pudo desvincular la pregunta.", "error");
+      }
+    }
+  };
+
+  const handleReorderQuestions = async (reorderedList) => {
+    if (!selectedTemplate) return;
+    try {
+      // Create promises to update each question's order in the database
+      const promises = reorderedList.map((p, idx) => {
+        const newOrder = idx + 1;
+        return axios.post(`${API_BASE}/preguntas`, {
+          pregunta_id: p.pregunta_id || p.id,
+          template_id: selectedTemplate.id,
+          dimension_id: p.dimension_id,
+          subdimension: p.subdimension,
+          texto: p.texto,
+          tipo: p.tipo,
+          escala: p.escala,
+          es_nps: p.es_nps,
+          orden: newOrder,
+          opciones_json: typeof p.opciones_json === "string"
+            ? JSON.parse(p.opciones_json)
+            : p.opciones_json || [],
+          requerida: p.requerida || 1,
+        });
+      });
+      await Promise.all(promises);
+      await loadPreguntas(selectedTemplate.id);
+    } catch (err) {
+      console.error("Error reordering questions:", err);
+      Swal.fire("Error", "No se pudieron guardar las posiciones de las preguntas.", "error");
+    }
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const listCopy = [...preguntas];
+    const draggedItem = listCopy[draggedIndex];
+    listCopy.splice(draggedIndex, 1);
+    listCopy.splice(targetIndex, 0, draggedItem);
+
+    // Update local state first for instant feedback
+    setPreguntas(listCopy);
+    setDraggedIndex(null);
+
+    // Save the new order in the database
+    await handleReorderQuestions(listCopy);
   };
 
   const swapOrder = async (index1, index2, currentQuestionsList) => {
@@ -1456,7 +1602,10 @@ export default function EditorEncuestas() {
                 flex: 1,
                 overflowY: "auto",
                 marginBottom: "20px",
-                paddingRight: "5px",
+                paddingLeft: "6px",
+                paddingRight: "6px",
+                paddingTop: "4px",
+                paddingBottom: "4px",
               }}
             >
               {loading ? (
@@ -1564,34 +1713,83 @@ export default function EditorEncuestas() {
             {selectedTemplate ? (
               <div className="fade">
                 <div style={styles.mainHeader}>
-                  <div>
-                    <h2
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input
+                      type="text"
+                      value={selectedTemplate.nombre}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setSelectedTemplate(prev => ({ ...prev, nombre: newName }));
+                      }}
+                      onBlur={async () => {
+                        const newName = selectedTemplate.nombre.trim();
+                        if (newName) {
+                          try {
+                            const updatedFields = {
+                              id: selectedTemplate.id,
+                              nombre: newName,
+                              activo: selectedTemplate.activo
+                            };
+                            await axios.patch(`${API_BASE}/templates`, updatedFields);
+                            // Refresh templates list
+                            const latestTemplates = await axios.get(`${API_BASE}/templates`);
+                            setTemplates(latestTemplates.data);
+                          } catch (err) {
+                            console.error(err);
+                            Swal.fire("Error", "No se pudo cambiar el nombre del template.", "error");
+                          }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.target.blur();
+                        }
+                      }}
                       style={{
-                        margin: 0,
                         fontSize: "20px",
+                        fontWeight: "bold",
                         color: "var(--text-main)",
+                        border: "1px solid transparent",
+                        background: "transparent",
+                        borderRadius: "6px",
+                        padding: "6px 12px",
+                        width: "100%",
+                        maxWidth: "360px",
+                        outline: "none",
+                        transition: "all 0.2s"
                       }}
-                    >
-                      {selectedTemplate.nombre}
-                    </h2>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "13px",
-                        color: "var(--text-muted)",
+                      onFocus={(e) => {
+                        e.target.style.border = "1px solid #cbd5e1";
+                        e.target.style.background = "#fff";
                       }}
-                    >
-                      {preguntas.length} preguntas vinculadas
-                    </p>
+                      onBlurCapture={(e) => {
+                        e.target.style.border = "1px solid transparent";
+                        e.target.style.background = "transparent";
+                      }}
+                      title="Haga clic para editar el nombre del template"
+                    />
                   </div>
-                  <div style={{ display: "flex", gap: "10px" }}>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                     <button
-                      onClick={() =>
-                        handleOpenTemplateManager(selectedTemplate)
-                      }
+                      onClick={() => handleCambiarEstado(selectedTemplate)}
                       className="btn-editor-header"
+                      style={{ background: "#64748b", color: "#fff", display: "inline-flex", alignItems: "center", gap: "4px" }}
                     >
-                      ⚙️ Editar
+                      ⚙️ {selectedTemplate.activo === 1 ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      onClick={() => handleSelectFromLibrary(true)}
+                      className="btn-editor-header"
+                      style={{ background: "#10b981", color: "#fff", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                      🔍 Vincular Pregunta
+                    </button>
+                    <button
+                      onClick={() => handleEditPregunta(null, false, preguntas.length + 1)}
+                      className="btn-editor-header"
+                      style={{ background: "#4f46e5", color: "#fff", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                      ➕ Nueva Pregunta
                     </button>
                   </div>
                 </div>
@@ -1600,6 +1798,7 @@ export default function EditorEncuestas() {
                   <table style={styles.table}>
                     <thead>
                       <tr style={styles.th}>
+                        <th style={{ ...styles.thCell, width: "30px", textAlign: "center" }}></th>
                         <th style={{ ...styles.thCell, width: "40px" }}>#</th>
                         <th style={styles.thCell}>Pregunta</th>
                         <th style={styles.thCell}>Dimensión</th>
@@ -1619,7 +1818,7 @@ export default function EditorEncuestas() {
                       {preguntas.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="5"
+                            colSpan="6"
                             style={{
                               padding: "40px",
                               textAlign: "center",
@@ -1630,8 +1829,33 @@ export default function EditorEncuestas() {
                           </td>
                         </tr>
                       ) : (
-                        preguntas.map((p) => (
-                          <tr key={p.assignment_id || p.id} style={styles.tr}>
+                        preguntas.map((p, idx) => (
+                          <tr
+                            key={p.assignment_id || p.id}
+                            style={{
+                              ...styles.tr,
+                              opacity: draggedIndex === idx ? 0.4 : 1,
+                              backgroundColor: draggedIndex === idx ? "#f8fafc" : "transparent"
+                            }}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, idx)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, idx)}
+                          >
+                            <td
+                              style={{
+                                ...styles.tdCell,
+                                cursor: "grab",
+                                textAlign: "center",
+                                color: "#94a3b8",
+                                fontSize: "16px",
+                                userSelect: "none",
+                                width: "30px"
+                              }}
+                              title="Arrastra para reordenar"
+                            >
+                              ⣿
+                            </td>
                             <td style={styles.tdCell}>{p.orden}</td>
                             <td style={styles.tdCell}>
                               <div

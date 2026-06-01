@@ -1,9 +1,9 @@
 const app = require("./app");
 const { startScheduler } = require("./services/scheduler/scheduler.service");
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor corriendo en puerto ${PORT} (${process.env.NODE_ENV || "development"})`);
   startScheduler();
 });

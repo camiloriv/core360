@@ -36,16 +36,18 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
 
   return (
     <div style={{ position: "relative", flex: 1, minWidth: '200px' }} ref={dropdownRef}>
-      <label style={{ 
-        display: "block", 
-        fontSize: "11px", 
-        fontWeight: "bold", 
-        color: "var(--text-muted)", 
-        textTransform: "uppercase",
-        marginBottom: "6px"
-      }}>
-        {label}
-      </label>
+      {label && (
+        <label style={{ 
+          display: "block", 
+          fontSize: "11px", 
+          fontWeight: "bold", 
+          color: "var(--text-muted)", 
+          textTransform: "uppercase",
+          marginBottom: "6px"
+        }}>
+          {label}
+        </label>
+      )}
       
       <div style={{ position: 'relative' }}>
         <input

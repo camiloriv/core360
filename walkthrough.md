@@ -189,6 +189,68 @@ Refinamos significativamente la experiencia del administrador de encuestas (`Edi
 - **Visual Loop Optimizada**: Al cancelar o culminar una acción en el selector de estados, el sistema retorna con suavidad al modal principal del template, garantizando un flujo interactivo ininterrumpido.
 - **Compilación Flawless**: La compilación final empaquetó el bundle del cliente en Vite en solo 1.77 segundos.
 
+---
+
+## 🎨 Alineación de Buscador y Divisor Sutil (` | `) en Seguimiento de Cobertura
+
+Hemos implementado un ajuste de diseño altamente solicitado en el panel de **Seguimiento de Cobertura** (`SeguimientoEmpresas.jsx`) para perfeccionar la alineación visual y la coherencia del diseño del Dashboard.
+
+### Cambios Estéticos Aplicados:
+1. **Condicionalización de la Etiqueta en `SearchableFilter`**: Modificamos el componente reutilizable `SearchableFilter.jsx` para que solo renderice el elemento `<label>` y su respectivo margen inferior de `6px` si la propiedad `label` fue provista. Esto evita la inserción de espacios verticales vacíos no deseados.
+2. **Remoción de Etiqueta de Búsqueda**: Eliminamos la propiedad `label` en el buscador de empresas de la fila inferior en `SeguimientoEmpresas.jsx`. Al remover esta etiqueta superior redundante, el campo de búsqueda se alinea de forma impecable y simétrica en la misma línea que los botones de selección de vista.
+3. **Divisor Vertical Sutil (` | `)**: Ajustamos el divisor a una visualización sumamente sutil (`width: '1px'`, `height: '20px'`, `background: '#cbd5e1'`) con un margen estrecho y balanceado (`margin: '0 6px'`), logrando separar elegantemente ambos componentes sin generar dispersión.
+4. **Placeholder Intuitivo**: Actualizamos el placeholder del input a `"🔍 Buscar empresa..."` para mayor claridad del usuario final.
+5. **Apego e Integración a la Izquierda**: El buscador se redujo levemente en ancho máximo (`maxWidth: "300px"`) y se eliminó su factor de crecimiento dinámico (`flex: "1 1 300px"`). Gracias a esto, el selector de vistas, el divisor vertical y el campo de búsqueda se sitúan de manera compacta y contigua, perfectamente apegados a la izquierda.
+6. **Compilación de Producción Exitosa**: Validamos los cambios mediante la ejecución de un build limpio en Vite, logrando un empaquetado impecable en 46.97 segundos.
+
+---
+
+## 🔄 Sincronización Interactiva Bidireccional de Filtros
+
+Implementamos una lógica inteligente de auto-completado y sincronización entre los filtros del Dashboard en `SeguimientoEmpresas.jsx`:
+
+1. **Búsqueda Global Expandida**: El buscador `"Buscar Empresa"` ahora muestra todas las empresas permitidas para el usuario autenticado (independiente del filtro actual superior de Jefatura o Macro-Zona). Esto permite buscar cualquier empresa de forma instantánea.
+2. **Sincronización Automática al Seleccionar Empresa**: Al buscar y elegir una empresa específica:
+   - **Macro-Zona**: Se auto-selecciona automáticamente a `Matriz` o `Regiones` en base al campo `zona_nombre` de la empresa.
+   - **Jefatura**: Se auto-selecciona la Jefatura/Ejecutiva encargada de dicha cuenta.
+   - Esto actualiza instantáneamente los selectores superiores y despliega el estatus de la empresa seleccionada en las vistas.
+3. **Reinicio Dinámico ("Todas")**: Al elegir la opción `"Todas"` en el buscador de empresas, los filtros superiores de **Macro-Zona** y **Jefatura / Ejecutiva** se restablecen a sus valores por defecto (`"Todas"` / `"TODAS"`).
+4. **Remoción de Bucles de Efecto (`useEffect` Cascade)**: Eliminamos los ganchos reactivos implícitos en favor de flujos de control explícitos e imperativos en los controladores de eventos (`handleMacroZonaChange`, `handleJefaturaChange`, `handleEmpresaFilterChange`). Esto previene ciclos de actualización infinitos y reinicios no deseados de la UI.
+5. **Compilación Impecable**: Empaquetado de producción de Vite exitoso en 9.88 segundos.
+
+---
+
+## 📈 Avance de Cobertura Dinámico y Proporcional
+
+Rediseñamos la lógica de cálculo del componente de visualización de **Avance de Cobertura** (KPI de cabecera en el panel) para que refleje de manera matemáticamente precisa los datos correspondientes a los filtros de período, macro-zona, jefatura y búsqueda de empresas seleccionados de manera activa:
+
+1. **Vincular Avance a `empresasFiltradas`**: Anteriormente, el total de empresas (`totalEmpresas`) y las empresas con reuniones listas (`totalGestionadas`) en el período se computaban usando la lista estática por jefatura (`empresasPorJefatura`), lo cual ignoraba búsquedas o filtros específicos. Hemos migrado este cálculo a la variable de control final `empresasFiltradas`.
+2. **Cálculo de Progreso Proporcional en Tiempo Real**:
+   - **Filtro de Período**: Las reuniones se computan rigurosamente evaluando el estado `'gestionada'` en los logs del período seleccionado (ej. `2026-05`).
+   - **Filtro de Jefatura y Macro-Zona**: Si se selecciona una jefatura o macro-zona específica, el total de empresas y reuniones se reduce proporcionalmente a ese subconjunto.
+   - **Buscador de Empresa**: Si el usuario busca y selecciona una sola empresa, el indicador en la cabecera se adaptará dinámicamente reflejando un avance del `100%` (si fue gestionada/reunida en el período) o `0%` (si está pendiente, solicitada o agendada), mostrando la etiqueta `"1 de 1"` o `"0 de 1"`.
+3. **Verificación de Compilación**: Empaquetado de producción Vite ejecutado y completado de forma impecable en **7.71 segundos** con cero advertencias de archivos.
+
+---
+
+## 📊 Incorporación de Métricas de Reuniones Únicas (Dashboard de Reuniones)
+
+Resolvimos de forma clara y definitiva la diferencia conceptual entre la métrica del **Dashboard de Reuniones** (`DashboardReuniones.jsx`) y la **Vista de Cobertura** (`SeguimientoEmpresas.jsx`), añadiendo tarjetas de información premium de fácil lectura:
+
+### 1. Clarificación de Conceptos:
+- **Dashboard de Reuniones**: Cuenta el **total bruto de reuniones/minutas** realizadas (si una sola empresa sostiene 3 reuniones en el mes, suma 3 en el total de actividad mensual).
+- **Vista de Cobertura**: Cuenta la **cobertura única de empresas** (una empresa es una sola entidad corporativa y solo puede estar en un estado en el ciclo del período, por ejemplo, `'gestionada'`).
+
+### 2. Nuevas Tarjetas Incorporadas:
+Ampliamos el panel de KPIs en `DashboardReuniones.jsx` a una cuadrícula premium de **6 columnas**, integrando dos tarjetas clave que calculan la cardinalidad única en base a los filtros activos de macro-zona, jefatura, empresa y tipo:
+- **`Empresas Únicas`**: Muestra la cantidad total de empresas distintas atendidas dentro del historial filtrado (`new Set(filteredReuniones.map(r => r.empresa_id)).size`).
+- **`Este Mes (Únicas)`**: Muestra la cantidad de empresas distintas atendidas durante el mes calendario corriente, logrando sincronía exacta con la métrica de cobertura (por ejemplo, desplegando `12` empresas únicas frente a las `19` reuniones mensuales totales).
+- **`Este Mes (Total)`**: Renombramos el anterior KPI "Este Mes" para diferenciarlo claramente de la cifra de empresas únicas.
+
+### 3. Compilación Satisfactoria:
+El código fuente empaquetó de forma impecable a través de Vite en un tiempo óptimo de **4.82 segundos** sin warnings.
+
+
 
 
 

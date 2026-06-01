@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import api from "../services/api";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { useDashboardData } from "../hooks/useDashboardData";
 import {
   BarChart,
   Bar,
@@ -31,13 +31,8 @@ const TYPE_COLORS = {
 const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // Default gris claro
 
 export default function DashboardReuniones() {
-  const user = JSON.parse(localStorage.getItem("usuario") || "null");
+  const { user, reuniones, jefaturas, empresas, loading } = useDashboardData();
   const userRol = user?.permisos;
-
-  const [reuniones, setReuniones] = useState([]);
-  const [jefaturas, setJefaturas] = useState([]);
-  const [empresas, setEmpresas] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
   const [filtroJefatura, setFiltroJefatura] = useState("");
@@ -51,91 +46,6 @@ export default function DashboardReuniones() {
 
   useEffect(() => {
     document.title = "CORE 360 - Minutas";
-    const fetchData = async () => {
-      try {
-        const rol = userRol;
-        const id = user?.id;
-        const jefaturaId = user?.jefatura_id;
-
-        // Parámetros según rol
-        let jefaturasUrl = "/jefaturas";
-        let empresasUrl = "/empresas";
-        let reunionesUrl = "/reuniones";
-
-        if (rol === "gerencia" && id) {
-          jefaturasUrl = `/jefaturas?gerencia_id=${id}`;
-          empresasUrl = `/empresas?gerencia_id=${id}`;
-          reunionesUrl = `/reuniones?usuario_id=${id}&rol=gerencia`;
-        } else if (rol === "gerencia_general" && id) {
-          reunionesUrl = `/reuniones`;
-        } else if (rol === "jefatura" && id) {
-          jefaturasUrl = `/jefaturas?jefatura_id=${id}`;
-          empresasUrl = `/empresas?jefatura_id=${id}`;
-          reunionesUrl = `/reuniones?usuario_id=${id}&rol=jefatura`;
-        } else if (rol === "ejecutiva" && id) {
-          const targetJefId = jefaturaId || id;
-          jefaturasUrl = `/jefaturas?jefatura_id=${targetJefId}`;
-          empresasUrl = `/empresas?jefatura_id=${targetJefId}`;
-          reunionesUrl = `/reuniones?usuario_id=${id}&rol=ejecutiva`;
-        }
-
-        const [reunRes, jefRes, empRes] = await Promise.all([
-          api.get(reunionesUrl),
-          api.get(jefaturasUrl),
-          api.get(empresasUrl),
-        ]);
-
-        const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
-                           user?.nombre?.toLowerCase().includes("demo") ||
-                           user?.correo?.toLowerCase().includes("prueba") ||
-                           user?.correo?.toLowerCase().includes("demo") ||
-                           user?.cargos?.toLowerCase().includes("prueba") ||
-                           user?.cargos?.toLowerCase().includes("demo");
-
-        let filteredJefaturas = (jefRes.data || []).filter(j => {
-          const jDemo = j.nombre?.toLowerCase().includes("prueba") || 
-                        j.nombre?.toLowerCase().includes("demo") ||
-                        j.correo?.toLowerCase().includes("prueba") ||
-                        j.correo?.toLowerCase().includes("demo");
-          return isUserDemo ? jDemo : !jDemo;
-        });
-
-        let filteredEmpresas = (empRes.data || []).filter(emp => {
-          const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
-                          emp.nombre?.toLowerCase().includes("prueba") ||
-                          emp.jefatura_id === 28;
-          return isUserDemo ? empDemo : !empDemo;
-        });
-
-        if (rol === "jefatura" && id) {
-          filteredJefaturas = filteredJefaturas.filter(j => j.id === id);
-          // Keep all companies returned by the backend (includes direct and managing Gerencia companies)
-        } else if (rol === "ejecutiva" && (jefaturaId || id)) {
-          const targetJefId = jefaturaId || id;
-          filteredJefaturas = filteredJefaturas.filter(j => j.id === targetJefId);
-          // Keep all companies returned by the backend
-        }
-
-        const filteredReunionesList = (reunRes.data || []).filter(r => {
-          const isDemoEmp = r.empresa_nombre?.toLowerCase().includes("demo") || 
-                            r.empresa_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("demo") ||
-                            r.jefatura_nombre?.toLowerCase().includes("prueba") ||
-                            r.jefatura_nombre?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoEmp : !isDemoEmp;
-        });
-
-        setReuniones(filteredReunionesList);
-        setJefaturas(filteredJefaturas);
-        setEmpresas(filteredEmpresas);
-      } catch (err) {
-        console.error("Error cargando datos:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
   }, []);
 
   useEffect(() => {
@@ -148,88 +58,117 @@ export default function DashboardReuniones() {
   }, [filtroMacroZona]);
 
   // Jefaturas que tienen al menos una empresa en la macro-zona seleccionada
-  const jefaturasFiltradas = jefaturas.filter(j =>
-    empresas.some(e => {
-      if (e.jefatura_id !== j.id) return false;
-      if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
-      if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
-      return true;
-    })
-  );
+  const jefaturasFiltradas = useMemo(() => {
+    return jefaturas.filter(j =>
+      empresas.some(e => {
+        if (e.jefatura_id !== j.id) return false;
+        if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
+        if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
+        return true;
+      })
+    );
+  }, [jefaturas, empresas, filtroMacroZona]);
 
-  const esJefaturaMatriz = (jefId) => {
+  const esJefaturaMatriz = useCallback((jefId) => {
     return empresas.some(e => e.jefatura_id === jefId && e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz"));
-  };
+  }, [empresas]);
 
-  const jefaturasFiltradasOrdenadas = [...jefaturasFiltradas].sort((a, b) => {
-    const aEsMatriz = esJefaturaMatriz(a.id);
-    const bEsMatriz = esJefaturaMatriz(b.id);
-    if (aEsMatriz && !bEsMatriz) return -1;
-    if (!aEsMatriz && bEsMatriz) return 1;
-    return a.nombre.localeCompare(b.nombre);
-  });
+  const jefaturasFiltradasOrdenadas = useMemo(() => {
+    return [...jefaturasFiltradas].sort((a, b) => {
+      const aEsMatriz = esJefaturaMatriz(a.id);
+      const bEsMatriz = esJefaturaMatriz(b.id);
+      if (aEsMatriz && !bEsMatriz) return -1;
+      if (!aEsMatriz && bEsMatriz) return 1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+  }, [jefaturasFiltradas, esJefaturaMatriz]);
 
   const optionsMacroZona = ["TODAS", "MATRIZ", "REGIONES"];
-  const optionsJefaturas = [
+  const optionsJefaturas = useMemo(() => [
     "TODAS",
     ...jefaturasFiltradasOrdenadas.map(j => j.nombre.toUpperCase())
-  ];
+  ], [jefaturasFiltradasOrdenadas]);
 
-  const empresasPorJefatura = empresas.filter(emp => {
-    const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
-    
-    let pasaMacroZona = true;
-    if (filtroMacroZona === "Matriz") {
-      pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
-    } else if (filtroMacroZona === "Regiones") {
-      pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
-    }
+  const empresasPorJefatura = useMemo(() => {
+    return empresas.filter(emp => {
+      const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
+      
+      let pasaMacroZona = true;
+      if (filtroMacroZona === "Matriz") {
+        pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
+      } else if (filtroMacroZona === "Regiones") {
+        pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
+      }
 
-    return pasaJefatura && pasaMacroZona;
-  });
+      return pasaJefatura && pasaMacroZona;
+    });
+  }, [empresas, userRol, filtroJefatura, filtroMacroZona]);
 
-  const optionsEmpresas = [
+  const optionsEmpresas = useMemo(() => [
     "Todas",
     ...[...new Set(empresasPorJefatura.map(emp => emp.nombre))].sort()
-  ];
+  ], [empresasPorJefatura]);
 
-  const optionsTipos = [
+  const optionsTipos = useMemo(() => [
     "Todas",
     ...[...new Set(reuniones.map(r => r.tipo_reu).filter(Boolean))].sort()
-  ];
+  ], [reuniones]);
 
-  const filteredReuniones = reuniones.filter((r) => {
-    const pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === r.empresa_id);
-    const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa;
-    const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo;
+  const filteredReuniones = useMemo(() => {
+    return reuniones.filter((r) => {
+      const pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa;
+      const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo;
 
-    return pasaMacroYJef && pasaEmpresa && pasaTipo && r.estado_envio !== "pendiente";
-  });
+      return pasaMacroYJef && pasaEmpresa && pasaTipo && r.estado_envio !== "pendiente";
+    });
+  }, [reuniones, empresasPorJefatura, filtroEmpresa, filtroTipo]);
+
+  // 🔹 CÁLCULO DE DATOS DE REUNIONES ÚNICAS
+  const reunionesEsteMes = useMemo(() => {
+    return filteredReuniones.filter((r) => {
+      const d = new Date(r.fecha_reu);
+      const now = new Date();
+      return (
+        d.getMonth() === now.getMonth() &&
+        d.getFullYear() === now.getFullYear()
+      );
+    });
+  }, [filteredReuniones]);
+
+  const empresasUnicasEsteMes = useMemo(() => new Set(reunionesEsteMes.map((r) => r.empresa_id)).size, [reunionesEsteMes]);
+  const empresasUnicasTotal = useMemo(() => new Set(filteredReuniones.map((r) => r.empresa_id)).size, [filteredReuniones]);
 
   // 🔹 CÁLCULO DE DATOS PARA GRÁFICOS DINÁMICOS
 
   // 1. Gráfico de Barras: Cantidad por Tipo
-  const barData = Object.entries(
-    filteredReuniones.reduce((acc, r) => {
-      acc[r.tipo_reu] = (acc[r.tipo_reu] || 0) + 1;
-      return acc;
-    }, {}),
-  ).map(([name, total]) => ({ name, total }));
+  const barData = useMemo(() => {
+    return Object.entries(
+      filteredReuniones.reduce((acc, r) => {
+        acc[r.tipo_reu] = (acc[r.tipo_reu] || 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([name, total]) => ({ name, total }));
+  }, [filteredReuniones]);
 
   // 2. Gráfico de Líneas: Evolución por Fecha y Tipo
-  const timelineMap = filteredReuniones.reduce((acc, r) => {
-    const date = new Date(r.fecha_reu).toISOString().split("T")[0];
-    if (!acc[date]) acc[date] = {};
-    acc[date][r.tipo_reu] = (acc[date][r.tipo_reu] || 0) + 1;
-    return acc;
-  }, {});
+  const timelineMap = useMemo(() => {
+    return filteredReuniones.reduce((acc, r) => {
+      const date = new Date(r.fecha_reu).toISOString().split("T")[0];
+      if (!acc[date]) acc[date] = {};
+      acc[date][r.tipo_reu] = (acc[date][r.tipo_reu] || 0) + 1;
+      return acc;
+    }, {});
+  }, [filteredReuniones]);
 
-  const lineData = Object.entries(timelineMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, counts]) => ({
-      date,
-      ...counts,
-    }));
+  const lineData = useMemo(() => {
+    return Object.entries(timelineMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({
+        date,
+        ...counts,
+      }));
+  }, [timelineMap]);
 
   const handleExport = () => {
     const dataToExport = filteredReuniones.map((r) => ({
@@ -364,12 +303,12 @@ export default function DashboardReuniones() {
           </div>
         </div>
 
-        {/* --- KPI CARDS (4 COLUMNAS SEGÚN MOCKUP) --- */}
+        {/* --- KPI CARDS (6 COLUMNAS CON REUNIONES ÚNICAS) --- */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "20px",
+            gridTemplateColumns: "repeat(6, 1fr)",
+            gap: "15px",
             marginBottom: "30px",
           }}
         >
@@ -378,6 +317,12 @@ export default function DashboardReuniones() {
             value={filteredReuniones.length}
             sub="Reuniones filtradas"
             color="#4338ca" // Deep Indigo
+          />
+          <KpiCard
+            title="Empresas Únicas"
+            value={empresasUnicasTotal}
+            sub="Empresas atendidas (total)"
+            color="#0ea5e9" // Sky Blue
           />
           <KpiCard
             title="Reuniones Presenciales"
@@ -396,19 +341,16 @@ export default function DashboardReuniones() {
             color="#9333ea" // Purple
           />
           <KpiCard
-            title="Este Mes"
-            value={
-              filteredReuniones.filter((r) => {
-                const d = new Date(r.fecha_reu);
-                const now = new Date();
-                return (
-                  d.getMonth() === now.getMonth() &&
-                  d.getFullYear() === now.getFullYear()
-                );
-              }).length
-            }
+            title="Este Mes (Total)"
+            value={reunionesEsteMes.length}
             sub="Actividad mensual"
             color="#e11d48" // Rose/Pink
+          />
+          <KpiCard
+            title="Este Mes (Únicas)"
+            value={empresasUnicasEsteMes}
+            sub="Empresas reunidas"
+            color="#10b981" // Emerald Green
           />
         </div>
 

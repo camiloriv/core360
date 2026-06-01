@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { useDashboardData } from "../hooks/useDashboardData";
 import Swal from "sweetalert2";
 import {
   BarChart,
@@ -126,13 +127,11 @@ const SurveyRow = ({ r, onToggleStatus, onResend, onShowDetail }) => (
 // =============================================================================
 
 export default function DashboardEncuestas() {
-  const user = JSON.parse(localStorage.getItem("usuario") || "null");
+  const { user, jefaturas, empresas, reuniones, loading: dataLoading } = useDashboardData();
   const userRol = user?.permisos;
 
   const [respuestas, setRespuestas] = useState([]);
   const [programadas, setProgramadas] = useState([]);
-  const [jefaturas, setJefaturas] = useState([]);
-  const [empresas, setEmpresas] = useState([]);
   const [totalEnvios, setTotalEnvios] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dimensionData, setDimensionData] = useState([]);
@@ -152,38 +151,20 @@ export default function DashboardEncuestas() {
   // Solo admin, gerencia_general y gerencia pueden ver y cambiar el filtro de Jefatura
   const mostrarFiltroJefatura = userRol === 'admin' || userRol === 'gerencia_general' || userRol === 'gerencia';
 
-  // 🔹 Fetch inicial de datos
+  // 🔹 Fetch inicial de datos específicos de encuestas
   useEffect(() => {
+    if (dataLoading || !user) return;
+
     const fetchData = async () => {
       try {
         const rol = userRol;
         const id = user?.id;
-        const jefaturaId = user?.jefatura_id;
+        const queryParams = `?usuario_id=${id}&rol=${rol}`;
 
-        // Parámetros según rol
-        let jefaturasUrl = "/jefaturas";
-        let empresasUrl = "/empresas";
-        let queryParams = `?usuario_id=${id}&rol=${rol}`;
-
-        if (rol === "gerencia" && id) {
-          jefaturasUrl = `/jefaturas?gerencia_id=${id}`;
-          empresasUrl = `/empresas?gerencia_id=${id}`;
-        } else if (rol === "jefatura" && id) {
-          jefaturasUrl = `/jefaturas?jefatura_id=${id}`;
-          empresasUrl = `/empresas?jefatura_id=${id}`;
-        } else if (rol === "ejecutiva" && id) {
-          const targetJefId = jefaturaId || id;
-          jefaturasUrl = `/jefaturas?jefatura_id=${targetJefId}`;
-          empresasUrl = `/empresas?jefatura_id=${targetJefId}`;
-        }
-
-        const [respRes, statsRes, kpiRes, reuniRes, jefRes, empRes] = await Promise.all([
+        const [respRes, statsRes, kpiRes] = await Promise.all([
           api.get(`/encuestas/respuestas/all${queryParams}`),
           api.get(`/encuestas/stats/summary${queryParams}`),
-          api.get(`/encuestas/stats/kpis${queryParams}`),
-          api.get(`/reuniones${queryParams}`),
-          api.get(jefaturasUrl),
-          api.get(empresasUrl),
+          api.get(`/encuestas/stats/kpis${queryParams}`)
         ]);
 
         const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
@@ -193,45 +174,11 @@ export default function DashboardEncuestas() {
                            user?.cargos?.toLowerCase().includes("prueba") ||
                            user?.cargos?.toLowerCase().includes("demo");
 
-        let filteredJefaturas = (jefRes.data || []).filter(j => {
-          const jDemo = j.nombre?.toLowerCase().includes("prueba") || 
-                        j.nombre?.toLowerCase().includes("demo") ||
-                        j.correo?.toLowerCase().includes("prueba") ||
-                        j.correo?.toLowerCase().includes("demo");
-          return isUserDemo ? jDemo : !jDemo;
-        });
-
-        let filteredEmpresas = (empRes.data || []).filter(emp => {
-          const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
-                          emp.nombre?.toLowerCase().includes("prueba") ||
-                          emp.jefatura_id === 28;
-          return isUserDemo ? empDemo : !empDemo;
-        });
-
-        if (rol === "jefatura" && id) {
-          filteredJefaturas = filteredJefaturas.filter(j => j.id === id);
-          // Keep all companies returned by the backend (includes direct and managing Gerencia companies)
-        } else if (rol === "ejecutiva" && (jefaturaId || id)) {
-          const targetJefId = jefaturaId || id;
-          filteredJefaturas = filteredJefaturas.filter(j => j.id === targetJefId);
-          // Keep all companies returned by the backend
-        }
-
         const filteredResponses = (respRes.data || []).filter(r => {
           const isDemoEmp = r.empresa?.toLowerCase().includes("demo") || 
                             r.empresa?.toLowerCase().includes("prueba") ||
                             r.jefatura?.toLowerCase().includes("prueba") ||
                             r.jefatura?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoEmp : !isDemoEmp;
-        });
-
-        const filteredReuniones = (reuniRes.data || []).filter(r => {
-          const isDemoEmp = r.empresa_nombre?.toLowerCase().includes("demo") || 
-                            r.empresa_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("demo") ||
-                            r.jefatura_nombre?.toLowerCase().includes("prueba") ||
-                            r.jefatura_nombre?.toLowerCase().includes("demo");
           return isUserDemo ? isDemoEmp : !isDemoEmp;
         });
 
@@ -257,7 +204,7 @@ export default function DashboardEncuestas() {
         setRespuestas(masterData);
         setTotalEnvios(filteredResponses.length);
 
-        const prog = filteredReuniones.filter(
+        const prog = reuniones.filter(
           (r) =>
             r.programar_encuesta && r.encuesta_estado_envio === "pendiente",
         );
@@ -283,8 +230,6 @@ export default function DashboardEncuestas() {
           })),
         );
 
-        setJefaturas(filteredJefaturas);
-        setEmpresas(filteredEmpresas);
       } catch (err) {
         console.error("Error cargando datos:", err);
       } finally {
@@ -292,7 +237,7 @@ export default function DashboardEncuestas() {
       }
     };
     fetchData();
-  }, []);
+  }, [dataLoading, user, userRol, reuniones]);
 
   useEffect(() => {
     setFiltroEmpresa("Todas");
@@ -304,55 +249,61 @@ export default function DashboardEncuestas() {
   }, [filtroMacroZona]);
 
   // Jefaturas que tienen al menos una empresa en la macro-zona seleccionada
-  const jefaturasFiltradas = jefaturas.filter(j =>
-    empresas.some(e => {
-      if (e.jefatura_id !== j.id) return false;
-      if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
-      if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
-      return true;
-    })
-  );
+  const jefaturasFiltradas = useMemo(() => {
+    return jefaturas.filter(j =>
+      empresas.some(e => {
+        if (e.jefatura_id !== j.id) return false;
+        if (filtroMacroZona === "Matriz") return e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz");
+        if (filtroMacroZona === "Regiones") return !e.zona_nombre || !e.zona_nombre.toLowerCase().includes("matriz");
+        return true;
+      })
+    );
+  }, [jefaturas, empresas, filtroMacroZona]);
 
-  const esJefaturaMatriz = (jefId) => {
+  const esJefaturaMatriz = useCallback((jefId) => {
     return empresas.some(e => e.jefatura_id === jefId && e.zona_nombre && e.zona_nombre.toLowerCase().includes("matriz"));
-  };
+  }, [empresas]);
 
-  const jefaturasFiltradasOrdenadas = [...jefaturasFiltradas].sort((a, b) => {
-    const aEsMatriz = esJefaturaMatriz(a.id);
-    const bEsMatriz = esJefaturaMatriz(b.id);
-    if (aEsMatriz && !bEsMatriz) return -1;
-    if (!aEsMatriz && bEsMatriz) return 1;
-    return a.nombre.localeCompare(b.nombre);
-  });
+  const jefaturasFiltradasOrdenadas = useMemo(() => {
+    return [...jefaturasFiltradas].sort((a, b) => {
+      const aEsMatriz = esJefaturaMatriz(a.id);
+      const bEsMatriz = esJefaturaMatriz(b.id);
+      if (aEsMatriz && !bEsMatriz) return -1;
+      if (!aEsMatriz && bEsMatriz) return 1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+  }, [jefaturasFiltradas, esJefaturaMatriz]);
 
   const optionsMacroZona = ["TODAS", "MATRIZ", "REGIONES"];
-  const optionsJefaturas = [
+  const optionsJefaturas = useMemo(() => [
     "TODAS",
     ...jefaturasFiltradasOrdenadas.map(j => j.nombre.toUpperCase())
-  ];
+  ], [jefaturasFiltradasOrdenadas]);
 
-  const empresasPorJefatura = empresas.filter(emp => {
-    const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
-    
-    let pasaMacroZona = true;
-    if (filtroMacroZona === "Matriz") {
-      pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
-    } else if (filtroMacroZona === "Regiones") {
-      pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
-    }
+  const empresasPorJefatura = useMemo(() => {
+    return empresas.filter(emp => {
+      const pasaJefatura = (userRol === "jefatura" || userRol === "ejecutiva") || filtroJefatura === "" || emp.jefatura_id === Number(filtroJefatura);
+      
+      let pasaMacroZona = true;
+      if (filtroMacroZona === "Matriz") {
+        pasaMacroZona = emp.zona_nombre && emp.zona_nombre.toLowerCase().includes("matriz");
+      } else if (filtroMacroZona === "Regiones") {
+        pasaMacroZona = !emp.zona_nombre || !emp.zona_nombre.toLowerCase().includes("matriz");
+      }
 
-    return pasaJefatura && pasaMacroZona;
-  });
+      return pasaJefatura && pasaMacroZona;
+    });
+  }, [empresas, userRol, filtroJefatura, filtroMacroZona]);
 
-  const optionsEmpresas = [
+  const optionsEmpresas = useMemo(() => [
     "Todas",
     ...[...new Set(empresasPorJefatura.map(emp => emp.nombre))].sort()
-  ];
+  ], [empresasPorJefatura]);
 
-  const optionsTipos = [
+  const optionsTipos = useMemo(() => [
     "Todas",
     ...[...new Set(respuestas.map(r => r.titulo).filter(Boolean))].sort()
-  ];
+  ], [respuestas]);
 
   // 🔹 MEMOIZACIÓN: Filtrado y Estadísticas
   const { filteredTableData, stats } = useMemo(() => {

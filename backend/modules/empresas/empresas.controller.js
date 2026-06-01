@@ -103,13 +103,13 @@ exports.actualizarEstadoEmpresa = async (req, res) => {
         "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id) VALUES (?, 'solicitada', ?, ?)",
         [id, fechaVal, usuario_id || null]
       );
-    } else if (estado_seguimiento === 'concretada') {
+    } else if (estado_seguimiento === 'agendada') {
       const fechaVal = fecha || new Date().toISOString().split('T')[0];
       query = "UPDATE empresas SET estado_seguimiento = ?, fecha_solicitada = COALESCE(fecha_solicitada, ?), fecha_concretada = ? WHERE id = ?";
       params = [estado_seguimiento, fechaVal, fechaVal, id];
       // Insert log entry
       await db.query(
-        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id) VALUES (?, 'concretada', ?, ?)",
+        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id) VALUES (?, 'agendada', ?, ?)",
         [id, fechaVal, usuario_id || null]
       );
     } else if (estado_seguimiento === 'pendiente') {

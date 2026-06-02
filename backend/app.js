@@ -6,14 +6,34 @@ require("dotenv").config();
 const app = express();
 
 // ✅ Seguridad: Cabeceras HTTP protegidas
-// Nota: Requiere npm install helmet
 try {
   const helmet = require("helmet");
   app.use(helmet({
     crossOriginResourcePolicy: false, // Permitir cargar imágenes de uploads
   }));
 } catch (e) {
-  console.warn("Helmet no instalado. Se recomienda: npm install helmet");
+  console.warn("Helmet no instalado localmente.");
+}
+
+// ✅ Compresión GZIP (Reduce tamaño de respuesta)
+try {
+  const compression = require("compression");
+  app.use(compression());
+} catch (e) {
+  console.warn("Compression no instalado localmente.");
+}
+
+// ✅ Rate Limiting Básico (Evitar DDoS)
+try {
+  const rateLimit = require("express-rate-limit");
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 1000, // limite de 1000 peticiones por ventana
+    message: { error: "Demasiadas peticiones. Intenta más tarde." }
+  });
+  app.use(limiter);
+} catch (e) {
+  console.warn("Express-rate-limit no instalado localmente.");
 }
 
 // ✅ CORS Dinámico

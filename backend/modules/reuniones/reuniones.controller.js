@@ -1,10 +1,8 @@
 const db = require("../../database/connection");
 const { enviarCorreo } = require("../../services/email/email.service");
 
-// 🔹 LISTAR REUNIONES
-exports.listarReuniones = async (req, res) => {
-    const { usuario_id, rol } = req.query;
-
+// 🔹 Función auxiliar para DRY: Construye WHERE según el rol
+const buildRoleWhereClause = (usuario_id, rol) => {
     let whereClause = "WHERE 1=1";
     let params = [];
 
@@ -34,6 +32,14 @@ exports.listarReuniones = async (req, res) => {
         ) OR emp.jefatura_id = ?)`;
         params.push(usuario_id, usuario_id, usuario_id);
     }
+    
+    return { whereClause, params };
+};
+
+// 🔹 LISTAR REUNIONES
+exports.listarReuniones = async (req, res) => {
+    const { usuario_id, rol } = req.query;
+    const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
 
     const sql = `
         SELECT 
@@ -67,35 +73,7 @@ exports.obtenerStats = async (req, res) => {
         LEFT JOIN empresas emp ON r.empresa_id = emp.id
         LEFT JOIN usuarios j ON emp.jefatura_id = j.id
     `;
-    let whereClause = "WHERE 1=1";
-    let params = [];
-
-    if (rol === 'ejecutiva') {
-        whereClause += ` AND (
-            emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
-            OR emp.jefatura_id IN (
-                SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
-            )
-            OR r.ejecutiva_id = ?
-        )`;
-        params.push(usuario_id, usuario_id, usuario_id);
-    } else if (rol === 'jefatura') {
-        whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
-            SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
-        ))`;
-        params.push(usuario_id, usuario_id);
-    } else if (rol === 'gerencia') {
-        whereClause += ` AND (j.id IN (
-            SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
-            UNION
-            SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
-                SELECT ug.usuario_id FROM usuario_gerencias ug 
-                JOIN usuarios u ON ug.usuario_id = u.id 
-                WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
-            )
-        ) OR emp.jefatura_id = ?)`;
-        params.push(usuario_id, usuario_id, usuario_id);
-    }
+    const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
 
     try {
         const stats = {};

@@ -21,12 +21,19 @@ function ReunionesForm({ onSuccess }) {
 
   const { form, setField, setFiles, resetForm } = useReunionesForm();
 
+  const isUserDemo = user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba");
+
   const { empresas, setEmpresas, templates, destinatarios, ejecutivas } =
     useReunionesData(user, form.empresa_id);
 
-  // Para no-admin: inicializar ejecutiva_id y enviado_por desde el usuario logueado
+  // Para no-admin o usuarios de prueba: inicializar ejecutiva_id y enviado_por desde el usuario logueado
+  // Excepción: "gerencia" debe seleccionar ejecutiva, así que no autocompletamos su ejecutiva_id ni jefatura_id
   useEffect(() => {
-    if (user.permisos && user.permisos !== "admin") {
+    if (!form.enviado_por_correo) {
+      setField("enviado_por_correo", user.correo);
+    }
+    
+    if (((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia") || isUserDemo) && !user.nombre?.toLowerCase().includes("lilian")) {
       if (!form.jefatura_id) {
         setField("jefatura_id", user.jefatura_id || user.id);
       }
@@ -36,10 +43,10 @@ function ReunionesForm({ onSuccess }) {
       if (!form.enviado_por) {
         setField("enviado_por", user.nombre);
       }
-    } else if (user.permisos === "admin" && !form.enviado_por) {
+    } else if ((user.permisos === "admin" || user.permisos === "gerencia") && !form.enviado_por) {
       setField("enviado_por", user.nombre);
     }
-  }, [user.permisos, user.id, user.jefatura_id, user.nombre, form.ejecutiva_id, form.jefatura_id, form.enviado_por]);
+  }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo, isUserDemo]);
 
   const { submit, loading } = useSubmitReunion({
     form,
@@ -120,8 +127,8 @@ function ReunionesForm({ onSuccess }) {
             required
           />
 
-          {/* Selector de usuario asignado: solo visible para admin */}
-          {user.permisos === "admin" && (
+          {/* Selector de usuario asignado: visible para admin y gerencia (que no sea de prueba) */}
+          {(user.permisos === "admin" || user.permisos === "gerencia") && !isUserDemo && (
             <FormSection
               label={
                 <>
@@ -366,6 +373,36 @@ function ReunionesForm({ onSuccess }) {
                       border: "1px solid var(--border-color)",
                     }}
                   />
+                </div>
+                <div style={{ gridColumn: "1 / -1", marginTop: "5px" }}>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--info-color)",
+                      fontWeight: "bold",
+                      display: "block",
+                      marginBottom: "5px"
+                    }}
+                  >
+                    CORREO DESTINATARIO ENCUESTA:
+                  </span>
+                  <input
+                    type="email"
+                    placeholder="ejemplo@empresa.com"
+                    value={form.encuesta_destinatario}
+                    onChange={(e) =>
+                      setField("encuesta_destinatario", e.target.value)
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  />
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                    Si se deja en blanco, la encuesta se enviará al mismo correo especificado en "Enviar a (Correo Electrónico)".
+                  </p>
                 </div>
                 <div style={{ gridColumn: "1 / -1", marginTop: "10px" }}>
                   <label

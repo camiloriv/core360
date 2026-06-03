@@ -6,6 +6,7 @@ const initialState = {
   empresa_id: "",
   enviado_a: "",
   enviado_por: "",
+  enviado_por_correo: "",
   participantes: "",
   tipo_reu: "",
   fecha_reu: "",
@@ -19,7 +20,8 @@ const initialState = {
   programar_encuesta: false,
   encuesta_tipo: "",
   encuesta_programada_para: "",
-  encuesta_relacionada: false
+  encuesta_relacionada: false,
+  encuesta_destinatario: ""
 };
 
 export default function useReunionesForm() {

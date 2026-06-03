@@ -214,12 +214,14 @@ const styles = {
     fontFamily: "var(--font-main)",
   },
   card: {
+    position: "relative",
+    zIndex: 1,
     width: "100%",
     maxWidth: "380px",
     background: "#ffffff",
     borderRadius: "16px",
     padding: "40px",
-    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)",
+    boxShadow: "0 20px 40px -5px rgba(0, 0, 0, 0.15), 0 10px 20px -5px rgba(0, 0, 0, 0.08)",
     boxSizing: "border-box",
   },
   logoContainer: {

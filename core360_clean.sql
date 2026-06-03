@@ -440,6 +440,7 @@ CREATE TABLE `reuniones` (
   `encuesta_programada_para` datetime DEFAULT NULL,
   `encuesta_estado_envio` varchar(20) DEFAULT 'pendiente',
   `encuesta_relacionada` tinyint(1) DEFAULT '0',
+  `encuesta_destinatario` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ejecutiva_id` (`ejecutiva_id`),
   KEY `empresa_id` (`empresa_id`),

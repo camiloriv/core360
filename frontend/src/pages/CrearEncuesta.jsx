@@ -113,7 +113,7 @@ function CrearEncuesta() {
   };
 
   return (
-    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh', overflow: 'hidden' }}>
+    <div className="encuesta-page" style={{ background: 'var(--bg-body)', minHeight: '100vh', overflow: 'hidden' }}>
       <div className="container">
         <div style={{ marginBottom: "30px" }}>
           <h1

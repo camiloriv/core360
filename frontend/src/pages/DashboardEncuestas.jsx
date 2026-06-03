@@ -516,8 +516,8 @@ export default function DashboardEncuestas() {
   };
 
   return (
-    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh' }}>
-      <div className="container">
+    <div className="encuesta-page" style={{ background: 'var(--bg-body)', minHeight: '100vh' }}>
+      <div className="container" style={{ padding: "30px 20px" }}>
         <div style={{ marginBottom: "30px" }}>
           <h1
             className="page-title"

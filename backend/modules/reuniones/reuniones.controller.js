@@ -167,7 +167,8 @@ exports.crearReunion = async (req, res) => {
         empresa_id,
         programar_encuesta,
         encuesta_tipo,
-        encuesta_programada_para
+        encuesta_programada_para,
+        encuesta_destinatario
     } = req.body;
 
     const archivos = req.files || [];
@@ -199,8 +200,9 @@ exports.crearReunion = async (req, res) => {
                 tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
                 motivo_reu, minuta, form_f, empresa_id, programado_para,
                 estado_envio, archivos_nombres, programar_encuesta,
-                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada,
+                encuesta_destinatario
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -211,7 +213,8 @@ exports.crearReunion = async (req, res) => {
             isSurveyProgrammed ? encuesta_tipo : null,
             isSurveyProgrammed ? encuesta_programada_para : null,
             isSurveyProgrammed ? 'pendiente' : 'enviado',
-            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0
+            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+            isSurveyProgrammed ? encuesta_destinatario : null
         ];
 
         await db.query(sql, values);
@@ -231,11 +234,13 @@ exports.crearReunion = async (req, res) => {
             SELECT 
                 r.*, 
                 emp.nombre AS empresa_nombre,
+                z.nombre AS zona_nombre,
                 e.nombre AS ejecutiva_nombre,
                 e.correo AS ejecutiva_correo,
                 j.correo AS jefatura_correo
             FROM reuniones r
             JOIN empresas emp ON r.empresa_id = emp.id
+            LEFT JOIN zonas z ON emp.zona_id = z.id
             JOIN usuarios e ON r.ejecutiva_id = e.id
             LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE r.id_reunion = ?
@@ -251,7 +256,24 @@ exports.crearReunion = async (req, res) => {
             }));
 
             try {
-                const correosCc = [data.ejecutiva_correo, data.jefatura_correo].filter(Boolean).join(',');
+                const enviado_por_correo = req.body.enviado_por_correo;
+                const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
+                
+                if (enviado_por_correo) {
+                    correosCcArray.push(enviado_por_correo);
+                }
+
+                const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
+                               data.empresa_nombre?.toLowerCase().includes("prueba") || 
+                               enviado_por_correo?.toLowerCase().includes("prueba") ||
+                               data.ejecutiva_correo?.toLowerCase().includes("prueba");
+
+                if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
+                    correosCcArray.push("lortega@proforma.cl");
+                }
+                
+                // Deduplicate emails and remove any null/undefined
+                const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(',');
                 await enviarCorreo({
                     to: data.enviado_a,
                     cc: correosCc,

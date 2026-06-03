@@ -60,7 +60,7 @@ export default function useReunionesData(user, empresa_id) {
   useEffect(() => {
     if (!empresa_id) {
       setDestinatarios([]);
-      if (user?.permisos === "admin") {
+      if (user?.permisos === "admin" || user?.permisos === "gerencia") {
         setEjecutivas([]); // Limpiar la lista hasta que se seleccione empresa
       }
       return;
@@ -68,7 +68,7 @@ export default function useReunionesData(user, empresa_id) {
 
     getDestinatarios(empresa_id).then(res => setDestinatarios(res.data));
 
-    if (user?.permisos === "admin") {
+    if (user?.permisos === "admin" || user?.permisos === "gerencia") {
       getUsuariosPorEmpresa(empresa_id).then(list => setEjecutivas(list));
     }
   }, [empresa_id, user?.permisos]);

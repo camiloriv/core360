@@ -729,9 +729,9 @@ export default function GestionEmpresas() {
   return (
     <div
       className="encuesta-page"
-      style={{ background: "#f8fafc", minHeight: "100vh" }}
+      style={{ background: "var(--bg-body)", minHeight: "100vh" }}
     >
-      <div className="container">
+      <div className="container" style={{ padding: "30px 20px" }}>
         {/* Unified Page Header */}
         <header className="page-header">
           <div className="page-title-area" style={{ marginBottom: "30px" }}>

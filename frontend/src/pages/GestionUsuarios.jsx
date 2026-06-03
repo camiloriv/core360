@@ -338,8 +338,8 @@ const GestionUsuarios = () => {
   };
 
   return (
-    <div className="encuesta-page" style={{ background: '#f8fafc', minHeight: '100vh' }}>
-      <div className="container">
+    <div className="encuesta-page" style={{ background: 'var(--bg-body)', minHeight: '100vh' }}>
+      <div className="container" style={{ padding: "30px 20px" }}>
         {/* Style injection to cleanly suppress default browser focus outline and shadow for our search field */}
         <style>{`
           .no-focus-outline:focus {

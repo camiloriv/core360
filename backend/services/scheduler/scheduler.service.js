@@ -9,10 +9,12 @@ const checkAndSendScheduledEmails = async () => {
             SELECT 
                 r.*, 
                 emp.nombre as empresa_nombre,
+                z.nombre as zona_nombre,
                 e.correo as ejecutiva_correo,
                 j.correo as jefatura_correo
             FROM reuniones r
             JOIN empresas emp ON r.empresa_id = emp.id
+            LEFT JOIN zonas z ON emp.zona_id = z.id
             JOIN usuarios e ON r.ejecutiva_id = e.id
             LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE r.programar_encuesta = 1 
@@ -25,7 +27,16 @@ const checkAndSendScheduledEmails = async () => {
         for (const data of pendingEncuestas) {
             try {
                 // Preparar BCC
-                const bcc = [data.ejecutiva_correo, data.jefatura_correo].filter(Boolean).join(',');
+                const bccArray = [data.ejecutiva_correo, data.jefatura_correo];
+                const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
+                               data.empresa_nombre?.toLowerCase().includes("prueba") || 
+                               data.enviado_por?.toLowerCase().includes("prueba") ||
+                               data.ejecutiva_correo?.toLowerCase().includes("prueba");
+
+                if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
+                    bccArray.push("lortega@proforma.cl");
+                }
+                const bcc = [...new Set(bccArray.filter(Boolean))].join(',');
 
                 // Generar encuesta
                 const resEncuesta = await encuestaService.crearEncuesta({
@@ -33,11 +44,11 @@ const checkAndSendScheduledEmails = async () => {
                     empresa_id: data.empresa_id,
                     tipo_encuesta: data.encuesta_tipo,
                     reunion_id: data.id,
-                    enviado_a: data.enviado_a
+                    enviado_a: data.encuesta_destinatario || data.enviado_a
                 });
 
                 // Enviar correo
-                await enviarCorreoEncuesta(data.enviado_a, resEncuesta.url, bcc);
+                await enviarCorreoEncuesta(data.encuesta_destinatario || data.enviado_a, resEncuesta.url, bcc);
 
                 // Marcar como enviado
                 await db.query("UPDATE reuniones SET encuesta_estado_envio = 'enviado' WHERE id = ?", [data.id]);

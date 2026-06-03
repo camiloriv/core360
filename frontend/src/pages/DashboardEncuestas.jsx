@@ -146,6 +146,10 @@ export default function DashboardEncuestas() {
 
   const [optionsEstados] = useState(["Todas", "Pendientes", "Respondidas", "Activas", "Inactivas"]);
 
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
   // Solo admin, gerencia_general y gerencia pueden ver y cambiar el filtro de Jefatura
@@ -368,6 +372,25 @@ export default function DashboardEncuestas() {
     const pasaEmpresa = filtroEmpresa === "Todas" || p.empresa_nombre === filtroEmpresa;
     return pasaMacroYJef && pasaEmpresa;
   });
+
+  // 🔹 Reset Paginación
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroEstado]);
+
+  // 🔹 Cálculos Paginación
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTableData = filteredTableData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredTableData.length / itemsPerPage);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
 
   // 🔹 Handlers
   const toggleActivo = async (id, currentStatus) => {
@@ -607,34 +630,40 @@ export default function DashboardEncuestas() {
 
         <div style={styles.kpiGrid}>
           <KpiCard
-            title="Creadas"
+            title="Total Creadas"
             value={stats.creadas}
-            sub="Total"
-            color="var(--primary-color)"
+            sub="Encuestas emitidas"
+            color="#4338ca"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>}
           />
           <KpiCard
             title="Respondidas"
             value={stats.respondidas}
-            sub="Completadas"
-            color="var(--success-color)"
+            sub="Tasa de respuesta"
+            color="#10b981"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}
+            trend={`${stats.creadas > 0 ? Math.round((stats.respondidas / stats.creadas) * 100) : 0}%`}
           />
           <KpiCard
             title="Pendientes"
             value={stats.pendientes}
-            sub="Por responder"
-            color="var(--warning-color)"
+            sub="Esperando respuesta"
+            color="#f59e0b"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
           />
           <KpiCard
             title="Activas"
             value={stats.activas}
-            sub="Links hábiles"
-            color="var(--secondary-color)"
+            sub="En proceso / Abiertas"
+            color="#0ea5e9"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>}
           />
           <KpiCard
             title="Inactivas"
             value={stats.inactivas}
             sub="Links anulados"
-            color="var(--danger-color)"
+            color="#ef4444"
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>}
           />
         </div>
 
@@ -643,15 +672,15 @@ export default function DashboardEncuestas() {
         ) : (
           <>
             <div style={styles.chartsGrid}>
-              <div style={styles.chartBox}>
+              <div style={{ ...styles.chartBox, overflow: "hidden" }}>
                 <h3 style={styles.sectionTitle}>
                   Desempeño por Dimensión (DB)
                 </h3>
-                <ResponsiveContainer width="100%" height={320}>
+                <ResponsiveContainer width="99%" height={320} minWidth={1} minHeight={1}>
                   <RadarChart
                     cx="50%"
                     cy="50%"
-                    outerRadius="80%"
+                    outerRadius="65%"
                     data={dimensionData}
                   >
                     <PolarGrid stroke="var(--border-color)" />
@@ -674,15 +703,16 @@ export default function DashboardEncuestas() {
                       stroke="var(--secondary-color)"
                       fill="var(--secondary-color)"
                       fillOpacity={0.4}
+                      isAnimationActive={false}
                     />
-                    <Tooltip />
+                    <Tooltip isAnimationActive={false} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
 
-              <div style={styles.chartBox}>
+              <div style={{ ...styles.chartBox, overflow: "hidden" }}>
                 <h3 style={styles.sectionTitle}>Ranking NPS por Jefatura</h3>
-                <ResponsiveContainer width="100%" height={320}>
+                <ResponsiveContainer width="99%" height={320} minWidth={1} minHeight={1}>
                   <BarChart
                     data={rankingData}
                     layout="vertical"
@@ -780,7 +810,7 @@ export default function DashboardEncuestas() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTableData.map((r) => (
+                    {currentTableData.map((r) => (
                       <SurveyRow
                         key={r.id}
                         r={r}
@@ -792,6 +822,34 @@ export default function DashboardEncuestas() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    Mostrando {indexOfFirstItem + 1} a {Math.min(indexOfLastItem, filteredTableData.length)} de {filteredTableData.length} registros
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      onClick={handlePrevPage} 
+                      disabled={currentPage === 1}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: currentPage === 1 ? '#f1f5f9' : '#fff', color: currentPage === 1 ? '#94a3b8' : '#334155', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                    >
+                      Anterior
+                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '30px', fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button 
+                      onClick={handleNextPage} 
+                      disabled={currentPage === totalPages}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: currentPage === totalPages ? '#f1f5f9' : '#fff', color: currentPage === totalPages ? '#94a3b8' : '#334155', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div
               style={{

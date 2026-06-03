@@ -72,7 +72,7 @@ const MainLayout = () => {
   return (
     <div style={{ display: 'flex' }}>
       <Sidebar />
-      <div style={{ flex: 1, marginLeft: '100px', minHeight: '100vh', background: 'var(--bg-body)' }}>
+      <div style={{ flex: 1, marginLeft: '220px', minHeight: '100vh', background: 'var(--bg-body)' }}>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Navigate to="/registrar-reunion" replace />} />

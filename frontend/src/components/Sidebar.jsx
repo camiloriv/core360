@@ -20,10 +20,10 @@ const Sidebar = () => {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="lucide lucide-calendar-check-icon lucide-calendar-check"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="lucide lucide-calendar-check-icon lucide-calendar-check"
         >
           <path d="M8 2v4" />
           <path d="M16 2v4" />
@@ -45,10 +45,10 @@ const Sidebar = () => {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="lucide lucide-file-plus-corner-icon lucide-file-plus-corner"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="lucide lucide-file-plus-corner-icon lucide-file-plus-corner"
         >
           <path d="M11.35 22H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v5.35" />
           <path d="M14 2v5a1 1 0 0 0 1 1h5" />
@@ -69,10 +69,10 @@ const Sidebar = () => {
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="lucide lucide-handshake-icon lucide-handshake"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="lucide lucide-handshake-icon lucide-handshake"
         >
           <path d="m11 17 2 2a1 1 0 1 0 3-3" />
           <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
@@ -193,7 +193,9 @@ const Sidebar = () => {
   ];
 
   const vistas = user.vistas_permitidas
-    ? (typeof user.vistas_permitidas === "string" ? JSON.parse(user.vistas_permitidas) : user.vistas_permitidas)
+    ? typeof user.vistas_permitidas === "string"
+      ? JSON.parse(user.vistas_permitidas)
+      : user.vistas_permitidas
     : null;
 
   if (vistas) {
@@ -201,7 +203,8 @@ const Sidebar = () => {
   } else {
     if (user.permisos !== "admin") {
       menuItems = menuItems.filter(
-        (item) => !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
+        (item) =>
+          !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
       );
     }
 
@@ -376,7 +379,25 @@ const Sidebar = () => {
   return (
     <div style={styles.sidebar}>
       <div style={styles.logoContainer}>
-        <img src="/icono_negativo.PNG" alt="Core360 Logo" style={styles.logo} />
+        {/* Replace image with styled text to match CloudSync vibe until an SVG is provided */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: "white",
+          }}
+        >
+          <img
+            src="/logo_texto.PNG"
+            alt="CORE 360 Logo"
+            style={{
+              maxWidth: "100%",
+              maxHeight: "45px",
+              objectFit: "contain",
+            }}
+          />
+        </div>
       </div>
 
       <nav style={styles.nav} className="sidebar-nav">
@@ -387,12 +408,9 @@ const Sidebar = () => {
             style={({ isActive }) => ({
               ...styles.navLink,
               backgroundColor: isActive
-                ? "rgba(255,255,255,0.1)"
+                ? "var(--secondary-color)"
                 : "transparent",
-              color: isActive ? "var(--bg-container)" : "var(--text-light)",
-              borderLeft: isActive
-                ? "4px solid #3b82f6"
-                : "4px solid transparent",
+              color: isActive ? "white" : "rgba(255, 255, 255, 0.7)",
             })}
           >
             <span style={styles.icon}>{item.icon}</span>
@@ -406,19 +424,19 @@ const Sidebar = () => {
           <div
             onClick={handleOpenPasswordModal}
             style={{
-              color: "var(--border-input)",
-              fontSize: "11px",
+              color: "rgba(255, 255, 255, 0.7)",
+              fontSize: "12px",
               marginBottom: "15px",
-              fontWeight: "600",
+              fontWeight: "500",
               textAlign: "center",
               lineHeight: "1.2",
               cursor: "pointer",
               transition: "color 0.2s ease",
             }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--secondary-color, #e05e2b)")
+            onMouseEnter={(e) => (e.target.style.color = "white")}
+            onMouseLeave={(e) =>
+              (e.target.style.color = "rgba(255, 255, 255, 0.7)")
             }
-            onMouseLeave={(e) => (e.target.style.color = "var(--border-input)")}
             title="Seguridad / Cambiar Contraseña"
           >
             {user.nombre}
@@ -433,18 +451,20 @@ const Sidebar = () => {
           style={{
             background: "transparent",
             border: "none",
-            color: "var(--danger-color)",
+            color: "#fca5a5",
             cursor: "pointer",
-            fontSize: "10px",
-            fontWeight: "bold",
+            fontSize: "11px",
+            fontWeight: "600",
             textTransform: "uppercase",
             marginBottom: "10px",
             width: "100%",
+            transition: "color 0.2s ease",
           }}
+          onMouseEnter={(e) => (e.target.style.color = "#ef4444")}
+          onMouseLeave={(e) => (e.target.style.color = "#fca5a5")}
         >
           Cerrar Sesión
         </button>
-        <div style={styles.version}>v2.5</div>
       </div>
     </div>
   );
@@ -452,68 +472,62 @@ const Sidebar = () => {
 
 const styles = {
   sidebar: {
-    width: "100px",
+    width: "220px" /* Increased width for horizontal text */,
     height: "100vh",
-    background: "#2d2d2d",
+    background: "var(--primary-color)",
     display: "flex",
     flexDirection: "column",
     position: "fixed",
     left: 0,
     top: 0,
     zIndex: 1000,
-    boxShadow: "4px 0 10px rgba(0,0,0,0.1)",
+    boxShadow: "4px 0 10px rgba(0,0,0,0.05)",
+    fontFamily: "var(--font-main)",
   },
   logoContainer: {
-    padding: "20px 10px",
+    padding: "24px 20px",
     display: "flex",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    borderBottom: "1px solid rgba(255,255,255,0.05)",
     marginBottom: "10px",
   },
-  logo: {
-    width: "50px",
-    height: "auto",
-    objectFit: "contain",
-  },
   nav: {
-    padding: "5px 0",
+    padding: "10px 12px",
     flex: 1,
     display: "flex",
     flexDirection: "column",
-    gap: "0px",
+    gap: "4px",
     overflowY: "auto",
     overflowX: "hidden",
   },
   navLink: {
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
-    padding: "10px 5px",
+    padding: "10px 14px",
     textDecoration: "none",
     transition: "all 0.2s",
-    textAlign: "center",
+    borderRadius: "8px",
   },
   icon: {
-    fontSize: "22px",
-    marginBottom: "4px",
+    fontSize: "18px",
+    marginRight: "12px",
+    display: "flex",
+    alignItems: "center",
   },
   label: {
-    fontSize: "10px",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: "0.4px",
+    fontSize: "13px",
+    fontWeight: "500",
+    letterSpacing: "0.2px",
   },
   footer: {
-    padding: "15px",
+    padding: "20px 15px",
     textAlign: "center",
-    borderTop: "1px solid rgba(255,255,255,0.05)",
+    borderTop: "1px solid rgba(255,255,255,0.1)",
   },
   version: {
-    fontSize: "9px",
-    color: "var(--text-muted)",
-    fontWeight: "bold",
+    fontSize: "10px",
+    color: "rgba(255, 255, 255, 0.4)",
+    fontWeight: "500",
   },
 };
 

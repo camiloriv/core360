@@ -47,10 +47,10 @@ const styles = {
   },
   tableCard: { background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' },
   tableHeader: { padding: '20px', borderBottom: '1px solid #e2e8f0' },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "11px", textAlign: "left" },
   th: { backgroundColor: "#f8fafc", color: "#475569", borderBottom: "2px solid #e2e8f0" },
-  thCell: { padding: '15px 12px', fontWeight: '700', textTransform: 'uppercase' },
-  tdCell: { padding: "15px 12px", borderBottom: "1px solid #f1f5f9", color: "#475569", verticalAlign: "top" },
+  thCell: { padding: '10px 12px', fontWeight: '700', textTransform: 'uppercase', fontSize: '10px' },
+  tdCell: { padding: "8px 12px", borderBottom: "1px solid #f1f5f9", color: "#475569", verticalAlign: "middle" },
   tr: { transition: "background 0.2s" },
   respuestasBox: { 
     fontSize: "11px", 

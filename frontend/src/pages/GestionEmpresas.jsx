@@ -22,6 +22,7 @@ export default function GestionEmpresas() {
   const [traspasoDestino, setTraspasoDestino] = useState("");
   const [empresasTraspaso, setEmpresasTraspaso] = useState([]);
   const [selectedEmpresas, setSelectedEmpresas] = useState([]);
+  const [filtroTraspasoNombre, setFiltroTraspasoNombre] = useState("");
 
   // Estados para Traspaso por Excel
   const [traspasoTab, setTraspasoTab] = useState("manual"); // 'manual' o 'excel'
@@ -384,11 +385,22 @@ export default function GestionEmpresas() {
     }
   };
 
+  const empresasTraspasoFiltradas = empresasTraspaso.filter((emp) =>
+    emp.nombre.toLowerCase().includes(filtroTraspasoNombre.toLowerCase())
+  );
+
   const handleSelectTodas = () => {
-    if (selectedEmpresas.length === empresasTraspaso.length) {
-      setSelectedEmpresas([]);
+    // Check if all visible ones are selected
+    const allVisibleSelected = empresasTraspasoFiltradas.every(emp => selectedEmpresas.includes(emp.id));
+    
+    if (allVisibleSelected) {
+      // Unselect only the visible ones
+      const visibleIds = empresasTraspasoFiltradas.map(emp => emp.id);
+      setSelectedEmpresas(selectedEmpresas.filter(id => !visibleIds.includes(id)));
     } else {
-      setSelectedEmpresas(empresasTraspaso.map((emp) => emp.id));
+      // Select all visible ones (keep previously selected)
+      const newSelections = new Set([...selectedEmpresas, ...empresasTraspasoFiltradas.map(emp => emp.id)]);
+      setSelectedEmpresas(Array.from(newSelections));
     }
   };
 
@@ -1013,26 +1025,43 @@ export default function GestionEmpresas() {
                               {selectedEmpresas.length} de{" "}
                               {empresasTraspaso.length} seleccionadas)
                             </h3>
-                            {empresasTraspaso.length > 0 && (
-                              <button
-                                onClick={handleSelectTodas}
-                                style={{
-                                  border: "1px solid #cbd5e1",
-                                  background: "none",
-                                  padding: "4px 10px",
-                                  borderRadius: "6px",
-                                  fontSize: "11px",
-                                  fontWeight: "500",
-                                  cursor: "pointer",
-                                  color: "#475569",
-                                }}
-                              >
-                                {selectedEmpresas.length ===
-                                empresasTraspaso.length
-                                  ? "Deseleccionar Todas"
-                                  : "Seleccionar Todas"}
-                              </button>
-                            )}
+                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                              {empresasTraspaso.length > 0 && (
+                                <input
+                                  type="text"
+                                  placeholder="🔍 Filtrar por nombre..."
+                                  value={filtroTraspasoNombre}
+                                  onChange={(e) => setFiltroTraspasoNombre(e.target.value)}
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    fontSize: "12px",
+                                    outline: "none",
+                                    width: "200px"
+                                  }}
+                                />
+                              )}
+                              {empresasTraspaso.length > 0 && (
+                                <button
+                                  onClick={handleSelectTodas}
+                                  style={{
+                                    border: "1px solid #cbd5e1",
+                                    background: "none",
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    fontSize: "12px",
+                                    fontWeight: "500",
+                                    cursor: "pointer",
+                                    color: "#475569",
+                                  }}
+                                >
+                                  {empresasTraspasoFiltradas.every(emp => selectedEmpresas.includes(emp.id)) && empresasTraspasoFiltradas.length > 0
+                                    ? "Deseleccionar Visibles"
+                                    : "Seleccionar Visibles"}
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {empresasTraspaso.length === 0 ? (
@@ -1059,7 +1088,7 @@ export default function GestionEmpresas() {
                                 paddingRight: "8px",
                               }}
                             >
-                              {empresasTraspaso.map((emp) => {
+                              {empresasTraspasoFiltradas.map((emp) => {
                                 const isChecked = selectedEmpresas.includes(
                                   emp.id,
                                 );
@@ -1107,6 +1136,11 @@ export default function GestionEmpresas() {
                                   </div>
                                 );
                               })}
+                              {empresasTraspasoFiltradas.length === 0 && empresasTraspaso.length > 0 && (
+                                <div style={{ gridColumn: "1 / -1", padding: "20px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                                  No se encontraron empresas que coincidan con la búsqueda.
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

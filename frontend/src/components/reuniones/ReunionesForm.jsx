@@ -120,12 +120,12 @@ function ReunionesForm({ onSuccess }) {
             required
           />
 
-          {/* Selector de ejecutiva: solo visible para admin */}
+          {/* Selector de usuario asignado: solo visible para admin */}
           {user.permisos === "admin" && (
             <FormSection
               label={
                 <>
-                  EJECUTIVA <span style={{ color: "red" }}>*</span>
+                  ASIGNAR A (EJECUTIVA / JEFATURA / GERENCIA) <span style={{ color: "red" }}>*</span>
                 </>
               }
               full
@@ -137,7 +137,7 @@ function ReunionesForm({ onSuccess }) {
                     (x) => x.id === Number(e.target.value),
                   );
                   setField("ejecutiva_id", e.target.value);
-                  if (ej) setField("jefatura_id", ej.jefatura_id || "");
+                  if (ej) setField("jefatura_id", ej.jefatura_id || ej.id); // Si es jefatura, su id es su jefatura_id
                 }}
                 style={{
                   width: "100%",
@@ -147,11 +147,14 @@ function ReunionesForm({ onSuccess }) {
                   fontSize: "14px",
                   background: "white",
                 }}
+                disabled={!form.empresa_id}
               >
-                <option value="">-- Seleccione una ejecutiva --</option>
+                <option value="">
+                  {!form.empresa_id ? "-- Seleccione una empresa primero --" : "-- Seleccione un usuario --"}
+                </option>
                 {ejecutivas.map((ej) => (
                   <option key={ej.id} value={ej.id}>
-                    {ej.nombre}
+                    {ej.nombre} ({ej.permisos})
                   </option>
                 ))}
               </select>

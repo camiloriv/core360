@@ -23,6 +23,18 @@ try {
   console.warn("Compression no instalado localmente.");
 }
 
+// ✅ CORS Dinámico (Debe ir antes que el Rate Limiter para que los errores 429 devuelvan CORS correctos)
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  credentials: true
+}));
+
 // ✅ Rate Limiting Básico (Evitar DDoS)
 try {
   const rateLimit = require("express-rate-limit");
@@ -35,18 +47,6 @@ try {
 } catch (e) {
   console.warn("Express-rate-limit no instalado localmente.");
 }
-
-// ✅ CORS Dinámico
-const allowedOrigins = [
-  "http://localhost:5173",
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  credentials: true
-}));
 
 // ✅ Middlewares base
 app.use(express.json());

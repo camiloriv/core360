@@ -262,4 +262,31 @@ exports.traspasoExcel = async (req, res) => {
   }
 };
 
-
+exports.obtenerUsuariosAsignados = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Primero, obtener la jefatura de esta empresa
+    const [[empresa]] = await db.query("SELECT jefatura_id FROM empresas WHERE id = ?", [id]);
+    
+    if (!empresa || !empresa.jefatura_id) {
+      return res.json([]);
+    }
+    
+    const jefaturaId = empresa.jefatura_id;
+    
+    // Obtener todos los usuarios permitidos (jefatura, sus ejecutivas, y sus gerencias)
+    const [usuarios] = await db.query(`
+      SELECT id, nombre, permisos, correo, jefatura_id
+      FROM usuarios
+      WHERE id = ? 
+         OR (jefatura_id = ? AND permisos = 'ejecutiva')
+         OR (id IN (SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?) AND permisos = 'gerencia')
+      ORDER BY permisos DESC, nombre ASC
+    `, [jefaturaId, jefaturaId, jefaturaId]);
+    
+    res.json(usuarios);
+  } catch (err) {
+    console.error("Error obteniendo usuarios asignados a la empresa:", err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};

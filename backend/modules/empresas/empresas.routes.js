@@ -7,6 +7,7 @@ router.get("/", controller.listarEmpresas);
 router.get("/seguimiento-logs", controller.obtenerLogsEmpresas);
 router.get("/jefatura/:id_jefatura", controller.obtenerEmpresasPorJefatura);
 router.get("/:id/historial", controller.obtenerHistorialSeguimiento);
+router.get("/:id/usuarios-asignados", controller.obtenerUsuariosAsignados);
 router.get("/:id_ejecutiva", controller.obtenerEmpresasPorEjecutiva);
 router.post("/", controller.crearEmpresa);
 router.put("/:id", controller.actualizarEmpresa);

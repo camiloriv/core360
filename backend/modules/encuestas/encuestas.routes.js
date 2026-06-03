@@ -6,8 +6,8 @@ const controller = require("./encuestas.controller");
 router.get("/templates", controller.obtenerTemplates);
 router.get("/catalogo-preguntas", controller.obtenerPreguntas);
 router.get("/respuestas/all", controller.obtenerRespuestas);
-router.get("/stats/summary", controller.obtenerStats);
-router.get("/stats/kpis", controller.obtenerKpis);
+router.get("/resumen/general", controller.obtenerStats);
+router.get("/resumen/kpis", controller.obtenerKpis);
 
 // 2. RUTAS DEL EDITOR
 router.get("/editor/templates", controller.listarTemplatesFull);

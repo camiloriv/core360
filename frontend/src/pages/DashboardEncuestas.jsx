@@ -167,8 +167,8 @@ export default function DashboardEncuestas() {
 
         const [respRes, statsRes, kpiRes] = await Promise.all([
           api.get(`/encuestas/respuestas/all${queryParams}`),
-          api.get(`/encuestas/stats/summary${queryParams}`),
-          api.get(`/encuestas/stats/kpis${queryParams}`)
+          api.get(`/encuestas/resumen/general${queryParams}`),
+          api.get(`/encuestas/resumen/kpis${queryParams}`)
         ]);
 
         const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
@@ -241,7 +241,7 @@ export default function DashboardEncuestas() {
       }
     };
     fetchData();
-  }, [dataLoading, user, userRol, reuniones]);
+  }, [dataLoading, user?.id, userRol, reuniones]);
 
   useEffect(() => {
     setFiltroEmpresa("Todas");

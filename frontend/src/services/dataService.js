@@ -38,3 +38,8 @@ export const getEmpresasByGerencia = async (id) => {
   return res.data;
 };
 
+// Usuarios asignados a una empresa
+export const getUsuariosPorEmpresa = async (id) => {
+  const res = await axios.get(`${API}/empresas/${id}/usuarios-asignados`);
+  return res.data;
+};

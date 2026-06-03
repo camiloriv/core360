@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getDestinatarios } from "../../services/reunionesService";
 import { obtenerTemplates } from "../../services/encuestaService";
-import { getEmpresas, getEmpresasByJefatura, getEjecutivas, getEmpresasByGerencia } from "../../services/dataService";
+import { getEmpresas, getEmpresasByJefatura, getEjecutivas, getEmpresasByGerencia, getUsuariosPorEmpresa } from "../../services/dataService";
 
 export default function useReunionesData(user, empresa_id) {
   const [empresas, setEmpresas] = useState([]);
@@ -47,7 +47,7 @@ export default function useReunionesData(user, empresa_id) {
 
     if (user.permisos === "admin") {
       getEmpresas().then(list => setEmpresas(filterEmpresas(list)));
-      getEjecutivas().then(list => setEjecutivas(filterEjecutivas(list)));
+      // Para admin, las ejecutivas se cargarán cuando se seleccione la empresa
     } else if (user.permisos === "gerencia") {
       getEmpresasByGerencia(user.id).then(list => setEmpresas(filterEmpresas(list)));
     } else if (user.permisos === "jefatura") {
@@ -55,16 +55,23 @@ export default function useReunionesData(user, empresa_id) {
     } else if (user.jefatura_id) {
       getEmpresasByJefatura(user.jefatura_id).then(list => setEmpresas(filterEmpresas(list)));
     }
-  }, [user]);
+  }, [user?.id, user?.permisos, user?.jefatura_id, user?.nombre, user?.correo, user?.cargos]);
 
   useEffect(() => {
     if (!empresa_id) {
       setDestinatarios([]);
+      if (user?.permisos === "admin") {
+        setEjecutivas([]); // Limpiar la lista hasta que se seleccione empresa
+      }
       return;
     }
 
     getDestinatarios(empresa_id).then(res => setDestinatarios(res.data));
-  }, [empresa_id]);
+
+    if (user?.permisos === "admin") {
+      getUsuariosPorEmpresa(empresa_id).then(list => setEjecutivas(list));
+    }
+  }, [empresa_id, user?.permisos]);
 
   return {
     empresas,

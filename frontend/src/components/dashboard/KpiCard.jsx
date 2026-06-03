@@ -1,12 +1,128 @@
 import React from "react";
-import styles from "../../styles/DashboardStyles";
 
-export default function KpiCard({ title, value, sub, color }) {
+export default function KpiCard({ title, value, sub, color, trend, icon }) {
+  const cardColor = color || "var(--primary-color)";
+
   return (
-    <div style={styles.kpiCard}>
-      <span style={styles.kpiTitle}>{title}</span>
-      <span style={{ ...styles.kpiValue, color }}>{value}</span>
-      <span style={styles.kpiSubText}>{sub}</span>
+    <div
+      style={{
+        background: "#fff",
+        padding: "20px",
+        borderRadius: "12px",
+        border: "1px solid #e2e8f0",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        cursor: "default",
+        position: "relative",
+        overflow: "hidden",
+        height: "100%",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-4px)";
+        e.currentTarget.style.boxShadow =
+          "0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
+      }}
+    >
+      {/* Decorative colored left border */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "4px",
+          backgroundColor: cardColor,
+        }}
+      ></div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "15px",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "11px",
+            color: "#64748b",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            paddingLeft: "4px",
+          }}
+        >
+          {title}
+        </span>
+        {icon && (
+          <div
+            style={{
+              background: `${cardColor}15`,
+              padding: "6px",
+              borderRadius: "8px",
+              color: cardColor,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {icon}
+          </div>
+        )}
+      </div>
+
+      <div style={{ paddingLeft: "4px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+          <span
+            style={{
+              fontSize: "32px",
+              fontWeight: "800",
+              color: "#1e293b",
+              lineHeight: "1",
+            }}
+          >
+            {value}
+          </span>
+          {trend && (
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: "bold",
+                color:
+                  trend.startsWith("+") || trend.startsWith("↑")
+                    ? "#059669"
+                    : "#dc2626",
+                background:
+                  trend.startsWith("+") || trend.startsWith("↑")
+                    ? "#dcfce7"
+                    : "#fee2e2",
+                padding: "2px 6px",
+                borderRadius: "4px",
+              }}
+            >
+              {trend}
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: "11px",
+            color: "#94a3b8",
+            display: "block",
+            marginTop: "8px",
+          }}
+        >
+          {sub}
+        </span>
+      </div>
     </div>
   );
 }

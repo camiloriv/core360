@@ -7,10 +7,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['sweetalert2', 'lucide-react', 'recharts'],
-          utils: ['axios', 'date-fns']
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/sweetalert2') || id.includes('node_modules/lucide-react') || id.includes('node_modules/recharts')) {
+            return 'ui';
+          }
+          if (id.includes('node_modules/axios') || id.includes('node_modules/date-fns')) {
+            return 'utils';
+          }
         }
       }
     },

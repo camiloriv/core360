@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://localhost:8080/encuestas";
+const API = (import.meta.env.VITE_API_URL || "http://localhost:8080") + "/encuestas";
 
 export const crearEncuesta = async (data) => {
   const res = await axios.post(`${API}/crear`, data);

@@ -3,7 +3,8 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import "../styles/core360-theme.css";
 
-const API_BASE = "http://localhost:8080/encuestas/editor";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_BASE = `${API_URL}/encuestas/editor`;
 
 export default function EditorEncuestas() {
   const [templates, setTemplates] = useState([]);
@@ -336,7 +337,7 @@ export default function EditorEncuestas() {
     try {
       const loadAndShowLibrary = async () => {
         const res = await axios.get(
-          "http://localhost:8080/encuestas/catalogo-preguntas",
+          `${API_URL}/encuestas/catalogo-preguntas`,
         );
         const catalogo = res.data;
 
@@ -693,7 +694,7 @@ export default function EditorEncuestas() {
                   if (confirm.isConfirmed) {
                     try {
                       await axios.delete(
-                        `http://localhost:8080/encuestas/editor/catalogo-preguntas/${preguntaId}`,
+                        `${API_URL}/encuestas/editor/catalogo-preguntas/${preguntaId}`,
                       );
                       if (selectedTemplate) {
                         loadPreguntas(selectedTemplate.id);

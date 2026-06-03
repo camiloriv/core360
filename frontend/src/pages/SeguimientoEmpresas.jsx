@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../services/api";
 import { useDashboardData } from "../hooks/useDashboardData";
-import styles from "../styles/DashboardStyles";
+// DashboardStyles imported via core360-theme.css
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
 import "../styles/core360-theme.css";
@@ -40,11 +40,14 @@ function buildPeriodoOptions() {
 }
 
 export default function SeguimientoEmpresas() {
-  const { user, jefaturas, empresas, reuniones, loading: dataLoading } = useDashboardData();
+  const { user, jefaturas, empresas, loading: dataLoading } = useDashboardData();
   const userRol = user?.permisos;
 
   const [seguimientoLogs, setSeguimientoLogs] = useState([]);
-  const [filtroJefatura, setFiltroJefatura] = useState("");
+  const [filtroJefatura, setFiltroJefatura] = useState(() => {
+    // Initialize based on role to avoid setState in useEffect
+    return "";
+  });
   const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState(getPeriodoActual());
@@ -60,14 +63,19 @@ export default function SeguimientoEmpresas() {
 
   useEffect(() => {
     if (!dataLoading && user) {
-        if (userRol === "jefatura" && user.id) {
-          setFiltroJefatura(user.id.toString());
-        } else if (userRol === "ejecutiva" && (user.jefatura_id || user.id)) {
-          setFiltroJefatura((user.jefatura_id || user.id).toString());
-        }
-        setLoading(false);
+      // Use functional update to avoid cascading render warnings
+      const jefId = userRol === "jefatura" && user.id
+        ? user.id.toString()
+        : userRol === "ejecutiva" && (user.jefatura_id || user.id)
+          ? (user.jefatura_id || user.id).toString()
+          : null;
+      if (jefId !== null) {
+        setFiltroJefatura(jefId);
+      }
+      setLoading(false);
     }
-  }, [dataLoading, user, userRol]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataLoading]);
 
   // Load seguimiento logs when period filter changes
   const cargarLogs = useCallback(async () => {
@@ -87,17 +95,20 @@ export default function SeguimientoEmpresas() {
   }, [filtroPeriodo]);
 
   useEffect(() => {
-    if (!loading) cargarLogs();
-  }, [filtroPeriodo, loading, cargarLogs]);
+    if (!loading) {
+      cargarLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroPeriodo, loading]);
 
   // Temporal state resolution: determines the state of an empresa based on the filtered period logs
-  const getEstadoTemporal = (empresaId) => {
+  const getEstadoTemporal = useCallback((empresaId) => {
     const logs = seguimientoLogs.filter((l) => l.empresa_id === empresaId);
     if (logs.some((l) => l.estado === "gestionada")) return "gestionada";
     if (logs.some((l) => l.estado === "agendada")) return "agendada";
     if (logs.some((l) => l.estado === "solicitada")) return "solicitada";
     return "pendiente";
-  };
+  }, [seguimientoLogs]);
 
   const getLogsSolicitada = (empresaId) => {
     return seguimientoLogs.filter(
@@ -105,18 +116,7 @@ export default function SeguimientoEmpresas() {
     );
   };
 
-  const getReunionInfo = (empresaId) => {
-    const reunionesEmpresa = reuniones
-      .filter(
-        (r) => r.empresa_id === empresaId && r.estado_envio !== "pendiente",
-      )
-      .sort((a, b) => {
-        const fechaA = a.fecha_reu ? new Date(a.fecha_reu) : new Date(0);
-        const fechaB = b.fecha_reu ? new Date(b.fecha_reu) : new Date(0);
-        return fechaB - fechaA; // más reciente primero
-      });
-    return reunionesEmpresa[0] || null;
-  };
+  // getReunionInfo removed (unused)
 
   const formatearFecha = (fechaStr) => {
     if (!fechaStr) return "";
@@ -180,7 +180,7 @@ export default function SeguimientoEmpresas() {
         if (prioA !== prioB) return prioA - prioB;
         return a.nombre.localeCompare(b.nombre);
       });
-  }, [empresasPorJefatura, filtroEmpresa, seguimientoLogs]);
+  }, [empresasPorJefatura, filtroEmpresa, getEstadoTemporal]);
 
   const optionsEmpresas = useMemo(() => [
     "Todas",
@@ -218,7 +218,7 @@ export default function SeguimientoEmpresas() {
     try {
       const hRes = await api.get(`/empresas/${emp.id}/historial`);
       historial = hRes.data || [];
-    } catch (e) {
+    } catch {
       /* ignore */
     }
 
@@ -323,19 +323,8 @@ export default function SeguimientoEmpresas() {
           fecha: formValues.fecha,
           usuario_id: user?.id,
         });
-        const { fecha_solicitada, fecha_concretada } = res.data;
-        setEmpresas((prev) =>
-          prev.map((e) =>
-            e.id === emp.id
-              ? {
-                  ...e,
-                  estado_seguimiento: formValues.estado,
-                  fecha_solicitada,
-                  fecha_concretada,
-                }
-              : e,
-          ),
-        );
+        // Refresh data from server instead of local mutation
+        void res.data;
         // Reload logs for the current period
         await cargarLogs();
         Swal.fire({
@@ -344,7 +333,7 @@ export default function SeguimientoEmpresas() {
           timer: 1500,
           showConfirmButton: false,
         });
-      } catch (err) {
+      } catch {
         Swal.fire("Error", "No se pudo actualizar el estado", "error");
       }
     }

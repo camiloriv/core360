@@ -1,4 +1,8 @@
 /* Estilo Base CORE 360 */
+* {
+  box-sizing: border-box;
+}
+
 .encuesta-page {
   font-family: var(--font-main);
   background-color: var(--bg-body);
@@ -619,3 +623,277 @@ button:disabled {
   color: #b91c1c !important;
   transform: translateY(-1px) !important;
 }
+
+/* ======================================================
+   🔹 RESPONSIVE DESIGN (MOBILE-FRIENDLY)
+   ====================================================== */
+
+/* App Layout Structure */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 220px;
+  min-height: 100vh;
+  background: var(--bg-body);
+  transition: margin-left 0.3s ease;
+  width: calc(100% - 220px);
+}
+
+/* Mobile Header (Hidden on Desktop) */
+.mobile-header {
+  display: none;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 15px 20px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+}
+
+.hamburger-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  min-width: auto;
+}
+
+.close-sidebar-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 5px;
+  cursor: pointer;
+  min-width: auto;
+}
+
+.mobile-logo {
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-size: 16px;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 15px;
+}
+
+/* Responsive Grids */
+.responsive-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 15px;
+}
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+.responsive-editor-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+}
+.flex-wrap-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.swal-responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+/* Tablet Breakpoint */
+@media (max-width: 1024px) {
+  .responsive-grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .responsive-editor-layout {
+    grid-template-columns: 220px 1fr;
+  }
+}
+
+/* Mobile Breakpoint */
+@media (max-width: 768px) {
+  .responsive-grid-6 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .responsive-grid-2,
+  .swal-responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .responsive-editor-layout {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column-reverse; /* Usually sidebar goes to bottom on mobile, or stacked */
+  }
+  
+  .main-content {
+
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .close-sidebar-btn {
+    display: block;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+
+  .container {
+    margin: 20px auto;
+    padding: 20px;
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field.full {
+    grid-column: span 1;
+  }
+
+  .core360-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .cek-logo {
+    text-align: left;
+  }
+
+  .nav-buttons {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .nav-buttons button {
+    width: 100%;
+  }
+}
+
+/* Small Mobile Breakpoint */
+@media (max-width: 480px) {
+  .responsive-grid-6 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =============================================================================
+   📊 KPI CARDS & GRID RESPONSIVENESS (Dashboard)
+   ============================================================================= */
+.kpi-grid-container {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 20px !important;
+  margin-bottom: 40px !important;
+}
+
+@media (max-width: 1024px) {
+  .kpi-grid-container {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 15px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 25px !important;
+  }
+  .kpi-grid-container > div:last-child {
+    grid-column: span 2 !important;
+  }
+
+  /* Minimalist and smaller KPI Card styles on mobile */
+  .kpi-card {
+    padding: 12px 10px !important;
+    border-radius: 8px !important;
+  }
+  .kpi-card-header {
+    margin-bottom: 8px !important;
+  }
+  .kpi-card-title {
+    font-size: 9px !important;
+    letter-spacing: 0.2px !important;
+  }
+  .kpi-card-icon {
+    padding: 4px !important;
+    border-radius: 6px !important;
+  }
+  .kpi-card-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .kpi-card-value {
+    font-size: 20px !important;
+  }
+  .kpi-card-sub {
+    font-size: 9px !important;
+    margin-top: 4px !important;
+  }
+  .kpi-card-trend {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid-container {
+    gap: 8px !important;
+  }
+  .kpi-card {
+    padding: 10px 8px !important;
+  }
+}
+
+

@@ -717,13 +717,7 @@ export default function SeguimientoEmpresas() {
 
         {/* VISTA DIVIDIDA (LISTA) */}
         {viewMode === "split" && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "30px",
-            }}
-          >
+          <div className="responsive-grid-2">
             {/* PENDIENTES */}
             <div
               style={{
@@ -1042,7 +1036,7 @@ export default function SeguimientoEmpresas() {
             >
               Resumen de Cobertura por Jefatura
             </h3>
-            <div style={{ overflowX: "auto" }}>
+            <div className="table-responsive">
               <table
                 style={{
                   width: "100%",

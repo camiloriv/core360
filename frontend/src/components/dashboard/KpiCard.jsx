@@ -5,6 +5,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
 
   return (
     <div
+      className="kpi-card"
       style={{
         background: "#fff",
         padding: "20px",
@@ -32,6 +33,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
     >
       {/* Decorative colored left border */}
       <div
+        className="kpi-card-border"
         style={{
           position: "absolute",
           left: 0,
@@ -43,6 +45,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
       ></div>
 
       <div
+        className="kpi-card-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -51,6 +54,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
         }}
       >
         <span
+          className="kpi-card-title"
           style={{
             fontSize: "11px",
             color: "#64748b",
@@ -64,6 +68,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
         </span>
         {icon && (
           <div
+            className="kpi-card-icon"
             style={{
               background: `${cardColor}15`,
               padding: "6px",
@@ -79,9 +84,10 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
         )}
       </div>
 
-      <div style={{ paddingLeft: "4px" }}>
+      <div className="kpi-card-body" style={{ paddingLeft: "4px" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
           <span
+            className="kpi-card-value"
             style={{
               fontSize: "32px",
               fontWeight: "800",
@@ -93,6 +99,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
           </span>
           {trend && (
             <span
+              className="kpi-card-trend"
               style={{
                 fontSize: "11px",
                 fontWeight: "bold",
@@ -113,6 +120,7 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
           )}
         </div>
         <span
+          className="kpi-card-sub"
           style={{
             fontSize: "11px",
             color: "#94a3b8",

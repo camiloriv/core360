@@ -772,7 +772,7 @@ export default function EditorEncuestas() {
                     <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Texto de la Pregunta</label>
                     <textarea id="swal-texto" class="swal2-textarea" style="width: 100%; margin: 8px 0 20px 0; height: 80px; font-size: 14px;">${pregunta?.texto || ""}</textarea>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="swal-responsive-grid" style="margin-bottom: 20px;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Dimensión</label>
                             <select id="swal-dimension" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; height: 40px;">
@@ -786,7 +786,7 @@ export default function EditorEncuestas() {
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="swal-responsive-grid" style="margin-bottom: 20px;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Tipo de Respuesta</label>
                             <select id="swal-tipo" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; height: 40px;" onchange="
@@ -894,7 +894,7 @@ export default function EditorEncuestas() {
                         <div style="background: #fffbeb; border: 1px solid #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
                             <p style="font-size: 11px; color: #92400e; margin: 0; font-weight: bold; text-transform: uppercase;">⚠️ Pregunta Compartida</p>
                             <p style="font-size: 11px; color: #b45309; margin: 5px 0;">Se usa en ${pregunta.shared_count} templates.</p>
-                            <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <div class="flex-wrap-container" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 5px;">
                                 <label style="font-size: 11px; display: flex; align-items: center; gap: 6px;">
                                     <input type="radio" name="clone-logic" value="master" checked> Actualizar en todos
                                 </label>
@@ -910,7 +910,7 @@ export default function EditorEncuestas() {
                     <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Texto de la Pregunta</label>
                     <textarea id="swal-texto" class="swal2-textarea" style="width: 100%; margin: 8px 0 20px 0; height: 80px; font-size: 14px;">${pregunta?.texto || ""}</textarea>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="swal-responsive-grid" style="margin-bottom: 20px;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Dimensión</label>
                             <select id="swal-dimension" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; height: 40px;">
@@ -924,7 +924,7 @@ export default function EditorEncuestas() {
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="swal-responsive-grid" style="margin-bottom: 20px;">
                         <div>
                             <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Tipo de Respuesta</label>
                             <select id="swal-tipo" class="swal2-input" style="width: 100%; margin: 8px 0 0 0; height: 40px;" onchange="
@@ -1582,7 +1582,7 @@ export default function EditorEncuestas() {
           </div>
         </header>
 
-        <div style={styles.layout}>
+        <div className="responsive-editor-layout" style={styles.layout}>
           <aside
             style={{
               ...styles.sidebar,
@@ -1982,9 +1982,6 @@ const styles = {
   page: { background: "#f8fafc", minHeight: "100vh", padding: "40px 20px" },
   container: { maxWidth: "1300px", margin: "0 auto" },
   layout: {
-    display: "grid",
-    gridTemplateColumns: "260px 1fr",
-    gap: "20px",
     alignItems: "start",
   },
   sidebar: {

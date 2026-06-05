@@ -489,7 +489,8 @@ const GestionUsuarios = () => {
                 <p style={{ margin: 0, fontWeight: '500', color: 'var(--text-muted)' }}>No se encontraron usuarios que coincidan con la búsqueda.</p>
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-responsive">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={styles.theadRow}>
                     <th style={{ ...styles.th, width: '25%' }}>Nombre</th>
@@ -546,6 +547,7 @@ const GestionUsuarios = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>
@@ -589,12 +591,11 @@ const GestionUsuarios = () => {
           )}
 
           {/* 2. Main Hierarchy Tree Section */}
-          <div>
+          <div style={{ overflowX: 'auto', paddingBottom: '20px' }}>
             <h4 style={{ fontSize: '13px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '20px', fontWeight: '700' }}>
               👔 Estructura Divisional de Operations
             </h4>
-
-            {/* Loop over Gerencias */}
+            <div style={{ minWidth: '400px' }}>
             {gerenciasLista.map(g => {
               const directJefaturas = jefaturasLista.filter(j => jefaturaPerteneceAGerencia(j, g.id));
               const isCollapsed = collapsedNodes[`gerencia_${g.id}`];
@@ -853,6 +854,7 @@ const GestionUsuarios = () => {
             )}
           </div>
         </div>
+      </div>
       )}
 
       {/* Modal Form Overlay */}
@@ -1176,8 +1178,8 @@ const styles = {
   gerenciaCard: {
     background: '#fffbeb',
     border: '2px solid #fde68a',
-    borderRadius: '16px',
-    padding: '20px',
+    borderRadius: '12px',
+    padding: '12px',
     cursor: 'pointer',
     boxShadow: '0 4px 6px -1px rgba(217, 119, 6, 0.05)',
     position: 'relative'
@@ -1185,8 +1187,9 @@ const styles = {
   cardLayout: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    width: '100%'
+    gap: '12px',
+    width: '100%',
+    flexWrap: 'wrap'
   },
   avatarArea: {
     display: 'flex',
@@ -1262,12 +1265,12 @@ const styles = {
     minWidth: 'auto'
   },
   jefaturasContainer: {
-    marginLeft: '32px',
-    paddingLeft: '20px',
+    marginLeft: '16px',
+    paddingLeft: '16px',
     borderLeft: '2px dashed #cbd5e1',
     display: 'flex',
     flexDirection: 'column',
-    gap: '18px',
+    gap: '14px',
     marginTop: '12px',
     position: 'relative'
   },
@@ -1288,8 +1291,8 @@ const styles = {
   jefaturaCard: {
     background: '#eff6ff',
     border: '2px solid #bfdbfe',
-    borderRadius: '14px',
-    padding: '18px',
+    borderRadius: '12px',
+    padding: '12px',
     cursor: 'pointer',
     boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.03)',
     position: 'relative',
@@ -1316,12 +1319,12 @@ const styles = {
     borderRadius: '4px'
   },
   ejecutivasContainer: {
-    marginLeft: '32px',
-    paddingLeft: '20px',
+    marginLeft: '16px',
+    paddingLeft: '16px',
     borderLeft: '2px dashed #cbd5e1',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
     marginTop: '12px',
     position: 'relative'
   },
@@ -1332,7 +1335,7 @@ const styles = {
     background: '#f0fdf4',
     border: '1.5px solid #bbf7d0',
     borderRadius: '12px',
-    padding: '14px 16px',
+    padding: '12px',
     cursor: 'pointer',
     boxShadow: '0 2px 4px rgba(16, 185, 129, 0.02)',
     position: 'relative',

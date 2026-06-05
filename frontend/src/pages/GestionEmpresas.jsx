@@ -793,18 +793,6 @@ export default function GestionEmpresas() {
                 </span>{" "}
                 🔄 Traspaso Masivo de Carteras (Lote)
               </h2>
-              <span
-                style={{
-                  background: "rgba(59, 130, 246, 0.1)",
-                  color: "var(--secondary-color)",
-                  padding: "4px 10px",
-                  borderRadius: "20px",
-                  fontSize: "11px",
-                  fontWeight: "600",
-                }}
-              >
-                Utilidad Administrativa
-              </span>
             </div>
 
             {showTraspaso && (
@@ -815,6 +803,7 @@ export default function GestionEmpresas() {
                     display: "flex",
                     borderBottom: "1px solid #cbd5e1",
                     background: "#f8fafc",
+                    flexWrap: "wrap"
                   }}
                 >
                   <button
@@ -1025,7 +1014,7 @@ export default function GestionEmpresas() {
                               {selectedEmpresas.length} de{" "}
                               {empresasTraspaso.length} seleccionadas)
                             </h3>
-                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                            <div className="flex-wrap-container" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                               {empresasTraspaso.length > 0 && (
                                 <input
                                   type="text"

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useState } from "react";
 
 import "./styles/base.css";
 import "./styles/layout.css";
@@ -69,10 +69,29 @@ const ProtectedRoute = ({ children, allowedRoles, path }) => {
 // MainLayout wrapper to handle inactivity logout hook
 const MainLayout = () => {
   useInactivityLogout();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
-    <div style={{ display: 'flex' }}>
-      <Sidebar />
-      <div style={{ flex: 1, marginLeft: '220px', minHeight: '100vh', background: 'var(--bg-body)' }}>
+    <div className="app-layout">
+      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+      <div className="main-content">
+        {/* Mobile Header with Hamburger */}
+        <div className="mobile-header">
+          <button className="hamburger-btn" onClick={() => setIsMobileMenuOpen(true)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div className="mobile-logo">CORE 360</div>
+        </div>
+
+        {/* Overlay for mobile when sidebar is open */}
+        {isMobileMenuOpen && (
+          <div className="sidebar-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>
+        )}
+
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Navigate to="/registrar-reunion" replace />} />

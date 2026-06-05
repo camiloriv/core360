@@ -14,8 +14,10 @@ const styles = {
   filterGroup: { display: 'flex', flexDirection: 'column', flex: 1 },
   label: { fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' },
   select: { padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#f8fafc', fontWeight: 'bold' },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', marginBottom: '40px' },
+  kpiGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '40px' },
   kpiCard: { 
+    flex: '1 1 160px',
+    minWidth: '150px',
     background: '#fff', 
     padding: '20px', 
     borderRadius: '12px', 
@@ -28,8 +30,10 @@ const styles = {
   kpiTitle: { fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' },
   kpiValue: { fontSize: '32px', fontWeight: '800' },
   kpiSubText: { fontSize: '11px', color: '#64748b', marginTop: '5px' },
-  chartsGrid: { display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '30px', marginBottom: '40px' },
+  chartsGrid: { display: 'flex', flexWrap: 'wrap', gap: '30px', marginBottom: '40px' },
   chartBox: { 
+    flex: '1 1 400px',
+    minWidth: '300px',
     background: '#fff', 
     padding: '25px', 
     borderRadius: '12px', 

@@ -628,7 +628,7 @@ export default function DashboardEncuestas() {
           </div>
         </div>
 
-        <div style={styles.kpiGrid}>
+        <div className="kpi-grid-container" style={styles.kpiGrid}>
           <KpiCard
             title="Total Creadas"
             value={stats.creadas}
@@ -798,7 +798,7 @@ export default function DashboardEncuestas() {
                   📊 Exportar a Excel
                 </button>
               </div>
-              <div style={{ overflowX: "auto" }}>
+              <div className="table-responsive">
                 <table style={styles.table}>
                   <thead>
                     <tr style={styles.th}>
@@ -871,7 +871,7 @@ export default function DashboardEncuestas() {
                   📅 Encuestas Programadas (Pendientes de Envío)
                 </h3>
               </div>
-              <div style={{ overflowX: "auto" }}>
+              <div className="table-responsive">
                 {filteredProgramadas.length > 0 ? (
                   <table style={styles.table}>
                     <thead>

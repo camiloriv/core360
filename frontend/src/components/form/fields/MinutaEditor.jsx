@@ -330,7 +330,7 @@ const MenuBar = ({ editor }) => {
       </div>
 
       {showTableMenu && (
-        <div style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', gap: '15px', padding: '8px' }}>
+        <div style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', flexWrap: 'wrap', gap: '15px', padding: '8px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <button
               onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
@@ -535,10 +535,16 @@ function MinutaEditor({ form, setForm }) {
         .tiptap .selectedCell .column-resize-handle {
           background-color: #3b82f6;
         }
+        @media (max-width: 768px) {
+          .tiptap-editor-container .ProseMirror {
+            padding: 20px !important;
+            min-height: 400px !important;
+          }
+        }
       `}} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
         <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Editor de Minuta (Avanzado)</label>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex-wrap-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
           <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>borrar</button>
           <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>Franquicia</button>
@@ -575,12 +581,15 @@ function MinutaEditor({ form, setForm }) {
           padding: '30px 0'
         }}>
           <div style={{
-            width: '800px',
+            width: '100%',
+            maxWidth: '800px',
             minHeight: '800px',
             background: 'white',
             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
             borderRadius: '4px',
-            marginBottom: '40px'
+            marginBottom: '40px',
+            overflowX: 'auto',
+            boxSizing: 'border-box'
           }}>
             <EditorContent editor={editor} />
           </div>

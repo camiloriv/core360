@@ -427,14 +427,7 @@ export default function DashboardReuniones() {
         </div>
 
         {/* --- KPI CARDS (6 COLUMNAS CON REUNIONES ÚNICAS) --- */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
-            gap: "15px",
-            marginBottom: "30px",
-          }}
-        >
+        <div className="responsive-grid-6" style={{ marginBottom: "30px" }}>
           <KpiCard
             title="Total Histórico"
             value={filteredReuniones.length}
@@ -484,14 +477,7 @@ export default function DashboardReuniones() {
         </div>
 
         {/* --- CHARTS (SIDE BY SIDE SEGÚN MOCKUP) --- */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "30px",
-            marginBottom: "30px",
-          }}
-        >
+        <div className="responsive-grid-2" style={{ marginBottom: "30px" }}>
           <div
             style={{
               ...styles.chartBox,
@@ -550,12 +536,11 @@ export default function DashboardReuniones() {
 
               {/* LEYENDA PERSONALIZADA AL ESTILO DE LA IMAGEN */}
               <div
+                className="responsive-grid-2"
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: "10px",
                   marginTop: "10px",
                   fontSize: "12px",
+                  gap: "10px",
                 }}
               >
                 {barData.map((entry, index) => {
@@ -753,7 +738,7 @@ export default function DashboardReuniones() {
               📊 Exportar a Excel
             </button>
           </div>
-          <div style={{ overflowX: "auto" }}>
+          <div className="table-responsive">
             <table style={styles.table}>
               <thead>
                 <tr style={styles.th}>

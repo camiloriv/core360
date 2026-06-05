@@ -306,9 +306,8 @@ function ReunionesForm({ onSuccess }) {
             </label>
             {form.programar_encuesta && (
               <div
+                className="responsive-grid-2"
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
                   gap: "15px",
                 }}
               >

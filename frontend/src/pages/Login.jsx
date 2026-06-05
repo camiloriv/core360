@@ -98,7 +98,7 @@ const Login = () => {
 
       <svg
         style={{
-          position: "absolute",
+          position: "fixed",
           top: 0,
           left: 0,
           width: "100%",
@@ -207,7 +207,9 @@ const Login = () => {
 const styles = {
   container: {
     display: "flex",
-    height: "100vh",
+    minHeight: "100vh",
+    padding: "20px",
+    boxSizing: "border-box",
     justifyContent: "center",
     alignItems: "center",
     background: "var(--bg-body)",
@@ -223,6 +225,7 @@ const styles = {
     padding: "40px",
     boxShadow: "0 20px 40px -5px rgba(0, 0, 0, 0.15), 0 10px 20px -5px rgba(0, 0, 0, 0.08)",
     boxSizing: "border-box",
+    margin: "auto",
   },
   logoContainer: {
     display: "flex",

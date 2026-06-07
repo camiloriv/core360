@@ -143,6 +143,48 @@ const MenuBar = ({ editor }) => {
   if (!editor) return null;
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+  const [showColorMenu, setShowColorMenu] = useState(false);
+  const [showCellColorMenu, setShowCellColorMenu] = useState(false);
+  const colorDropdownRef = useRef(null);
+  const cellColorDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (colorDropdownRef.current && !colorDropdownRef.current.contains(event.target)) {
+        setShowColorMenu(false);
+      }
+      if (cellColorDropdownRef.current && !cellColorDropdownRef.current.contains(event.target)) {
+        setShowCellColorMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // States to keep track of current font attributes in active selection
+  const [currentFontSize, setCurrentFontSize] = useState("15px");
+  const [currentFontFamily, setCurrentFontFamily] = useState("");
+
+  useEffect(() => {
+    const updateMenuStates = () => {
+      if (!editor) return;
+      setCurrentFontSize(editor.getAttributes("textStyle").fontSize || "15px");
+      setCurrentFontFamily(editor.getAttributes("textStyle").fontFamily || "");
+    };
+
+    editor.on("transaction", updateMenuStates);
+    editor.on("selectionUpdate", updateMenuStates);
+    
+    // Initial sync
+    updateMenuStates();
+
+    return () => {
+      editor.off("transaction", updateMenuStates);
+      editor.off("selectionUpdate", updateMenuStates);
+    };
+  }, [editor]);
 
   const groupStyle = {
     display: 'flex',
@@ -216,8 +258,16 @@ const MenuBar = ({ editor }) => {
     }
   };
 
-  const standardTextColors = ['#000000', 'var(--text-muted)', 'var(--primary-color)', '#b91c1c', '#15803d', '#7c3aed'];
-  const standardCellColors = ['var(--bg-container)', 'var(--bg-muted)', 'var(--border-color)', '#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2'];
+  const extendedColors = [
+    '#000000', '#475569', '#94a3b8', '#dc2626', '#ea580c',
+    '#d97706', '#16a34a', '#0d9488', '#2563eb', '#4f46e5',
+    '#7c3aed', '#db2777', '#1e293b', '#b91c1c', '#15803d'
+  ];
+  const extendedCellColors = [
+    '#ffffff', '#f3f4f6', '#e5e7eb', '#fee2e2', '#ffedd5',
+    '#fef9c3', '#dcfce7', '#d1fae5', '#cffafe', '#e0f2fe',
+    '#dbeafe', '#e0e7ff', '#f3e8ff', '#fce7f3', '#ffe4e6'
+  ];
 
   return (
     <div className="editor-menubar" style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '8px 4px', borderTopLeftRadius: '12px', borderTopRightRadius: '12px', flexWrap: 'wrap', gap: '4px' }}>
@@ -267,7 +317,7 @@ const MenuBar = ({ editor }) => {
           <select
             onChange={e => editor.chain().focus().setFontFamily(e.target.value).run()}
             style={{ ...selectStyle, width: '100px' }}
-            value={editor.getAttributes('textStyle').fontFamily || ''}
+            value={currentFontFamily}
           >
             <option value="">Fuente</option>
             {fontFamilies.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
@@ -275,7 +325,7 @@ const MenuBar = ({ editor }) => {
           <select
             onChange={e => editor.chain().focus().setFontSize(e.target.value).run()}
             style={{ ...selectStyle, width: '65px' }}
-            value={editor.getAttributes('textStyle').fontSize || '15px'}
+            value={currentFontSize}
           >
             <option value="15px">15px</option>
             {fontSizes.map(s => <option key={s} value={s}>{s}</option>)}
@@ -291,11 +341,94 @@ const MenuBar = ({ editor }) => {
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }} className={editor.isActive('underline') ? 'is-active' : ''}><UnderlineIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} className={editor.isActive('strike') ? 'is-active' : ''}><StrikeIcon size={16} /></button>
           <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }}></div>
-          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }} title="Color de Texto">
-            {standardTextColors.map(color => (
-              <div key={color} className="color-dot" style={{ background: color }} onClick={() => editor.chain().focus().setColor(color).run()} />
-            ))}
-            <button onClick={(e) => { e.preventDefault(); editor.chain().focus().unsetColor().run(); }} style={{ minWidth: '18px', height: '18px', fontSize: '10px', padding: 0 }}>✕</button>
+          
+          {/* Selector de Color Desplegable */}
+          <div ref={colorDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              onClick={(e) => { e.preventDefault(); setShowColorMenu(!showColorMenu); }}
+              className={showColorMenu ? 'is-active' : ''}
+              title="Color de Texto"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Palette size={16} />
+              <span 
+                style={{ 
+                  width: '10px', 
+                  height: '10px', 
+                  borderRadius: '50%', 
+                  background: editor.getAttributes('textStyle').color || '#000000', 
+                  display: 'inline-block', 
+                  border: '1px solid #cbd5e1' 
+                }} 
+              />
+            </button>
+            {showColorMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '12px',
+                zIndex: 1000,
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                minWidth: '180px'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                  {extendedColors.map(color => (
+                    <div
+                      key={color}
+                      className="color-dot"
+                      style={{
+                        background: color,
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'transform 0.1s'
+                      }}
+                      onClick={() => {
+                        editor.chain().focus().setColor(color).run();
+                        setShowColorMenu(false);
+                      }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', color: '#475569' }}>
+                    <span style={{ fontWeight: 'bold' }}>Personalizado:</span>
+                    <input
+                      type="color"
+                      value={editor.getAttributes('textStyle').color || '#000000'}
+                      onChange={e => {
+                        editor.chain().focus().setColor(e.target.value).run();
+                      }}
+                      style={{ width: '24px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                    />
+                  </label>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      editor.chain().focus().unsetColor().run();
+                      setShowColorMenu(false);
+                    }}
+                    style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <span style={labelStyle}>Fuente</span>
@@ -363,10 +496,93 @@ const MenuBar = ({ editor }) => {
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-              {standardCellColors.map(color => (
-                <div key={color} className="color-dot" style={{ background: color }} onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', color).run()} />
-              ))}
+            {/* Selector de Color de Celda Desplegable */}
+            <div ref={cellColorDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                onClick={(e) => { e.preventDefault(); setShowCellColorMenu(!showCellColorMenu); }}
+                className={showCellColorMenu ? 'is-active' : ''}
+                title="Color de Celda"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: showCellColorMenu ? '#e2e8f0' : 'transparent', border: '1px solid #cbd5e1', padding: '4px 8px', borderRadius: '4px', height: '28px', cursor: 'pointer' }}
+              >
+                <Highlighter size={16} />
+                <span 
+                  style={{ 
+                    width: '10px', 
+                    height: '10px', 
+                    borderRadius: '50%', 
+                    background: editor.getAttributes('tableCell').backgroundColor || '#ffffff', 
+                    display: 'inline-block', 
+                    border: '1px solid #cbd5e1' 
+                  }} 
+                />
+              </button>
+              {showCellColorMenu && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  zIndex: 1000,
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  minWidth: '180px'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                    {extendedCellColors.map(color => (
+                      <div
+                        key={color}
+                        className="color-dot"
+                        style={{
+                          background: color,
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          transition: 'transform 0.1s'
+                        }}
+                        onClick={() => {
+                          editor.chain().focus().setCellAttribute('backgroundColor', color).run();
+                          setShowCellColorMenu(false);
+                        }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', color: '#475569' }}>
+                      <span style={{ fontWeight: 'bold' }}>Personalizado:</span>
+                      <input
+                        type="color"
+                        value={editor.getAttributes('tableCell').backgroundColor || '#ffffff'}
+                        onChange={e => {
+                          editor.chain().focus().setCellAttribute('backgroundColor', e.target.value).run();
+                        }}
+                        style={{ width: '24px', height: '20px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      />
+                    </label>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        editor.chain().focus().setCellAttribute('backgroundColor', null).run();
+                        setShowCellColorMenu(false);
+                      }}
+                      style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #cbd5e1',
+                        background: '#f8fafc',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

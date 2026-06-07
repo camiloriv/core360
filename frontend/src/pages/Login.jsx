@@ -185,11 +185,7 @@ const Login = () => {
             Iniciar Sesión
           </button>
 
-          <div style={styles.footerOptions}>
-            <label style={styles.checkboxLabel}>
-              <input type="checkbox" style={styles.checkbox} />
-              Recordarme
-            </label>
+          <div style={{ ...styles.footerOptions, justifyContent: "flex-end" }}>
             <span 
               onClick={handleHelpClick} 
               className="cloud-link" 

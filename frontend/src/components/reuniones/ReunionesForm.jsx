@@ -23,7 +23,7 @@ function ReunionesForm({ onSuccess }) {
 
   const isUserDemo = user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba");
 
-  const { empresas, setEmpresas, templates, destinatarios, ejecutivas } =
+  const { empresas, setEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);
 
   // Para no-admin o usuarios de prueba: inicializar ejecutiva_id y enviado_por desde el usuario logueado
@@ -63,6 +63,9 @@ function ReunionesForm({ onSuccess }) {
     if (!form.empresa_id) missingFields.push("Empresa");
     if (!form.ejecutiva_id) missingFields.push("Ejecutiva");
     if (!form.tipo_reu) missingFields.push("Tipo de Reunión");
+    if (form.tipo_reu === "Otros" && (!form.tipo_reu_detalle || !form.tipo_reu_detalle.trim())) {
+      missingFields.push("Especificar Tipo de Reunión");
+    }
     if (!form.motivo_reu) missingFields.push("Motivo");
     if (!form.enviado_a) missingFields.push("Enviar a");
     if (!form.participantes) missingFields.push("Participantes");
@@ -161,7 +164,7 @@ function ReunionesForm({ onSuccess }) {
                 </option>
                 {ejecutivas.map((ej) => (
                   <option key={ej.id} value={ej.id}>
-                    {ej.nombre} ({ej.permisos})
+                    {ej.nombre}
                   </option>
                 ))}
               </select>
@@ -175,6 +178,7 @@ function ReunionesForm({ onSuccess }) {
             onDetalleChange={(e) =>
               setField("tipo_reu_detalle", e.target.value)
             }
+            tipos={tiposReunion}
             required
           />
 

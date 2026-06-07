@@ -335,3 +335,22 @@ exports.obtenerDestinatarios = async (req, res) => {
     }
 };
 
+// 🔹 OBTENER TIPOS DE REUNIÓN UNICOS
+exports.obtenerTiposReunion = async (req, res) => {
+    const sql = `
+        SELECT DISTINCT tipo_reu 
+        FROM reuniones 
+        WHERE tipo_reu IS NOT NULL 
+        AND tipo_reu != ''
+        ORDER BY tipo_reu ASC
+    `;
+
+    try {
+        const [result] = await db.query(sql);
+        res.json(result.map(r => r.tipo_reu));
+    } catch (err) {
+        console.error("Error en obtenerTiposReunion:", err);
+        res.status(500).json({ error: "Error en la BD" });
+    }
+};
+

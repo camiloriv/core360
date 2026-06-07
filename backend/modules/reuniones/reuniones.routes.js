@@ -21,9 +21,10 @@ const upload = multer({
 });
 
 // 🔹 RUTAS
-router.get("/", reunionesController.listarReuniones);
 router.get("/resumen", reunionesController.obtenerStats);
 router.get("/destinatarios", reunionesController.obtenerDestinatarios);
+router.get("/tipos", reunionesController.obtenerTiposReunion);
+router.get("/", reunionesController.listarReuniones);
 router.post("/", upload.array("archivos"), reunionesController.crearReunion);
 
 module.exports = router;

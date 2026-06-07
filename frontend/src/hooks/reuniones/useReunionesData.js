@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getDestinatarios } from "../../services/reunionesService";
+import { getDestinatarios, getTiposReunion } from "../../services/reunionesService";
 import { obtenerTemplates } from "../../services/encuestaService";
 import { getEmpresas, getEmpresasByJefatura, getEjecutivas, getEmpresasByGerencia, getUsuariosPorEmpresa } from "../../services/dataService";
 
@@ -8,9 +8,19 @@ export default function useReunionesData(user, empresa_id) {
   const [templates, setTemplates] = useState([]);
   const [destinatarios, setDestinatarios] = useState([]);
   const [ejecutivas, setEjecutivas] = useState([]);
+  const [tiposReunion, setTiposReunion] = useState(["Inducción", "Implementación TI"]);
 
   useEffect(() => {
     obtenerTemplates().then(setTemplates);
+    getTiposReunion()
+      .then(res => {
+        const defaults = ["Inducción", "Implementación TI"];
+        const combined = Array.from(new Set([...defaults, ...(res.data || [])]));
+        setTiposReunion(combined);
+      })
+      .catch(err => {
+        console.error("Error al obtener tipos de reunión:", err);
+      });
   }, []);
 
   useEffect(() => {
@@ -78,6 +88,7 @@ export default function useReunionesData(user, empresa_id) {
     setEmpresas,
     templates,
     destinatarios,
-    ejecutivas
+    ejecutivas,
+    tiposReunion
   };
 }

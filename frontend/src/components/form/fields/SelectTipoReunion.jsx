@@ -1,6 +1,10 @@
-function SelectTipoReunion({ value, onChange, detalle, onDetalleChange, required }) {
+function SelectTipoReunion({ value, onChange, detalle, onDetalleChange, tipos = [], required }) {
 
   const esOtro = value === "Otros";
+
+  // Filter out any "Otros" value if it was saved in the db, as we handle it separately
+  // and ensure we don't have duplicates.
+  const filteredTipos = (tipos || []).filter(t => t !== "Otros");
 
   return (
     <div className="field">
@@ -13,8 +17,11 @@ function SelectTipoReunion({ value, onChange, detalle, onDetalleChange, required
         onChange={onChange}
       >
         <option value="">Seleccione</option>
-        <option value="Inducción">Inducción</option>
-        <option value="Implementación TI">Implementación TI</option>
+        {filteredTipos.map((tipo) => (
+          <option key={tipo} value={tipo}>
+            {tipo}
+          </option>
+        ))}
         <option value="Otros">Otros</option>
       </select>
 

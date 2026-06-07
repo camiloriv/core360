@@ -103,15 +103,6 @@ export default function GestionEmpresas() {
     }
   }, [traspasoOrigen, empresas]);
 
-  // Obtener nombres de ejecutivas de una jefatura para los labels del selector
-  const getEjecutivasNombres = (jefaturaId) => {
-    const nombres = ejecutivas
-      .filter((e) => e.jefatura_id === jefaturaId)
-      .map((e) => e.nombre);
-    return nombres.length > 0
-      ? ` (Ejecutivas: ${nombres.join(", ")})`
-      : " (Sin ejecutivas)";
-  };
 
   // --- CRUD Jefaturas ---
   const crearJefatura = async () => {
@@ -286,7 +277,7 @@ export default function GestionEmpresas() {
           <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #475569;">Jefatura Asignada</label>
           <select id="swal-input-jef" style="width: 100%; box-sizing: border-box; margin-bottom: 16px; padding: 10px 12px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white; font-family: inherit;">
             <option value="">Sin jefatura asignada</option>
-            ${jefaturas.map((j) => `<option value="${j.id}">${j.nombre}${getEjecutivasNombres(j.id)}</option>`).join("")}
+            ${jefaturas.map((j) => `<option value="${j.id}">${j.nombre}</option>`).join("")}
           </select>
           
           <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #475569;">Zona Comercial</label>
@@ -329,7 +320,7 @@ export default function GestionEmpresas() {
           <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #475569;">Jefatura Asignada</label>
           <select id="swal-input-jef" style="width: 100%; box-sizing: border-box; margin-bottom: 16px; padding: 10px 12px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; background: white; font-family: inherit;">
             <option value="">Sin jefatura asignada</option>
-            ${jefaturas.map((j) => `<option value="${j.id}" ${empresa.jefatura_id === j.id ? "selected" : ""}>${j.nombre}${getEjecutivasNombres(j.id)}</option>`).join("")}
+            ${jefaturas.map((j) => `<option value="${j.id}" ${empresa.jefatura_id === j.id ? "selected" : ""}>${j.nombre}</option>`).join("")}
           </select>
           
           <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #475569;">Zona Comercial</label>
@@ -907,7 +898,6 @@ export default function GestionEmpresas() {
                             {jefaturas.map((j) => (
                               <option key={j.id} value={j.id}>
                                 {j.nombre}
-                                {getEjecutivasNombres(j.id)}
                               </option>
                             ))}
                           </select>
@@ -964,7 +954,6 @@ export default function GestionEmpresas() {
                               .map((j) => (
                                 <option key={j.id} value={j.id}>
                                   {j.nombre}
-                                  {getEjecutivasNombres(j.id)}
                                 </option>
                               ))}
                           </select>

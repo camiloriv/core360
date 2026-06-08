@@ -752,7 +752,7 @@ export default function DashboardReuniones() {
               </thead>
               <tbody>
                 {currentReuniones.map((r, index) => {
-                  const isLastRows = index >= currentReuniones.length - 2 && currentReuniones.length > 3;
+                  const isLastRows = index >= currentReuniones.length - 1 || (index >= currentReuniones.length - 2 && index > 0);
                   const adjuntos = r.archivos_nombres
                     ? JSON.parse(r.archivos_nombres)
                     : [];

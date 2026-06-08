@@ -274,7 +274,8 @@ exports.crearReunion = async (req, res) => {
                 
                 // Deduplicate emails and remove any null/undefined
                 const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(',');
-                await enviarCorreo({
+                // Enviar en segundo plano para evitar colgar la respuesta HTTP si el SMTP falla o demora
+                enviarCorreo({
                     to: data.enviado_a,
                     cc: correosCc,
                     subject: `Reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_reunion}`,
@@ -292,9 +293,11 @@ exports.crearReunion = async (req, res) => {
                         documentos_adjuntos: data.documentos_adjuntos
                     },
                     attachments
+                }).catch(error => {
+                    console.error("Error enviando correo inmediato:", error);
                 });
             } catch (error) {
-                console.error("Error enviando correo inmediato:", error);
+                console.error("Error al preparar envío de correo:", error);
             }
         }
 

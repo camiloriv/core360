@@ -1710,7 +1710,7 @@ export default function EditorEncuestas() {
             </button>
           </aside>
 
-          <main style={styles.main}>
+          <main className="editor-main" style={styles.main}>
             {selectedTemplate ? (
               <div className="fade">
                 <div style={styles.mainHeader}>
@@ -2008,7 +2008,7 @@ const styles = {
     alignItems: "center",
     transition: "all 0.2s ease",
   },
-  main: { minHeight: "600px" },
+  main: {},
   mainHeader: {
     display: "flex",
     justifyContent: "space-between",

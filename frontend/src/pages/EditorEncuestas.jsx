@@ -1584,12 +1584,12 @@ export default function EditorEncuestas() {
 
         <div className="responsive-editor-layout" style={styles.layout}>
           <aside
+            className="editor-sidebar"
             style={{
               ...styles.sidebar,
               display: "flex",
               flexDirection: "column",
               height: "fit-content",
-              minHeight: "600px",
             }}
           >
             <div style={{ marginBottom: "20px" }}>

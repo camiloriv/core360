@@ -896,4 +896,15 @@ button:disabled {
   }
 }
 
+.editor-sidebar {
+  min-height: 600px;
+}
+
+@media (max-width: 768px) {
+  .editor-sidebar {
+    min-height: unset !important;
+  }
+}
+
+
 

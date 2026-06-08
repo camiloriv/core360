@@ -269,6 +269,13 @@ Hemos implementado un sistema de base de datos auto-sostenible para resolver los
 ### 2. Remoción de Advertencia de Duplicado de Extensión Tiptap (Frontend)
 - En [MinutaEditor.jsx](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/frontend/src/components/form/fields/MinutaEditor.jsx), removimos el registro manual e importación de la extensión `Underline` desde `@tiptap/extension-underline` porque el paquete `StarterKit` de Tiptap v3 ya incluye soporte nativo de subrayado. Esto elimina la advertencia `[tiptap warn]: Duplicate extension names found: ['underline']` de la consola de desarrollo de forma permanente sin afectar la funcionalidad.
 
+### 3. Resolución de Rutas Absolutas para Adjuntos en Multer
+- **Problema**: Al subir archivos adjuntos en producción/desarrollo (Render), la petición fallaba con error 500 porque Multer utilizaba una ruta relativa (`uploads/`) dependiente del directorio de ejecución actual (`process.cwd()`). Si el proceso Node se iniciaba desde la raíz, no encontraba la carpeta y abortaba la operación, bloqueando el guardado y el consecuente envío de correos.
+- **Solución**:
+  - Modificamos [app.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/app.js) para asegurar la creación del directorio `backend/uploads` en el arranque de la API mediante `fs.mkdirSync` y rutas absolutas independientes del entorno.
+  - Modificamos [reuniones.routes.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/modules/reuniones/reuniones.routes.js) para que la propiedad `destination` de Multer resuelva una ruta absoluta inequívoca a través de `path.resolve(__dirname, "../../uploads")`. Esto asegura que los archivos se carguen y adjunten exitosamente, permitiendo el flujo normal de guardado de minutas y envíos de emails.
+
+
 
 
 

@@ -49,9 +49,15 @@ try {
 }
 
 // ✅ Middlewares base
+const fs = require("fs");
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadsDir));
 
 // ✅ Rutas de Módulos
 const reunionesRoutes = require("./modules/reuniones/reuniones.routes");

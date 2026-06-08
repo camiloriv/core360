@@ -250,6 +250,26 @@ Ampliamos el panel de KPIs en `DashboardReuniones.jsx` a una cuadrícula premium
 ### 3. Compilación Satisfactoria:
 El código fuente empaquetó de forma impecable a través de Vite en un tiempo óptimo de **4.82 segundos** sin warnings.
 
+---
+
+## 🔧 Migraciones Automáticas de Base de Datos y Corrección de Advertencia Tiptap
+
+Hemos implementado un sistema de base de datos auto-sostenible para resolver los errores 500 al guardar reuniones en entornos de producción (como Render) y solucionado advertencias de duplicados en la consola del desarrollador.
+
+### 1. Migraciones Autónomas al Iniciar el Servidor (Backend)
+- **Nuevo script de migración**: Creamos [migrate.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/database/migrate.js) en `backend/database/` para unificar y verificar la presencia de todas las tablas y columnas creadas en desarrollo:
+  - Crear la tabla `zonas` e insertar las macro-zonas por defecto.
+  - Verificar y agregar las columnas `zona_id`, `gerencia_id` y `vistas_permitidas` en la tabla `usuarios`.
+  - Verificar y agregar la columna `zona_id` en la tabla `empresas`.
+  - Crear la tabla intermedia `usuario_gerencias` y migrar las relaciones previas.
+  - Verificar y agregar la columna `activo` en `encuesta_catalogo_preguntas`.
+  - Crear la tabla `empresa_seguimiento_log` y migrar los logs iniciales de cobertura.
+- **Ejecución en Startup**: Modificamos [index.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/index.js) de la API para que ejecute `runMigrations()` asíncronamente en el arranque del servidor, antes de abrir el puerto de escucha. Esto asegura que la base de datos de producción se actualice de forma transparente en cada despliegue, resolviendo el error 500 por la tabla faltante `empresa_seguimiento_log`.
+
+### 2. Remoción de Advertencia de Duplicado de Extensión Tiptap (Frontend)
+- En [MinutaEditor.jsx](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/frontend/src/components/form/fields/MinutaEditor.jsx), removimos el registro manual e importación de la extensión `Underline` desde `@tiptap/extension-underline` porque el paquete `StarterKit` de Tiptap v3 ya incluye soporte nativo de subrayado. Esto elimina la advertencia `[tiptap warn]: Duplicate extension names found: ['underline']` de la consola de desarrollo de forma permanente sin afectar la funcionalidad.
+
+
 
 
 

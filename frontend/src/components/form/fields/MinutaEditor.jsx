@@ -7,7 +7,6 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
-import { Underline } from "@tiptap/extension-underline";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { FontFamily } from "@tiptap/extension-font-family";
 import { Extension } from "@tiptap/core";
@@ -699,7 +698,6 @@ function MinutaEditor({ form, setForm }) {
       TableRow,
       CustomTableHeader,
       CustomTableCell,
-      Underline,
       TextStyle,
       Color,
       FontFamily,

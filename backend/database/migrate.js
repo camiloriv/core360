@@ -148,6 +148,25 @@ async function runMigrations() {
       }
     }
 
+    // 8. Columns in reuniones table
+    console.log("Migration: Checking columns in 'reuniones' table...");
+    const checkAndAddReunionColumn = async (colName, colDef) => {
+      const [cols] = await connection.query(`SHOW COLUMNS FROM reuniones LIKE '${colName}'`);
+      if (cols.length === 0) {
+        console.log(`Migration: Adding '${colName}' column to 'reuniones'...`);
+        await connection.query(`ALTER TABLE reuniones ADD COLUMN ${colName} ${colDef}`);
+      }
+    };
+
+    await checkAndAddReunionColumn('estado_envio', "VARCHAR(20) DEFAULT 'enviado'");
+    await checkAndAddReunionColumn('archivos_nombres', "TEXT NULL");
+    await checkAndAddReunionColumn('programar_encuesta', "TINYINT(1) DEFAULT 0");
+    await checkAndAddReunionColumn('encuesta_tipo', "VARCHAR(100) DEFAULT NULL");
+    await checkAndAddReunionColumn('encuesta_programada_para', "DATETIME DEFAULT NULL");
+    await checkAndAddReunionColumn('encuesta_estado_envio', "VARCHAR(20) DEFAULT 'pendiente'");
+    await checkAndAddReunionColumn('encuesta_relacionada', "TINYINT(1) DEFAULT 0");
+    await checkAndAddReunionColumn('encuesta_destinatario', "VARCHAR(255) DEFAULT NULL");
+
     console.log("Migration: All migrations verified and applied successfully!");
   } catch (error) {
     console.error("Migration: Error during database migration:", error);

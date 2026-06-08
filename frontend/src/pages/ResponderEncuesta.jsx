@@ -242,14 +242,14 @@ function ResponderEncuesta() {
           {/* ESCALA NUMÉRICA (1-N) o NPS (1-10) */}
           {(pregunta.tipo === "escala" || pregunta.tipo === "nps" || pregunta.es_nps === 1) && (
             <div style={{ width: "100%" }}>
-              <div className="radio-group scale-group" style={{ display: 'flex', justifyContent: 'center', gap: '5px', flexWrap: 'wrap' }}>
+              <div className="radio-group scale-group" style={{ '--columns': (pregunta.tipo === "nps" || pregunta.es_nps === 1) ? 10 : (pregunta.escala || 5) }}>
                 {Array.from(
                   { length: (pregunta.tipo === "nps" || pregunta.es_nps === 1) ? 10 : (pregunta.escala || 5) }, 
                   (_, i) => i + 1
                 ).map((n) => {
                   const isSelected = respuestas[pregunta.id] === n;
                   return (
-                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-btn)', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--secondary-color)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--primary-hover)' : 'var(--border-color)', color: isSelected ? 'var(--bg-container)' : 'var(--text-muted)', fontWeight: 'bold' }}>
+                    <label key={n} className={`radio-option scale-option ${isSelected ? 'selected' : ''}`} style={{ border: '1.5px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.2s', background: isSelected ? 'var(--secondary-color)' : 'var(--bg-container)', borderColor: isSelected ? 'var(--primary-hover)' : 'var(--border-color)', color: isSelected ? 'var(--bg-container)' : 'var(--text-muted)', fontWeight: 'bold' }}>
                       <input
                         type="radio"
                         name={pregunta.id}

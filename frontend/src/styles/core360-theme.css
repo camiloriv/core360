@@ -204,16 +204,36 @@ textarea:focus {
 }
 
 .scale-group {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 5), 1fr);
   gap: 8px;
+  justify-content: center;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .scale-option {
-  min-width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 4px;
-  /* Más cuadrado para escalas */
+  flex: none !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  min-width: unset !important;
+  padding: 0 !important;
+  border-radius: 50% !important; /* Circular look for scales */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+@media (max-width: 768px) {
+  .scale-group {
+    grid-template-columns: repeat(var(--columns, 5), 1fr) !important;
+    gap: 4px !important;
+  }
+  .scale-option {
+    font-size: 11px !important;
+  }
 }
 
 .core360-textarea {

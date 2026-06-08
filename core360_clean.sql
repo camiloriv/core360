@@ -440,7 +440,6 @@ CREATE TABLE `reuniones` (
   `encuesta_programada_para` datetime DEFAULT NULL,
   `encuesta_estado_envio` varchar(20) DEFAULT 'pendiente',
   `encuesta_relacionada` tinyint(1) DEFAULT '0',
-  `encuesta_destinatario` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ejecutiva_id` (`ejecutiva_id`),
   KEY `empresa_id` (`empresa_id`),
@@ -552,6 +551,8 @@ UNLOCK TABLES;
 --
 -- Dumping routines for database 'core360'
 --
+ALTER TABLE `reuniones` ADD COLUMN `encuesta_destinatario` varchar(255) DEFAULT NULL;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

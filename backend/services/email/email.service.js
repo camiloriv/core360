@@ -113,11 +113,22 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
     }
 
     // 🔹 9. Enviar correo
+    let recipientTo = to;
+    let recipientCc = cc;
+    let emailSubject = subject;
+
+    if (process.env.REDIRECT_EMAILS_TO) {
+      console.log(`✉️ [REDIRECT] Redireccionando correo de [${to}] (CC: ${cc || 'Ninguno'}) a [${process.env.REDIRECT_EMAILS_TO}]`);
+      recipientTo = process.env.REDIRECT_EMAILS_TO;
+      recipientCc = undefined;
+      emailSubject = `[DEV - Destinatario Original: ${to}] ${subject}`;
+    }
+
     const info = await transporter.sendMail({
       from: `"Sistema Reuniones" <${process.env.MAIL_USER}>`,
-      to,
-      ...(cc && { cc }),
-      subject,
+      to: recipientTo,
+      ...(recipientCc && { cc: recipientCc }),
+      subject: emailSubject,
       html,
       attachments: baseAttachments
     });
@@ -241,11 +252,22 @@ const enviarCorreoEncuesta = async (to, url, bcc, user_nombre) => {
 </html>
     `;
 
+    let recipientTo = to;
+    let recipientBcc = bcc;
+    let emailSubject = "[Encuesta OTIC Proforma] - Tu opinión es muy importante para nosotros";
+
+    if (process.env.REDIRECT_EMAILS_TO) {
+      console.log(`✉️ [REDIRECT] Redireccionando encuesta de [${to}] (BCC: ${bcc || 'Ninguno'}) a [${process.env.REDIRECT_EMAILS_TO}]`);
+      recipientTo = process.env.REDIRECT_EMAILS_TO;
+      recipientBcc = undefined;
+      emailSubject = `[DEV - Destinatario Original: ${to}] ${emailSubject}`;
+    }
+
     const info = await transporter.sendMail({
       from: `"Sistema Encuestas" <${process.env.MAIL_USER}>`,
-      to,
-      ...(bcc && { bcc }),
-      subject: "[Encuesta OTIC Proforma] - Tu opinión es muy importante para nosotros",
+      to: recipientTo,
+      ...(recipientBcc && { bcc: recipientBcc }),
+      subject: emailSubject,
       html,
       attachments: baseAttachments
     });

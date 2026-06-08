@@ -26,6 +26,7 @@ const upload = multer({
 router.get("/resumen", reunionesController.obtenerStats);
 router.get("/destinatarios", reunionesController.obtenerDestinatarios);
 router.get("/tipos", reunionesController.obtenerTiposReunion);
+router.get("/test-smtp", reunionesController.testSmtp);
 router.get("/", reunionesController.listarReuniones);
 router.post("/", upload.array("archivos"), reunionesController.crearReunion);
 

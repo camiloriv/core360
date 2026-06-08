@@ -357,3 +357,56 @@ exports.obtenerTiposReunion = async (req, res) => {
     }
 };
 
+// 🔹 PROBAR SMTP (Para diagnóstico)
+exports.testSmtp = async (req, res) => {
+    const targetEmail = req.query.email || "camilorivera.bravo@gmail.com";
+    const transporter = require("../../config/mailer");
+    const diagnostic = {
+        config: {
+            host: process.env.MAIL_HOST,
+            port: process.env.MAIL_PORT,
+            user: process.env.MAIL_USER,
+            redirect_to: process.env.REDIRECT_EMAILS_TO || "None"
+        },
+        verify: null,
+        send: null,
+        error: null
+    };
+
+    try {
+        await transporter.verify();
+        diagnostic.verify = "SUCCESS";
+    } catch (err) {
+        diagnostic.verify = "FAILED";
+        diagnostic.error = `Verify error: ${err.message || err}`;
+        return res.json(diagnostic);
+    }
+
+    try {
+        const sent = await enviarCorreo({
+            to: targetEmail,
+            subject: "Test de Diagnóstico SMTP - Core360",
+            data: {
+                id_reunion: "TEST-1234",
+                participantes: "Usuario de Prueba",
+                empresa: "Empresa Demo",
+                ejecutiva: "Ejecutiva de Prueba",
+                fecha_reu: new Date().toISOString().split('T')[0],
+                hora: "12:00",
+                lugar: "Microsoft Teams",
+                motivo_reu: "Prueba de Diagnóstico",
+                minuta: "<h3>Minuta de prueba</h3><p>Esto es un test del sistema de correos.</p>",
+                enviado_por: "Sistema de Diagnóstico",
+                documentos_adjuntos: "Ninguno"
+            },
+            attachments: []
+        });
+        diagnostic.send = sent ? "SUCCESS" : "FAILED (enviarCorreo returned false)";
+    } catch (err) {
+        diagnostic.send = "FAILED";
+        diagnostic.error = `Send error: ${err.message || err}`;
+    }
+
+    res.json(diagnostic);
+};
+

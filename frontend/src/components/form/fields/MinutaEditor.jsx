@@ -309,11 +309,108 @@ const MenuBar = ({ editor }) => {
           transform: scale(1.2);
           border-color: #94a3b8;
         }
+
+        /* Responsive Styles for Minuta Editor Toolbar */
+        @media (max-width: 768px) {
+          .editor-menubar {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            flex-direction: row !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 12px 8px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .menubar-group {
+            display: contents !important;
+          }
+          .menubar-row {
+            display: contents !important;
+          }
+          .menubar-group > span {
+            display: none !important; /* Hide section labels like 'FUENTE', 'PÁRRAFO' */
+          }
+          .menubar-divider {
+            display: none !important;
+          }
+          .editor-menubar select {
+            flex: 1 1 auto !important;
+            min-width: 80px !important;
+            max-width: 120px !important;
+            height: 30px !important;
+          }
+          .editor-menubar button {
+            flex: 0 0 auto !important;
+            min-width: 32px !important;
+            height: 32px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            border-radius: 6px !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+          }
+          .editor-menubar button:hover {
+            background-color: #f8fafc !important;
+          }
+          .editor-menubar button.is-active {
+            background-color: #e0e7ff !important;
+            border-color: #c7d2fe !important;
+            color: #4338ca !important;
+          }
+
+          /* Table Submenu styling for mobile */
+          .menubar-table-submenu {
+            width: 100% !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            flex-direction: row !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 8px !important;
+            background: #f1f5f9 !important;
+            border-radius: 8px !important;
+            margin-top: 4px !important;
+            border-right: none !important;
+            min-height: auto !important;
+            flex-shrink: 0 !important;
+            box-sizing: border-box !important;
+          }
+          .menubar-table-submenu span {
+            display: none !important;
+          }
+          .menubar-table-group {
+            display: contents !important;
+          }
+          .menubar-table-row {
+            display: contents !important;
+          }
+
+          /* Utility top buttons wrapping */
+          .editor-header-row {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+          }
+          .flex-wrap-container {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            width: 100% !important;
+            gap: 6px !important;
+          }
+          .flex-wrap-container button {
+            flex: 1 1 auto !important;
+            justify-content: center !important;
+            font-size: 11px !important;
+            padding: 6px 10px !important;
+          }
+        }
       `}} />
 
       {/* Grupo FUENTE */}
-      <div style={groupStyle}>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+      <div className="menubar-group" style={groupStyle}>
+        <div className="menubar-row" style={{ display: 'flex', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
           <select
             onChange={e => editor.chain().focus().setFontFamily(e.target.value).run()}
             style={{ ...selectStyle, width: '100px' }}
@@ -335,12 +432,12 @@ const MenuBar = ({ editor }) => {
             <button onClick={(e) => { e.preventDefault(); handleFontSizeChange(false); }} title="Disminuir"><Minus size={14} /></button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div className="menubar-row" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }} className={editor.isActive('bold') ? 'is-active' : ''}><BoldIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }} className={editor.isActive('italic') ? 'is-active' : ''}><ItalicIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }} className={editor.isActive('underline') ? 'is-active' : ''}><UnderlineIcon size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} className={editor.isActive('strike') ? 'is-active' : ''}><StrikeIcon size={16} /></button>
-          <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }}></div>
+          <div className="menubar-divider" style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }}></div>
           
           {/* Selector de Color Desplegable */}
           <div ref={colorDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
@@ -410,6 +507,7 @@ const MenuBar = ({ editor }) => {
                     />
                   </label>
                   <button
+                    className="menubar-dropdown-btn"
                     onClick={(e) => {
                       e.preventDefault();
                       editor.chain().focus().unsetColor().run();
@@ -435,14 +533,14 @@ const MenuBar = ({ editor }) => {
       </div>
 
       {/* Grupo PÁRRAFO */}
-      <div style={groupStyle}>
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+      <div className="menubar-group" style={groupStyle}>
+        <div className="menubar-row" style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('left').run(); }} className={editor.isActive({ textAlign: 'left' }) ? 'is-active' : ''}><AlignLeft size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('center').run(); }} className={editor.isActive({ textAlign: 'center' }) ? 'is-active' : ''}><AlignCenter size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('right').run(); }} className={editor.isActive({ textAlign: 'right' }) ? 'is-active' : ''}><AlignRight size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('justify').run(); }} className={editor.isActive({ textAlign: 'justify' }) ? 'is-active' : ''}><AlignJustify size={16} /></button>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div className="menubar-row" style={{ display: 'flex', gap: '4px' }}>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleBulletList().run(); }} className={editor.isActive('bulletList') ? 'is-active' : ''}><List size={16} /></button>
           <button onClick={(e) => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run(); }} className={editor.isActive('orderedList') ? 'is-active' : ''}><ListOrdered size={16} /></button>
         </div>
@@ -450,7 +548,7 @@ const MenuBar = ({ editor }) => {
       </div>
 
       {/* Grupo TABLA */}
-      <div style={groupStyle}>
+      <div className="menubar-group" style={groupStyle}>
         <button
           onClick={(e) => { e.preventDefault(); setShowTableMenu(!showTableMenu); }}
           className={showTableMenu ? 'is-active' : ''}
@@ -463,21 +561,21 @@ const MenuBar = ({ editor }) => {
       </div>
 
       {showTableMenu && (
-        <div style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', flexWrap: 'wrap', gap: '15px', padding: '8px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+        <div className="menubar-table-submenu" style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', flexWrap: 'wrap', gap: '15px', padding: '8px' }}>
+          <div className="menubar-table-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <button
               onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
               style={{ background: '#dcfce7', color: '#166534', fontSize: '10px', fontWeight: 'bold', width: 'auto', padding: '0 8px' }}
             >+ INSERTAR</button>
             <span style={{ fontSize: '9px', color: '#666' }}>Nueva</span>
           </div>
-          <div style={{ width: '1px', height: '30px', background: 'var(--border-input)' }}></div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+          <div className="menubar-divider" style={{ width: '1px', height: '30px', background: 'var(--border-input)' }}></div>
+          <div className="menubar-table-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="menubar-table-row" style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
               <div style={{ display: 'flex', gap: '2px', background: 'white', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().addColumnAfter().run(); }} title="Agregar Columna"><Columns size={14} color="#059669" /></button>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().addRowAfter().run(); }} title="Agregar Fila"><Rows size={14} color="#059669" /></button>
-                <div style={{ width: '1px', background: 'var(--border-color)', margin: '0 2px' }}></div>
+                <div className="menubar-divider" style={{ width: '1px', background: 'var(--border-color)', margin: '0 2px' }}></div>
                 <button onClick={(e) => { e.preventDefault(); editor.chain().focus().mergeCells().run(); }} title="Combinar"><CaseUpper size={14} /></button>
               </div>
               <div style={{ display: 'flex', gap: '2px', background: 'white', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
@@ -489,9 +587,9 @@ const MenuBar = ({ editor }) => {
                 <button onClick={(e) => { e.preventDefault(); setShowDeleteOptions(!showDeleteOptions); }} style={{ color: showDeleteOptions ? 'var(--danger-color)' : 'var(--text-muted)' }}><Trash2 size={16} /></button>
                 {showDeleteOptions && (
                   <div style={{ position: 'absolute', top: '100%', right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px', zIndex: 100, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '120px' }}>
-                    <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteRow().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Fila</button>
-                    <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteColumn().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Columna</button>
-                    <button onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setShowDeleteOptions(false); }} style={{ ...dropdownBtnStyle, background: 'var(--danger-color)', color: 'white' }}>BORRAR TABLA</button>
+                    <button className="menubar-dropdown-btn" onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteRow().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Fila</button>
+                    <button className="menubar-dropdown-btn" onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteColumn().run(); setShowDeleteOptions(false); }} style={dropdownBtnStyle}>Borrar Columna</button>
+                    <button className="menubar-dropdown-btn" onClick={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setShowDeleteOptions(false); }} style={{ ...dropdownBtnStyle, background: 'var(--danger-color)', color: 'white' }}>BORRAR TABLA</button>
                   </div>
                 )}
               </div>
@@ -564,6 +662,7 @@ const MenuBar = ({ editor }) => {
                       />
                     </label>
                     <button
+                      className="menubar-dropdown-btn"
                       onClick={(e) => {
                         e.preventDefault();
                         editor.chain().focus().setCellAttribute('backgroundColor', null).run();
@@ -725,7 +824,7 @@ function MinutaEditor({ form, setForm }) {
     <div className="field full" style={{ marginBottom: '40px' }}>
       <style dangerouslySetInnerHTML={{
         __html: `
-        .tiptap-editor-container .ProseMirror { min-height: 800px; padding: 40px 60px; outline: none; font-size: 15px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; }
+        .tiptap-editor-container .ProseMirror { min-height: 800px; padding: 40px 60px; outline: none; font-size: 15px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         .tiptap p { margin: 0 0 10px 0; text-align: inherit; width: 100%; }
         .tiptap table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin: 15px 0; border: 1px solid #000000; }
         .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; }
@@ -752,13 +851,17 @@ function MinutaEditor({ form, setForm }) {
           background-color: #3b82f6;
         }
         @media (max-width: 768px) {
+          .tiptap-editor-container {
+            max-width: 100% !important;
+            overflow: hidden !important;
+          }
           .tiptap-editor-container .ProseMirror {
             padding: 20px !important;
             min-height: 400px !important;
           }
         }
       `}} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+      <div className="editor-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
         <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Editor de Minuta (Avanzado)</label>
         <div className="flex-wrap-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>

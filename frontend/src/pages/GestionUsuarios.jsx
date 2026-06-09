@@ -860,18 +860,26 @@ const GestionUsuarios = () => {
       {/* Modal Form Overlay */}
       {isModalOpen && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>
+          <div style={{
+            ...styles.modalContent,
+            maxWidth: (form.permisos === 'jefatura' || form.permisos === 'gerencia') ? '980px' : '720px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>
                 {isEditing ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}
               </h3>
               <button onClick={handleCancel} style={styles.modalCloseBtn}>✕</button>
             </div>
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '28px', alignItems: 'start' }}>
+            <form onSubmit={handleSubmit} style={{
+              display: 'grid',
+              gridTemplateColumns: (form.permisos === 'jefatura' || form.permisos === 'gerencia') ? '1.3fr 1fr 1fr' : '1fr 1fr',
+              gap: '20px',
+              alignItems: 'start'
+            }}>
               
-              {/* LEFT COLUMN: Datos de Usuario & Acciones */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
+              {/* COLUMN 1: Datos de Usuario & Acciones */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ gridColumn: 'span 2' }}>
                   <label style={styles.label}>Nombre Completo</label>
                   <input type="text" name="nombre" value={form.nombre} onChange={handleChange} style={styles.input} required placeholder="Ej: Beatriz Silva" />
                 </div>
@@ -881,45 +889,44 @@ const GestionUsuarios = () => {
                   <input type="email" name="correo" value={form.correo} onChange={handleChange} style={styles.input} required placeholder="Ej: bsilva@proforma.cl" />
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={styles.label}>Contraseña</label>
-                    <input 
-                      type="text" 
-                      name="contrasena" 
-                      value={form.contrasena} 
-                      onChange={handleChange} 
-                      style={{
-                        ...styles.input,
-                        backgroundColor: isEditing ? '#f8fafc' : 'white',
-                        cursor: isEditing ? 'not-allowed' : 'text',
-                        color: isEditing ? '#64748b' : '#334155',
-                        borderColor: isEditing ? '#e2e8f0' : '#cbd5e1'
-                      }} 
-                      required={!isEditing} 
-                      readOnly={isEditing}
-                      title={isEditing ? "La contraseña no se puede modificar desde aquí por seguridad" : ""}
-                      placeholder="Contraseña" 
-                    />
-                  </div>
-                  <div>
-                    <label style={styles.label}>Rol / Permisos</label>
-                    <select name="permisos" value={form.permisos} onChange={handleChange} style={styles.input} required>
-                      <option value="ejecutiva">Ejecutiva</option>
-                      <option value="jefatura">Jefatura</option>
-                      <option value="gerencia">Gerencia</option>
-                      <option value="admin">Administrador</option>
-                    </select>
-                  </div>
-                </div>
-                
                 <div>
                   <label style={styles.label}>Cargo específico</label>
                   <input type="text" name="cargos" value={form.cargos} onChange={handleChange} style={styles.input} placeholder="Ej: Jefatura de Operaciones" />
                 </div>
                 
+                <div>
+                  <label style={styles.label}>Contraseña</label>
+                  <input 
+                    type="text" 
+                    name="contrasena" 
+                    value={form.contrasena} 
+                    onChange={handleChange} 
+                    style={{
+                      ...styles.input,
+                      backgroundColor: isEditing ? '#f8fafc' : 'white',
+                      cursor: isEditing ? 'not-allowed' : 'text',
+                      color: isEditing ? '#64748b' : '#334155',
+                      borderColor: isEditing ? '#e2e8f0' : '#cbd5e1'
+                    }} 
+                    required={!isEditing} 
+                    readOnly={isEditing}
+                    title={isEditing ? "La contraseña no se puede modificar desde aquí por seguridad" : ""}
+                    placeholder="Contraseña" 
+                  />
+                </div>
+                
+                <div>
+                  <label style={styles.label}>Rol / Permisos</label>
+                  <select name="permisos" value={form.permisos} onChange={handleChange} style={styles.input} required>
+                    <option value="ejecutiva">Ejecutiva</option>
+                    <option value="jefatura">Jefatura</option>
+                    <option value="gerencia">Gerencia</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </div>
+                
                 {form.permisos === 'ejecutiva' && (
-                  <div>
+                  <div style={{ gridColumn: 'span 2' }}>
                     <label style={styles.label}>Jefatura asignada (Hereda Zona)</label>
                     <select name="jefatura_id" value={form.jefatura_id} onChange={handleChange} style={styles.input}>
                       <option value="">Ninguna</option>
@@ -931,7 +938,7 @@ const GestionUsuarios = () => {
                 )}
                 
                 {form.permisos === 'jefatura' && (
-                  <div>
+                  <div style={{ gridColumn: 'span 2' }}>
                     <label style={styles.label}>Zona Asignada</label>
                     <select name="zona_id" value={form.zona_id} onChange={handleChange} style={styles.input}>
                       <option value="">Ninguna</option>
@@ -942,7 +949,7 @@ const GestionUsuarios = () => {
                   </div>
                 )}
                 
-                <div style={{ display: 'flex', gap: '10px', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
+                <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
                   {isEditing && (
                     <button 
                       type="button" 
@@ -950,153 +957,153 @@ const GestionUsuarios = () => {
                           handleDelete(form.id);
                           setIsModalOpen(false);
                       }} 
-                      style={{...styles.buttonSecondary, color: 'var(--danger-color)', border: '1px solid #fecaca', background: '#fef2f2', padding: '10px 14px', fontSize: '13px', margin: 0}}
+                      style={{...styles.buttonSecondary, color: 'var(--danger-color)', border: '1px solid #fecaca', background: '#fef2f2', padding: '8px 12px', fontSize: '13px', margin: 0}}
                     >
                       🗑️ Eliminar
                     </button>
                   )}
-                  <button type="button" onClick={handleCancel} style={{ ...styles.buttonSecondary, padding: '10px 14px', fontSize: '13px', margin: 0, marginLeft: 'auto' }}>Cancelar</button>
-                  <button type="submit" style={{ ...styles.buttonPrimary, padding: '10px 18px', fontSize: '13px', margin: 0 }}>{isEditing ? 'Actualizar' : 'Guardar'}</button>
+                  <button type="button" onClick={handleCancel} style={{ ...styles.buttonSecondary, padding: '8px 12px', fontSize: '13px', margin: 0, marginLeft: 'auto' }}>Cancelar</button>
+                  <button type="submit" style={{ ...styles.buttonPrimary, padding: '8px 16px', fontSize: '13px', margin: 0 }}>{isEditing ? 'Actualizar' : 'Guardar'}</button>
                 </div>
-                {error && <p style={{ color: 'var(--danger-color)', margin: '10px 0 0 0', fontWeight: '500', fontSize: '13px' }}>⚠️ {error}</p>}
+                {error && <div style={{ gridColumn: 'span 2' }}><p style={{ color: 'var(--danger-color)', margin: '8px 0 0 0', fontWeight: '500', fontSize: '13px' }}>⚠️ {error}</p></div>}
               </div>
-              
-              {/* RIGHT COLUMN: Jerarquía & Permisos de Vistas */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                
-                {/* CONDITIONAL: Reporta a (Gerencias a cargo) */}
-                {(form.permisos === 'jefatura' || form.permisos === 'gerencia') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '6px', color: '#1e293b', fontWeight: 'bold' }}>
-                      <span>🏢</span> Reporta a
-                    </label>
-                    <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px 0', lineHeight: '1.3' }}>
-                      Selecciona las gerencias a las que reporta directamente este usuario.
-                    </p>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '8px',
-                      backgroundColor: '#f8fafc',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      border: '1.5px solid #cbd5e1'
-                    }}>
-                      {gerencias.filter(g => g.id !== form.id).length === 0 ? (
-                        <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>
-                          No hay otras gerencias disponibles.
-                        </span>
-                      ) : (
-                        gerencias
-                          .filter(g => g.id !== form.id)
-                          .map(g => {
-                            const isSelected = form.gerencia_ids && form.gerencia_ids.includes(g.id);
-                            return (
-                              <label
-                                key={g.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '8px 12px',
-                                  borderRadius: '8px',
-                                  border: `1px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
-                                  backgroundColor: isSelected ? '#eff6ff' : 'white',
-                                  color: isSelected ? '#1d4ed8' : '#475569',
-                                  fontWeight: isSelected ? '700' : '600',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  userSelect: 'none'
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {
-                                    const currentIds = form.gerencia_ids || [];
-                                    const newIds = isSelected
-                                      ? currentIds.filter(id => id !== g.id)
-                                      : [...currentIds, g.id];
-                                    setForm({ ...form, gerencia_ids: newIds });
-                                  }}
-                                  style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    cursor: 'pointer'
-                                  }}
-                                />
-                                <span>{g.nombre}</span>
-                              </label>
-                            );
-                          })
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {/* ALWAYS VISIBLE: Custom permitted views checklist */}
+
+              {/* COLUMN 2 (Conditional): Reporta a (Gerencias a cargo) */}
+              {(form.permisos === 'jefatura' || form.permisos === 'gerencia') && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '6px', color: '#1e293b', fontWeight: 'bold' }}>
-                    <span>🛡️</span> Vistas Permitidas (Acceso Personalizado de Vistas)
+                  <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '6px', color: '#1e293b', fontWeight: 'bold', marginBottom: '2px' }}>
+                    <span>🏢</span> Reporta a
                   </label>
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px 0', lineHeight: '1.3' }}>
-                    Habilita o deshabilita los accesos de vistas y del menú lateral específicamente para este usuario.
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 6px 0', lineHeight: '1.3' }}>
+                    Gerencias a las que reporta.
                   </p>
                   <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
                     backgroundColor: '#f8fafc',
-                    padding: '12px 14px',
-                    borderRadius: '12px',
-                    border: '1.5px solid #cbd5e1'
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #cbd5e1',
+                    maxHeight: '220px',
+                    overflowY: 'auto'
                   }}>
-                    {ALL_VIEWS.map(view => {
-                      const isAllowed = form.vistas_permitidas && form.vistas_permitidas.includes(view.path);
-                      return (
-                        <label 
-                          key={view.path} 
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: `1px solid ${isAllowed ? '#3b82f6' : '#cbd5e1'}`,
-                            backgroundColor: isAllowed ? '#eff6ff' : 'white',
-                            color: isAllowed ? '#1d4ed8' : '#475569',
-                            fontWeight: isAllowed ? '700' : '600',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            userSelect: 'none'
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isAllowed}
-                            onChange={() => {
-                              const current = form.vistas_permitidas || [];
-                              const updated = isAllowed
-                                ? current.filter(p => p !== view.path)
-                                : [...current, view.path];
-                              setForm({ ...form, vistas_permitidas: updated });
-                            }}
-                            style={{
-                              width: '14px',
-                              height: '14px',
-                              cursor: 'pointer'
-                            }}
-                          />
-                          <span>{view.label}</span>
-                        </label>
-                      );
-                    })}
+                    {gerencias.filter(g => g.id !== form.id).length === 0 ? (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>
+                        No hay otras gerencias.
+                      </span>
+                    ) : (
+                      gerencias
+                        .filter(g => g.id !== form.id)
+                        .map(g => {
+                          const isSelected = form.gerencia_ids && form.gerencia_ids.includes(g.id);
+                          return (
+                            <label
+                              key={g.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                border: `1px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
+                                backgroundColor: isSelected ? '#eff6ff' : 'white',
+                                color: isSelected ? '#1d4ed8' : '#475569',
+                                fontWeight: isSelected ? '700' : '600',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                userSelect: 'none'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  const currentIds = form.gerencia_ids || [];
+                                  const newIds = isSelected
+                                    ? currentIds.filter(id => id !== g.id)
+                                    : [...currentIds, g.id];
+                                  setForm({ ...form, gerencia_ids: newIds });
+                                }}
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                              <span>{g.nombre}</span>
+                            </label>
+                          );
+                        })
+                    )}
                   </div>
                 </div>
-                
+              )}
+
+              {/* COLUMN 3: Vistas Permitidas */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '6px', color: '#1e293b', fontWeight: 'bold', marginBottom: '2px' }}>
+                  <span>🛡️</span> Vistas Permitidas
+                </label>
+                <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 6px 0', lineHeight: '1.3' }}>
+                  Accesos del menú lateral.
+                </p>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  backgroundColor: '#f8fafc',
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #cbd5e1',
+                  maxHeight: '220px',
+                  overflowY: 'auto'
+                }}>
+                  {ALL_VIEWS.map(view => {
+                    const isAllowed = form.vistas_permitidas && form.vistas_permitidas.includes(view.path);
+                    return (
+                      <label 
+                        key={view.path} 
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: `1px solid ${isAllowed ? '#3b82f6' : '#cbd5e1'}`,
+                          backgroundColor: isAllowed ? '#eff6ff' : 'white',
+                          color: isAllowed ? '#1d4ed8' : '#475569',
+                          fontWeight: isAllowed ? '700' : '600',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isAllowed}
+                          onChange={() => {
+                            const current = form.vistas_permitidas || [];
+                            const updated = isAllowed
+                              ? current.filter(p => p !== view.path)
+                              : [...current, view.path];
+                            setForm({ ...form, vistas_permitidas: updated });
+                          }}
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span>{view.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
+
             </form>
           </div>
         </div>
@@ -1425,17 +1432,17 @@ const styles = {
   },
   label: { 
     display: 'block', 
-    fontSize: '13px', 
+    fontSize: '12px', 
     fontWeight: '600', 
-    marginBottom: '6px', 
+    marginBottom: '4px', 
     color: '#475569' 
   },
   input: { 
     width: '100%', 
-    padding: '10px 12px', 
+    padding: '8px 12px', 
     borderRadius: 'var(--radius-btn)', 
     border: '1px solid #cbd5e1', 
-    fontSize: '14px', 
+    fontSize: '13px', 
     boxSizing: 'border-box',
     color: '#334155',
     outline: 'none',

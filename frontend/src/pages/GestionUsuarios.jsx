@@ -984,9 +984,7 @@ const GestionUsuarios = () => {
                     backgroundColor: '#f8fafc',
                     padding: '8px 10px',
                     borderRadius: '10px',
-                    border: '1.5px solid #cbd5e1',
-                    maxHeight: '220px',
-                    overflowY: 'auto'
+                    border: '1.5px solid #cbd5e1'
                   }}>
                     {gerencias.filter(g => g.id !== form.id).length === 0 ? (
                       <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '4px' }}>
@@ -1056,9 +1054,7 @@ const GestionUsuarios = () => {
                   backgroundColor: '#f8fafc',
                   padding: '8px 10px',
                   borderRadius: '10px',
-                  border: '1.5px solid #cbd5e1',
-                  maxHeight: '220px',
-                  overflowY: 'auto'
+                  border: '1.5px solid #cbd5e1'
                 }}>
                   {ALL_VIEWS.map(view => {
                     const isAllowed = form.vistas_permitidas && form.vistas_permitidas.includes(view.path);

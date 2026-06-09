@@ -269,7 +269,9 @@ exports.crearReunion = async (req, res) => {
                                data.ejecutiva_correo?.toLowerCase().includes("prueba");
 
                 if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-                    correosCcArray.push("lortega@proforma.cl");
+                    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+                    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
+                    correosCcArray.push(lilianCorreo);
                 }
                 
                 // Deduplicate emails and remove any null/undefined

@@ -34,7 +34,9 @@ const checkAndSendScheduledEmails = async () => {
                                data.ejecutiva_correo?.toLowerCase().includes("prueba");
 
                 if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-                    bccArray.push("lortega@proforma.cl");
+                    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+                    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
+                    bccArray.push(lilianCorreo);
                 }
                 const bcc = [...new Set(bccArray.filter(Boolean))].join(',');
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { crearReunion } from "../../services/reunionesService";
 
-export default function useSubmitReunion({ form, resetForm, onSuccess, setEmpresas }) {
+export default function useSubmitReunion({ form, resetForm, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
@@ -27,7 +27,6 @@ export default function useSubmitReunion({ form, resetForm, onSuccess, setEmpres
       const res = await crearReunion(formData);
 
       resetForm();
-      setEmpresas([]);
       onSuccess?.();
 
       return res;

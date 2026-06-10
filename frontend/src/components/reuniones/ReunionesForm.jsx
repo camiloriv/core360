@@ -25,7 +25,7 @@ function ReunionesForm({ onSuccess }) {
 
   const isUserDemo = user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba");
 
-  const { empresas, setEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
+  const { empresas, setEmpresas, fetchEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);
 
   // Para no-admin o usuarios de prueba: inicializar ejecutiva_id y enviado_por desde el usuario logueado
@@ -79,8 +79,10 @@ function ReunionesForm({ onSuccess }) {
   const { submit, loading } = useSubmitReunion({
     form,
     resetForm,
-    onSuccess,
-    setEmpresas,
+    onSuccess: () => {
+      fetchEmpresas();
+      onSuccess?.();
+    },
   });
 
   const handleSubmit = async (e) => {

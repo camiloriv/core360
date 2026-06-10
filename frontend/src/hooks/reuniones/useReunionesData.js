@@ -23,7 +23,7 @@ export default function useReunionesData(user, empresa_id) {
       });
   }, []);
 
-  useEffect(() => {
+  const fetchEmpresas = () => {
     if (!user || !user.permisos) {
       setEmpresas([]);
       return;
@@ -45,19 +45,8 @@ export default function useReunionesData(user, empresa_id) {
       });
     };
 
-    const filterEjecutivas = (list) => {
-      return (list || []).filter(ej => {
-        const ejDemo = ej.nombre?.toLowerCase().includes("prueba") || 
-                       ej.nombre?.toLowerCase().includes("demo") ||
-                       ej.correo?.toLowerCase().includes("prueba") ||
-                       ej.correo?.toLowerCase().includes("demo");
-        return isUserDemo ? ejDemo : !ejDemo;
-      });
-    };
-
     if (user.permisos === "admin") {
       getEmpresas().then(list => setEmpresas(filterEmpresas(list)));
-      // Para admin, las ejecutivas se cargarán cuando se seleccione la empresa
     } else if (user.permisos === "gerencia") {
       getEmpresasByGerencia(user.id).then(list => setEmpresas(filterEmpresas(list)));
     } else if (user.permisos === "jefatura") {
@@ -65,6 +54,10 @@ export default function useReunionesData(user, empresa_id) {
     } else if (user.jefatura_id) {
       getEmpresasByJefatura(user.jefatura_id).then(list => setEmpresas(filterEmpresas(list)));
     }
+  };
+
+  useEffect(() => {
+    fetchEmpresas();
   }, [user?.id, user?.permisos, user?.jefatura_id, user?.nombre, user?.correo, user?.cargos]);
 
   useEffect(() => {
@@ -86,6 +79,7 @@ export default function useReunionesData(user, empresa_id) {
   return {
     empresas,
     setEmpresas,
+    fetchEmpresas,
     templates,
     destinatarios,
     ejecutivas,

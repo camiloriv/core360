@@ -297,5 +297,10 @@ Reorganizamos la estructura de los campos en el formulario para registrar reunio
    - Añadimos un `useEffect` que escucha los cambios en `form.ejecutiva_id` para restablecer también `isCcEditable` a `false` al reasignar el usuario.
    - Estos reinicios gatillan de forma segura la consulta a la API (`getDefaultCc`) para traer los correos CC por defecto correspondientes a la nueva combinación seleccionada, evitando que persistan datos de la empresa anterior.
 
+4. **Persistencia y Recarga de Empresas tras Envío**:
+   - Solucionamos un bug en el hook [useSubmitReunion.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/reuniones/useSubmitReunion.js) donde, al culminar un envío exitoso, se llamaba a `setEmpresas([])` vaciando el listado del estado global, lo que impedía buscar/seleccionar empresas en la sesión actual sin refrescar.
+   - Removimos el vaciado de empresas y expusimos el método `fetchEmpresas` en [useReunionesData.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/reuniones/useReunionesData.js).
+   - Ahora, al registrar una minuta, se ejecuta `fetchEmpresas()` en la resolución exitosa del callback para volver a cargar el listado de empresas con su estatus actualizado, manteniendo el buscador 100% operativo de forma ininterrumpida.
+
 ### Validación
 - El proyecto compila de manera impecable y sin errores en Vite tras realizar `npm run build`.

@@ -85,4 +85,5 @@
   - [x] Mover el campo "En Copia (CC)" debajo de "Enviar A" y asignarle ancho completo (`full`).
   - [x] Programar recarga reactiva automática de "En Copia (CC)" al cambiar la empresa (limpia valores antiguos, bloquea input temporalmente y re-consulta API).
   - [x] Resetear perfiles ejecutivos al cambiar de empresa en perfiles administrativos (`admin`/`gerencia`) para sincronizar sus defaults de copia.
+  - [x] Corregir bug en hook `useSubmitReunion` que vaciaba la lista de empresas al registrar minutas, y agregar recarga automática (`fetchEmpresas`) tras éxito.
   - [x] Compilar y verificar el bundle con `npm run build` de forma limpia y exitosa.

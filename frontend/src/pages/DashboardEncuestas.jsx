@@ -171,12 +171,13 @@ export default function DashboardEncuestas() {
           api.get(`/encuestas/resumen/kpis${queryParams}`)
         ]);
 
-        const isUserDemo = user?.nombre?.toLowerCase().includes("prueba") || 
-                           user?.nombre?.toLowerCase().includes("demo") ||
-                           user?.correo?.toLowerCase().includes("prueba") ||
-                           user?.correo?.toLowerCase().includes("demo") ||
-                           user?.cargos?.toLowerCase().includes("prueba") ||
-                           user?.cargos?.toLowerCase().includes("demo");
+        const isUserDemo = (user?.nombre?.toLowerCase().includes("prueba") || 
+                            user?.nombre?.toLowerCase().includes("demo") ||
+                            user?.correo?.toLowerCase().includes("prueba") ||
+                            user?.correo?.toLowerCase().includes("demo") ||
+                            user?.cargos?.toLowerCase().includes("prueba") ||
+                            user?.cargos?.toLowerCase().includes("demo")) &&
+                           !user?.correo?.toLowerCase().includes("prueba_");
 
         const filteredResponses = (respRes.data || []).filter(r => {
           const isDemoEmp = r.empresa?.toLowerCase().includes("demo") || 

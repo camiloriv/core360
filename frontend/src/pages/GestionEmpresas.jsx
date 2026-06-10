@@ -39,12 +39,13 @@ export default function GestionEmpresas() {
       const resZonas = await api.get("/zonas");
 
       const isUserDemo =
-        user?.nombre?.toLowerCase().includes("prueba") ||
+        (user?.nombre?.toLowerCase().includes("prueba") ||
         user?.nombre?.toLowerCase().includes("demo") ||
         user?.correo?.toLowerCase().includes("prueba") ||
         user?.correo?.toLowerCase().includes("demo") ||
         user?.cargos?.toLowerCase().includes("prueba") ||
-        user?.cargos?.toLowerCase().includes("demo");
+        user?.cargos?.toLowerCase().includes("demo")) &&
+        !user?.correo?.toLowerCase().includes("prueba_");
 
       const filteredEjecutivas = (resE.data || []).filter((ej) => {
         const ejDemo =

@@ -72,12 +72,13 @@ export const useDashboardData = (forceRefresh = false) => {
         ]);
 
         const isUserDemo =
-          user?.nombre?.toLowerCase().includes("prueba") ||
+          (user?.nombre?.toLowerCase().includes("prueba") ||
           user?.nombre?.toLowerCase().includes("demo") ||
           user?.correo?.toLowerCase().includes("prueba") ||
           user?.correo?.toLowerCase().includes("demo") ||
           user?.cargos?.toLowerCase().includes("prueba") ||
-          user?.cargos?.toLowerCase().includes("demo");
+          user?.cargos?.toLowerCase().includes("demo")) &&
+          !user?.correo?.toLowerCase().includes("prueba_");
 
         let filteredJefaturas = (resJ.data || []).filter((j) => {
           const jDemo =

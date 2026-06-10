@@ -302,5 +302,16 @@ Reorganizamos la estructura de los campos en el formulario para registrar reunio
    - Removimos el vaciado de empresas y expusimos el método `fetchEmpresas` en [useReunionesData.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/reuniones/useReunionesData.js).
    - Ahora, al registrar una minuta, se ejecuta `fetchEmpresas()` en la resolución exitosa del callback para volver a cargar el listado de empresas con su estatus actualizado, manteniendo el buscador 100% operativo de forma ininterrumpida.
 
+5. **Exclusión de Prefijo de Prueba (`prueba_`) en Filtros Demo**:
+   - Para permitir cambiar los correos de usuarios reales a formatos de prueba (ej: `prueba_correo@proforma.cl`) sin que el sistema los clasifique erróneamente como usuarios "Demo" (lo cual restringía su visibilidad únicamente a empresas de prueba/demo), ajustamos el helper de detección `isUserDemo`.
+   - Modificamos la expresión para validar que, si bien la palabra "prueba" o "demo" esté presente en el correo, se descarte si contiene el patrón de email de prueba real `prueba_` (con guion bajo).
+   - Este ajuste se aplicó de forma consistente en:
+     - [ReunionesForm.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/reuniones/ReunionesForm.jsx)
+     - [useReunionesData.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/reuniones/useReunionesData.js)
+     - [useDashboardData.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/hooks/useDashboardData.js)
+     - [CrearEncuesta.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/CrearEncuesta.jsx)
+     - [DashboardEncuestas.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/DashboardEncuestas.jsx)
+     - [GestionEmpresas.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/GestionEmpresas.jsx)
+
 ### Validación
 - El proyecto compila de manera impecable y sin errores en Vite tras realizar `npm run build`.

@@ -23,7 +23,7 @@ function ReunionesForm({ onSuccess }) {
   const { form, setField, setFiles, resetForm } = useReunionesForm();
   const [isCcEditable, setIsCcEditable] = useState(false);
 
-  const isUserDemo = user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba");
+  const isUserDemo = (user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba")) && !user.correo?.toLowerCase().includes("prueba_");
 
   const { empresas, setEmpresas, fetchEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);

@@ -735,7 +735,7 @@ function MinutaEditor({ form, setForm }) {
 
   const formatPreviewDate = (dateStr) => {
     if (!dateStr) return "";
-    const parts = dateStr.split('-');
+    const parts = dateStr.split("-");
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
@@ -807,12 +807,10 @@ function MinutaEditor({ form, setForm }) {
           </div>
 
           <!-- BLOQUE DOCUMENTOS ADJUNTOS -->
-          ${form.documentos_adjuntos ? `
-            <div class="preview-section-label">Documentos Adjuntos:</div>
-            <div class="preview-content-box" style="margin-bottom: 20px;">
-              ${form.documentos_adjuntos}
-            </div>
-          ` : ''}
+          <div class="preview-section-label">Documentos Adjuntos:</div>
+          <div class="preview-content-box" style="margin-bottom: 25px; font-size: 14px; color: #475569;">
+            ${form.documentos_adjuntos || '<span style="color:#94a3b8">Ninguno</span>'}
+          </div>
 
           <!-- BLOQUE ARCHIVOS -->
           <div class="preview-section-label">Archivos Adjuntos:</div>

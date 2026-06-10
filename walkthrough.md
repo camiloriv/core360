@@ -313,5 +313,20 @@ Reorganizamos la estructura de los campos en el formulario para registrar reunio
      - [DashboardEncuestas.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/DashboardEncuestas.jsx)
      - [GestionEmpresas.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/GestionEmpresas.jsx)
 
+6. **Lógica de CC por Roles e Inclusión del Remitente**:
+   - Para proveer un respaldo del envío de minutas/encuestas a los usuarios logueados (ya que el servidor físico utiliza el correo remitente genérico `minutas@proforma.cl` y esto no deja copia en sus bandejas personales de "Enviados"), actualizamos y extrajimos la lógica de CC en el helper de backend `calcularDefaultCc`.
+   - La nueva estructura incluye a todas las partes interesadas según el rol del remitente, sin filtrar su propia dirección:
+     - **Ejecutiva**: Copia a Ejecutiva + Jefatura + Gerencia (Lilian Ortega).
+     - **Jefatura**: Copia a Jefatura + Ejecutivas de su equipo + Gerencia (Lilian Ortega).
+     - **Gerencia / Admin**: Copia a Gerencia + Ejecutiva seleccionada + Jefatura de la ejecutiva.
+   - En el frontend, `ReunionesForm.jsx` y `reunionesService.js` ahora envían también el `user.id` (`enviado_por_id`) al backend para resolver de forma precisa e inequívoca el rol del remitente en el caso de correos de prueba duplicados.
+
+7. **Mejoras en la Previsualización de Minuta**:
+   - En el editor de minutas [MinutaEditor.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/form/fields/MinutaEditor.jsx), implementamos el formateador `formatPreviewDate` para cambiar la fecha del input estándar (`YYYY-MM-DD`) al formato tradicional chileno `DD/MM/YYYY`.
+   - Agregamos la previsualización del campo de texto **DOCUMENTOS ADJUNTOS** (`form.documentos_adjuntos`) bajo una sección dedicada "Documentos Adjuntos:", replicando fielmente el diseño de la plantilla HTML final.
+
+8. **URL Dinámica para Encuestas**:
+   - En el servicio de backend [encuestas.service.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/encuestas/encuestas.service.js), reemplazamos la dirección hardcodeada con `localhost` en la generación de enlaces de encuesta por la variable de entorno `${process.env.FRONTEND_URL || 'http://localhost:5173'}`. Esto permite que en el entorno de Railway se generen enlaces correctos con el dominio de desarrollo/producción configurado en lugar de enlaces locales inservibles.
+
 ### Validación
 - El proyecto compila de manera impecable y sin errores en Vite tras realizar `npm run build`.

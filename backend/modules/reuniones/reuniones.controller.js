@@ -36,6 +36,92 @@ const buildRoleWhereClause = (usuario_id, rol) => {
     return { whereClause, params };
 };
 
+const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id) => {
+    // 1. Obtener datos de Lilian Ortega (Gerencia)
+    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
+
+    // 2. Obtener el perfil del usuario logueado
+    let userPermisos = 'ejecutiva';
+    let loggedInUser = null;
+    if (enviado_por_id) {
+        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE id = ? LIMIT 1", [enviado_por_id]);
+        if (userRows.length > 0) {
+            loggedInUser = userRows[0];
+            userPermisos = loggedInUser.permisos || 'ejecutiva';
+        }
+    } else if (enviado_por_correo) {
+        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ? LIMIT 1", [enviado_por_correo]);
+        if (userRows.length > 0) {
+            loggedInUser = userRows[0];
+            userPermisos = loggedInUser.permisos || 'ejecutiva';
+        }
+    }
+
+    let correosCcArray = [];
+
+    // Siempre incluir al remitente en el CC para que tenga su respaldo (envío desde centralizado)
+    const remitenteCorreo = loggedInUser?.correo || enviado_por_correo;
+    if (remitenteCorreo) {
+        correosCcArray.push(remitenteCorreo);
+    }
+
+    if (userPermisos === 'ejecutiva') {
+        // Ejecutiva: su jefatura y gerencia (Lilian Ortega)
+        let jefaturaId = loggedInUser?.jefatura_id;
+        if (!jefaturaId && ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            jefaturaId = ejRows[0]?.jefatura_id;
+        }
+
+        if (jefaturaId) {
+            const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [jefaturaId]);
+            if (jefRows[0]?.correo) {
+                correosCcArray.push(jefRows[0].correo);
+            }
+        }
+        correosCcArray.push(lilianCorreo);
+
+    } else if (userPermisos === 'jefatura') {
+        // Jefatura: su ejecutiva(s) y gerencia (Lilian Ortega)
+        const jefaturaId = loggedInUser?.id || ejecutiva_id;
+        const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE jefatura_id = ? AND permisos = 'ejecutiva'", [jefaturaId]);
+        ejRows.forEach(row => {
+            if (row.correo) correosCcArray.push(row.correo);
+        });
+        correosCcArray.push(lilianCorreo);
+
+    } else {
+        // Gerencia / Admin: jefatura y ejecutiva + gerencia
+        if (ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            if (ejRows[0]) {
+                const ejCorreo = ejRows[0].correo;
+                const jefId = ejRows[0].jefatura_id;
+                if (ejCorreo) correosCcArray.push(ejCorreo);
+
+                if (jefId) {
+                    const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [jefId]);
+                    if (jefRows[0]?.correo) {
+                        correosCcArray.push(jefRows[0].correo);
+                    }
+                }
+            }
+        }
+        correosCcArray.push(lilianCorreo);
+    }
+
+    // Limpiar duplicados y valores vacíos
+    let correosCcFiltered = [...new Set(correosCcArray.filter(Boolean).map(email => email.trim()))];
+
+    // En todos los casos debe estar uno en copia siempre
+    if (correosCcFiltered.length === 0) {
+        correosCcFiltered.push(lilianCorreo);
+    }
+
+    return correosCcFiltered.join(', ');
+};
+
 // 🔹 LISTAR REUNIONES
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
@@ -257,25 +343,12 @@ exports.crearReunion = async (req, res) => {
 
             try {
                 const enviado_por_correo = req.body.enviado_por_correo;
-                const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
-                
-                if (enviado_por_correo) {
-                    correosCcArray.push(enviado_por_correo);
-                }
-
-                const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
-                               data.empresa_nombre?.toLowerCase().includes("prueba") || 
-                               enviado_por_correo?.toLowerCase().includes("prueba") ||
-                               data.ejecutiva_correo?.toLowerCase().includes("prueba");
-
-                if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-                    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
-                    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
-                    correosCcArray.push(lilianCorreo);
-                }
+                const enviado_por_id = req.body.enviado_por_id;
                 
                 // Use frontend-provided CCs if available, otherwise generate default
-                const correosCc = req.body.correos_cc !== undefined ? req.body.correos_cc : [...new Set(correosCcArray.filter(Boolean))].join(',');
+                const correosCc = req.body.correos_cc !== undefined 
+                    ? req.body.correos_cc 
+                    : await calcularDefaultCc(data.empresa_id, data.ejecutiva_id, enviado_por_correo, enviado_por_id);
 
                 // Enviar en segundo plano para evitar colgar la respuesta HTTP si el SMTP falla o demora
                 enviarCorreo({
@@ -414,51 +487,15 @@ exports.testSmtp = async (req, res) => {
 };
 
 exports.obtenerDefaultCc = async (req, res) => {
-    const { empresa_id, ejecutiva_id, enviado_por_correo } = req.query;
+    const { empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id } = req.query;
 
     if (!empresa_id || !ejecutiva_id) {
         return res.json({ cc: enviado_por_correo || "" });
     }
 
     try {
-        const sql = `
-            SELECT 
-                emp.nombre AS empresa_nombre,
-                z.nombre AS zona_nombre,
-                e.correo AS ejecutiva_correo,
-                j.correo AS jefatura_correo
-            FROM empresas emp
-            LEFT JOIN zonas z ON emp.zona_id = z.id
-            LEFT JOIN usuarios e ON e.id = ?
-            LEFT JOIN usuarios j ON e.jefatura_id = j.id
-            WHERE emp.id = ?
-        `;
-        const [result] = await db.query(sql, [ejecutiva_id, empresa_id]);
-        
-        if (result.length === 0) {
-            return res.json({ cc: enviado_por_correo || "" });
-        }
-
-        const data = result[0];
-        const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
-
-        if (enviado_por_correo) {
-            correosCcArray.push(enviado_por_correo);
-        }
-
-        const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
-                       data.empresa_nombre?.toLowerCase().includes("prueba") || 
-                       enviado_por_correo?.toLowerCase().includes("prueba") ||
-                       data.ejecutiva_correo?.toLowerCase().includes("prueba");
-
-        if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-            const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
-            const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
-            correosCcArray.push(lilianCorreo);
-        }
-
-        const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(', ');
-        res.json({ cc: correosCc });
+        const cc = await calcularDefaultCc(empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id);
+        res.json({ cc });
     } catch (err) {
         console.error("Error en obtenerDefaultCc:", err);
         res.status(500).json({ error: "Error obteniendo CC por defecto" });

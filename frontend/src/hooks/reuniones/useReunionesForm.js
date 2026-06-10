@@ -7,6 +7,7 @@ const initialState = {
   enviado_a: "",
   enviado_por: "",
   enviado_por_correo: "",
+  enviado_por_id: "",
   participantes: "",
   tipo_reu: "",
   fecha_reu: "",

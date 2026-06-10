@@ -34,6 +34,9 @@ function ReunionesForm({ onSuccess }) {
     if (!form.enviado_por_correo) {
       setField("enviado_por_correo", user.correo);
     }
+    if (!form.enviado_por_id) {
+      setField("enviado_por_id", user.id);
+    }
     
     if (((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia") || isUserDemo) && !user.nombre?.toLowerCase().includes("lilian")) {
       if (!form.jefatura_id) {
@@ -68,13 +71,13 @@ function ReunionesForm({ onSuccess }) {
   // Obtener CC por defecto desde el backend
   useEffect(() => {
     if (form.empresa_id && form.ejecutiva_id && !isCcEditable) {
-      getDefaultCc(form.empresa_id, form.ejecutiva_id, user.correo)
+      getDefaultCc(form.empresa_id, form.ejecutiva_id, user.correo, user.id)
         .then((res) => {
           setField("correos_cc", res.data.cc);
         })
         .catch((err) => console.error("Error al obtener correos en copia:", err));
     }
-  }, [form.empresa_id, form.ejecutiva_id, user.correo, isCcEditable]);
+  }, [form.empresa_id, form.ejecutiva_id, user.correo, user.id, isCcEditable]);
 
   const { submit, loading } = useSubmitReunion({
     form,

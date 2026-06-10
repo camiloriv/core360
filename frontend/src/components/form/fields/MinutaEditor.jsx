@@ -733,6 +733,15 @@ function MinutaEditor({ form, setForm }) {
     if (result.isConfirmed && editor) { editor.commands.clearContent(); }
   };
 
+  const formatPreviewDate = (dateStr) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const handlePreview = (e) => { e.preventDefault(); setShowPreviewModal(true); };
 
   const getPreviewHTML = () => {
@@ -770,7 +779,7 @@ function MinutaEditor({ form, setForm }) {
                 </tr>
                 <tr>
                   <td class="preview-info-label">Fecha:</td>
-                  <td class="preview-info-value">${form.fecha_reu || ""}</td>
+                  <td class="preview-info-value">${formatPreviewDate(form.fecha_reu)}</td>
                 </tr>
                 <tr>
                   <td class="preview-info-label">Hora:</td>
@@ -797,21 +806,28 @@ function MinutaEditor({ form, setForm }) {
             ${editor.getHTML() || '<p style="color:#94a3b8">Sin contenido...</p>'}
           </div>
 
+          <!-- BLOQUE DOCUMENTOS ADJUNTOS -->
+          ${form.documentos_adjuntos ? `
+            <div class="preview-section-label">Documentos Adjuntos:</div>
+            <div class="preview-content-box" style="margin-bottom: 20px;">
+              ${form.documentos_adjuntos}
+            </div>
+          ` : ''}
 
-        <!-- BLOQUE ADJUNTOS -->
-        <div class="preview-section-label">Adjuntos:</div>
-        <div class="preview-content-box" style="margin-bottom: 25px;">
-          ${form.adjuntos && form.adjuntos.length > 0
-        ? `<ul style="margin: 0; padding: 0; list-style: none;">
-                ${Array.from(form.adjuntos).map(file => `
-                  <li style="display: flex; align-items: center; margin-bottom: 5px; color: #64748b; font-size: 13px;">
-                    <span style="margin-right: 8px;">📎</span> ${file.name || file}
-                  </li>
-                `).join('')}
-               </ul>`
-        : '<span style="color:#94a3b8; font-size: 13px;">Sin archivos adjuntos</span>'
-      }
-        </div>
+          <!-- BLOQUE ARCHIVOS -->
+          <div class="preview-section-label">Archivos Adjuntos:</div>
+          <div class="preview-content-box" style="margin-bottom: 25px;">
+            ${form.archivos && form.archivos.length > 0
+          ? `<ul style="margin: 0; padding: 0; list-style: none;">
+                  ${Array.from(form.archivos).map(file => `
+                    <li style="display: flex; align-items: center; margin-bottom: 5px; color: #64748b; font-size: 13px;">
+                      <span style="margin-right: 8px;">📎</span> ${file.name || file}
+                    </li>
+                  `).join('')}
+                 </ul>`
+          : '<span style="color:#94a3b8; font-size: 13px;">Sin archivos adjuntos</span>'
+        }
+          </div>
 
         </div>
       </div>

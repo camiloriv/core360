@@ -46,7 +46,7 @@ const crearEncuesta = async ({ ejecutiva_id, empresa_id, tipo_encuesta, reunion_
   return {
     id: result.insertId,
     token,
-    url: `http://localhost:5173/encuesta/${token}`,
+    url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/encuesta/${token}`,
   };
 };
 

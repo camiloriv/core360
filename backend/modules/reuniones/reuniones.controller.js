@@ -247,6 +247,202 @@ exports.crearReunion = async (req, res) => {
         `;
 
         const [result2] = await db.query(sqlDetalle, [id_reunion]);
+        ORDER BY r.fecha_reu DESC, r.hora DESC
+    `;
+
+    try {
+        const [result] = await db.query(sql, params);
+        res.json(result);
+    } catch (err) {
+        console.error("Error en listarReuniones:", err);
+        return res.status(500).json({ error: "Error en la BD" });
+    }
+};
+
+// 🔹 ESTADÍSTICAS PARA DASHBOARD
+exports.obtenerStats = async (req, res) => {
+    const { usuario_id, rol } = req.query;
+
+    let joinClause = `
+        LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
+        LEFT JOIN empresas emp ON r.empresa_id = emp.id
+        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    `;
+    const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
+
+    try {
+        const stats = {};
+
+        // 1. Conteo por tipo
+        const [porTipo] = await db.query(`
+            SELECT r.tipo_reu as name, COUNT(*) as value 
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause}
+            GROUP BY r.tipo_reu
+        `, params);
+        stats.porTipo = porTipo;
+
+        // 2. Conteo por ejecutiva
+        const [porEjecutiva] = await db.query(`
+            SELECT e.nombre as name, COUNT(*) as value 
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause}
+            GROUP BY e.id, e.nombre
+            ORDER BY value DESC
+        `, params);
+        stats.porEjecutiva = porEjecutiva;
+
+        // 3. Resumen general
+        const [resumen] = await db.query(`
+            SELECT 
+                COUNT(*) as total,
+                COUNT(CASE WHEN YEAR(r.created_at) = YEAR(CURDATE()) THEN 1 END) as este_ano,
+                COUNT(CASE WHEN MONTH(r.created_at) = MONTH(CURDATE()) AND YEAR(r.created_at) = YEAR(CURDATE()) THEN 1 END) as este_mes
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause}
+        `, params);
+        stats.resumen = resumen[0];
+
+        // 4. Últimos 6 meses (Tendencia)
+        const [tendencia] = await db.query(`
+            SELECT 
+                DATE_FORMAT(r.created_at, '%Y-%m') as mes,
+                COUNT(*) as total
+            FROM reuniones r
+            ${joinClause}
+            ${whereClause} AND r.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+            GROUP BY mes
+            ORDER BY mes ASC
+        `, params);
+        stats.tendencia = tendencia;
+
+        res.json(stats);
+    } catch (err) {
+        console.error("Error en obtenerStats:", err);
+        res.status(500).json({ error: "Error obteniendo estadísticas" });
+    }
+};
+
+// 🔹 GENERAR ID REUNIÓN
+const generarIdReunion = async () => {
+    const year = new Date().getFullYear();
+
+    const sql = `
+        SELECT COUNT(*) AS total 
+        FROM reuniones 
+        WHERE YEAR(created_at) = ?
+    `;
+
+    const [result] = await db.query(sql, [year]);
+
+    const total = result[0].total + 1;
+    const correlativo = String(total).padStart(4, "0");
+
+    return `REU-${year}-${correlativo}`;
+};
+
+// 🔥 CREAR REUNIÓN + ARCHIVOS
+exports.crearReunion = async (req, res) => {
+    const {
+        ejecutiva_id,
+        enviado_a,
+        enviado_por,
+        enviado_por_id,
+        participantes,
+        tipo_reu,
+        fecha_reu,
+        hora,
+        lugar,
+        documentos_adjuntos,
+        motivo_reu,
+        minuta,
+        form_f,
+        empresa_id,
+        programar_encuesta,
+        encuesta_tipo,
+        encuesta_programada_para,
+        encuesta_destinatario
+    } = req.body;
+
+    const archivos = req.files || [];
+    const archivosNombres = JSON.stringify(archivos.map(f => f.filename));
+
+    // Validar peso total de los archivos (Max 20MB)
+    const totalSize = archivos.reduce((acc, file) => acc + file.size, 0);
+    const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+
+    if (totalSize > MAX_SIZE) {
+        return res.status(400).json({
+            error: "El tamaño total de los archivos adjuntos supera el límite permitido de 20MB."
+        });
+    }
+
+    if (!ejecutiva_id || !empresa_id || !fecha_reu || !hora) {
+        return res.status(400).json({
+            error: "Campos obligatorios faltantes"
+        });
+    }
+
+    try {
+        const id_reunion = await generarIdReunion();
+        const isSurveyProgrammed = programar_encuesta === "true" || programar_encuesta === true;
+
+        const sql = `
+            INSERT INTO reuniones (
+                id_reunion, ejecutiva_id, enviado_a, enviado_por, participantes,
+                tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
+                motivo_reu, minuta, form_f, empresa_id, programado_para,
+                estado_envio, archivos_nombres, programar_encuesta,
+                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada,
+                encuesta_destinatario
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const values = [
+            id_reunion, ejecutiva_id, enviado_a, enviado_por, participantes,
+            tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
+            motivo_reu, minuta, form_f, empresa_id, null,
+            'enviado', archivosNombres, isSurveyProgrammed ? 1 : 0,
+            isSurveyProgrammed ? encuesta_tipo : null,
+            isSurveyProgrammed ? encuesta_programada_para : null,
+            isSurveyProgrammed ? 'pendiente' : 'enviado',
+            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+            isSurveyProgrammed ? encuesta_destinatario : null
+        ];
+
+        await db.query(sql, values);
+
+        // Auto-mark empresa as 'gestionada' with the meeting date (NOT server date)
+        await db.query(
+          "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
+          [fecha_reu, empresa_id]
+        );
+        await db.query(
+          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id) VALUES (?, 'gestionada', ?, ?, ?)",
+          [empresa_id, fecha_reu, ejecutiva_id, id_reunion]
+        );
+
+        // Enviar inmediatamente
+        const sqlDetalle = `
+            SELECT 
+                r.*, 
+                emp.nombre AS empresa_nombre,
+                z.nombre AS zona_nombre,
+                e.nombre AS ejecutiva_nombre,
+                e.correo AS ejecutiva_correo,
+                j.correo AS jefatura_correo
+            FROM reuniones r
+            JOIN empresas emp ON r.empresa_id = emp.id
+            LEFT JOIN zonas z ON emp.zona_id = z.id
+            JOIN usuarios e ON r.ejecutiva_id = e.id
+            LEFT JOIN usuarios j ON e.jefatura_id = j.id
+            WHERE r.id_reunion = ?
+        `;
+
+        const [result2] = await db.query(sqlDetalle, [id_reunion]);
 
         if (result2.length > 0) {
             const data = result2[0];
@@ -257,25 +453,11 @@ exports.crearReunion = async (req, res) => {
 
             try {
                 const enviado_por_correo = req.body.enviado_por_correo;
-                const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
-                
-                if (enviado_por_correo) {
-                    correosCcArray.push(enviado_por_correo);
-                }
-
-                const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
-                               data.empresa_nombre?.toLowerCase().includes("prueba") || 
-                               enviado_por_correo?.toLowerCase().includes("prueba") ||
-                               data.ejecutiva_correo?.toLowerCase().includes("prueba");
-
-                if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-                    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
-                    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
-                    correosCcArray.push(lilianCorreo);
-                }
                 
                 // Use frontend-provided CCs if available, otherwise generate default
-                const correosCc = req.body.correos_cc !== undefined ? req.body.correos_cc : [...new Set(correosCcArray.filter(Boolean))].join(',');
+                const correosCc = req.body.correos_cc !== undefined 
+                    ? req.body.correos_cc 
+                    : await calcularDefaultCc(data.empresa_id, data.ejecutiva_id, enviado_por_correo, enviado_por_id);
 
                 // Enviar en segundo plano para evitar colgar la respuesta HTTP si el SMTP falla o demora
                 enviarCorreo({
@@ -413,52 +595,102 @@ exports.testSmtp = async (req, res) => {
     res.json(diagnostic);
 };
 
+const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id) => {
+    // 1. Obtener datos de Lilian Ortega (Gerencia)
+    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+    const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
+
+    // 2. Obtener el perfil del usuario logueado
+    let userPermisos = 'ejecutiva';
+    let loggedInUser = null;
+    if (enviado_por_id) {
+        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE id = ? LIMIT 1", [enviado_por_id]);
+        if (userRows.length > 0) {
+            loggedInUser = userRows[0];
+            userPermisos = loggedInUser.permisos || 'ejecutiva';
+        }
+    } else if (enviado_por_correo) {
+        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ? LIMIT 1", [enviado_por_correo]);
+        if (userRows.length > 0) {
+            loggedInUser = userRows[0];
+            userPermisos = loggedInUser.permisos || 'ejecutiva';
+        }
+    }
+
+    let correosCcArray = [];
+
+    // Siempre incluir al remitente en el CC para que tenga su respaldo (envío desde centralizado)
+    const remitenteCorreo = loggedInUser?.correo || enviado_por_correo;
+    if (remitenteCorreo) {
+        correosCcArray.push(remitenteCorreo);
+    }
+
+    if (userPermisos === 'ejecutiva') {
+        // Ejecutiva: su jefatura y gerencia (Lilian Ortega)
+        let jefaturaId = loggedInUser?.jefatura_id;
+        if (!jefaturaId && ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            jefaturaId = ejRows[0]?.jefatura_id;
+        }
+
+        if (jefaturaId) {
+            const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [jefaturaId]);
+            if (jefRows[0]?.correo) {
+                correosCcArray.push(jefRows[0].correo);
+            }
+        }
+        correosCcArray.push(lilianCorreo);
+
+    } else if (userPermisos === 'jefatura') {
+        // Jefatura: su ejecutiva(s) y gerencia (Lilian Ortega)
+        const jefaturaId = loggedInUser?.id || ejecutiva_id;
+        const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE jefatura_id = ? AND permisos = 'ejecutiva'", [jefaturaId]);
+        ejRows.forEach(row => {
+            if (row.correo) correosCcArray.push(row.correo);
+        });
+        correosCcArray.push(lilianCorreo);
+
+    } else {
+        // Gerencia / Admin: jefatura y ejecutiva + gerencia
+        if (ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            if (ejRows[0]) {
+                const ejCorreo = ejRows[0].correo;
+                const jefId = ejRows[0].jefatura_id;
+                if (ejCorreo) correosCcArray.push(ejCorreo);
+
+                if (jefId) {
+                    const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [jefId]);
+                    if (jefRows[0]?.correo) {
+                        correosCcArray.push(jefRows[0].correo);
+                    }
+                }
+            }
+        }
+        correosCcArray.push(lilianCorreo);
+    }
+
+    // Limpiar duplicados y valores vacíos
+    let correosCcFiltered = [...new Set(correosCcArray.filter(Boolean).map(email => email.trim()))];
+
+    // En todos los casos debe estar uno en copia siempre
+    if (correosCcFiltered.length === 0) {
+        correosCcFiltered.push(lilianCorreo);
+    }
+
+    return correosCcFiltered.join(', ');
+};
+
 exports.obtenerDefaultCc = async (req, res) => {
-    const { empresa_id, ejecutiva_id, enviado_por_correo } = req.query;
+    const { empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id } = req.query;
 
     if (!empresa_id || !ejecutiva_id) {
         return res.json({ cc: enviado_por_correo || "" });
     }
 
     try {
-        const sql = `
-            SELECT 
-                emp.nombre AS empresa_nombre,
-                z.nombre AS zona_nombre,
-                e.correo AS ejecutiva_correo,
-                j.correo AS jefatura_correo
-            FROM empresas emp
-            LEFT JOIN zonas z ON emp.zona_id = z.id
-            LEFT JOIN usuarios e ON e.id = ?
-            LEFT JOIN usuarios j ON e.jefatura_id = j.id
-            WHERE emp.id = ?
-        `;
-        const [result] = await db.query(sql, [ejecutiva_id, empresa_id]);
-        
-        if (result.length === 0) {
-            return res.json({ cc: enviado_por_correo || "" });
-        }
-
-        const data = result[0];
-        const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
-
-        if (enviado_por_correo) {
-            correosCcArray.push(enviado_por_correo);
-        }
-
-        const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
-                       data.empresa_nombre?.toLowerCase().includes("prueba") || 
-                       enviado_por_correo?.toLowerCase().includes("prueba") ||
-                       data.ejecutiva_correo?.toLowerCase().includes("prueba");
-
-        if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-            const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
-            const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
-            correosCcArray.push(lilianCorreo);
-        }
-
-        const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(', ');
-        res.json({ cc: correosCc });
+        const cc = await calcularDefaultCc(empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id);
+        res.json({ cc });
     } catch (err) {
         console.error("Error en obtenerDefaultCc:", err);
         res.status(500).json({ error: "Error obteniendo CC por defecto" });

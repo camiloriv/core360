@@ -275,10 +275,27 @@ Hemos implementado un sistema de base de datos auto-sostenible para resolver los
   - Modificamos [app.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/app.js) para asegurar la creación del directorio `backend/uploads` en el arranque de la API mediante `fs.mkdirSync` y rutas absolutas independientes del entorno.
   - Modificamos [reuniones.routes.js](file:///C:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20(1)/Escritorio/core360/backend/modules/reuniones/reuniones.routes.js) para que la propiedad `destination` de Multer resuelva una ruta absoluta inequívoca a través de `path.resolve(__dirname, "../../uploads")`. Esto asegura que los archivos se carguen y adjunten exitosamente, permitiendo el flujo normal de guardado de minutas y envíos de emails.
 
+---
 
+## 📋 Reordenación de Campos en Registrar Reunión
 
+Reorganizamos la estructura de los campos en el formulario para registrar reuniones ([ReunionesForm.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/reuniones/ReunionesForm.jsx)) para optimizar la usabilidad y la legibilidad según lo solicitado:
 
+1. **Motivo al lado de Tipo Reunión**:
+   - Movimos el bloque de **Motivo** justo después de **Tipo Reunión**.
+   - Como ambos campos ocupan una sola columna en la grilla CSS de dos columnas, se renderizan perfectamente uno al lado del otro.
 
+2. **En Copia (CC) debajo de Enviar A**:
+   - Movimos el bloque de **En Copia (CC)** para que quede ubicado directamente debajo del campo de **Enviar A**.
+   - Le asignamos la propiedad `full` a la sección de **En Copia (CC)** para que abarque las dos columnas del formulario. Esto no solo da una consistencia simétrica excelente al ubicarse entre los campos de ancho completo **Enviar A** y **Participantes**, sino que también brinda mucho más espacio para la edición de las múltiples direcciones de correo asociadas.
 
+3. **Recarga Automática del CC al Cambiar de Empresa/Ejecutiva**:
+   - Añadimos un `useEffect` que escucha los cambios en `form.empresa_id`. Al cambiar de empresa:
+     - Bloquea temporalmente el input de copia reseteando `isCcEditable` a `false`.
+     - Limpia el contenido actual de `correos_cc`.
+     - En perfiles administrativos (`admin` o `gerencia`), restablece los campos `ejecutiva_id` y `jefatura_id` a `""` (ya que la lista de ejecutivas disponibles cambia por completo).
+   - Añadimos un `useEffect` que escucha los cambios en `form.ejecutiva_id` para restablecer también `isCcEditable` a `false` al reasignar el usuario.
+   - Estos reinicios gatillan de forma segura la consulta a la API (`getDefaultCc`) para traer los correos CC por defecto correspondientes a la nueva combinación seleccionada, evitando que persistan datos de la empresa anterior.
 
-
+### Validación
+- El proyecto compila de manera impecable y sin errores en Vite tras realizar `npm run build`.

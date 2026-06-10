@@ -125,7 +125,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
     }
 
     const info = await transporter.sendMail({
-      from: `"Sistema Reuniones" <${process.env.MAIL_USER}>`,
+      from: `"Sistema Reuniones" <${process.env.SMTP_USER}>`,
       to: recipientTo,
       ...(recipientCc && { cc: recipientCc }),
       subject: emailSubject,
@@ -264,7 +264,7 @@ const enviarCorreoEncuesta = async (to, url, bcc, user_nombre) => {
     }
 
     const info = await transporter.sendMail({
-      from: `"Sistema Encuestas" <${process.env.MAIL_USER}>`,
+      from: `"Sistema Encuestas" <${process.env.SMTP_USER}>`,
       to: recipientTo,
       ...(recipientBcc && { bcc: recipientBcc }),
       subject: emailSubject,

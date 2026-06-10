@@ -274,8 +274,9 @@ exports.crearReunion = async (req, res) => {
                     correosCcArray.push(lilianCorreo);
                 }
                 
-                // Deduplicate emails and remove any null/undefined
-                const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(',');
+                // Use frontend-provided CCs if available, otherwise generate default
+                const correosCc = req.body.correos_cc !== undefined ? req.body.correos_cc : [...new Set(correosCcArray.filter(Boolean))].join(',');
+
                 // Enviar en segundo plano para evitar colgar la respuesta HTTP si el SMTP falla o demora
                 enviarCorreo({
                     to: data.enviado_a,
@@ -365,9 +366,9 @@ exports.testSmtp = async (req, res) => {
     const transporter = require("../../config/mailer");
     const diagnostic = {
         config: {
-            host: process.env.MAIL_HOST,
-            port: process.env.MAIL_PORT,
-            user: process.env.MAIL_USER,
+            tenantId: process.env.AZURE_TENANT_ID ? "Configured" : "Missing",
+            clientId: process.env.AZURE_CLIENT_ID ? "Configured" : "Missing",
+            user: process.env.SMTP_USER,
             redirect_to: process.env.REDIRECT_EMAILS_TO || "None"
         },
         verify: null,
@@ -412,3 +413,54 @@ exports.testSmtp = async (req, res) => {
     res.json(diagnostic);
 };
 
+exports.obtenerDefaultCc = async (req, res) => {
+    const { empresa_id, ejecutiva_id, enviado_por_correo } = req.query;
+
+    if (!empresa_id || !ejecutiva_id) {
+        return res.json({ cc: enviado_por_correo || "" });
+    }
+
+    try {
+        const sql = `
+            SELECT 
+                emp.nombre AS empresa_nombre,
+                z.nombre AS zona_nombre,
+                e.correo AS ejecutiva_correo,
+                j.correo AS jefatura_correo
+            FROM empresas emp
+            LEFT JOIN zonas z ON emp.zona_id = z.id
+            LEFT JOIN usuarios e ON e.id = ?
+            LEFT JOIN usuarios j ON e.jefatura_id = j.id
+            WHERE emp.id = ?
+        `;
+        const [result] = await db.query(sql, [ejecutiva_id, empresa_id]);
+        
+        if (result.length === 0) {
+            return res.json({ cc: enviado_por_correo || "" });
+        }
+
+        const data = result[0];
+        const correosCcArray = [data.ejecutiva_correo, data.jefatura_correo];
+
+        if (enviado_por_correo) {
+            correosCcArray.push(enviado_por_correo);
+        }
+
+        const isTest = data.empresa_nombre?.toLowerCase().includes("demo") || 
+                       data.empresa_nombre?.toLowerCase().includes("prueba") || 
+                       enviado_por_correo?.toLowerCase().includes("prueba") ||
+                       data.ejecutiva_correo?.toLowerCase().includes("prueba");
+
+        if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
+            const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+            const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
+            correosCcArray.push(lilianCorreo);
+        }
+
+        const correosCc = [...new Set(correosCcArray.filter(Boolean))].join(', ');
+        res.json({ cc: correosCc });
+    } catch (err) {
+        console.error("Error en obtenerDefaultCc:", err);
+        res.status(500).json({ error: "Error obteniendo CC por defecto" });
+    }
+};

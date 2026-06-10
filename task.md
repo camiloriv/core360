@@ -79,3 +79,10 @@
   - [x] Refactorizar `useInactivityLogout.js` para realizar una validación de tiempo transcurrido en el montaje (`useEffect`), forzando el cierre de sesión inmediato si han pasado más de 30 minutos de inactividad mientras el navegador estuvo cerrado.
   - [x] Implementar optimización de escritura de timestamp (`throttling` de 5 segundos) en `useInactivityLogout.js` ante eventos de interacción (mousemove, click, scroll, etc.) para cuidar el rendimiento.
   - [x] Ejecutar compilación de producción con éxito.
+
+- [x] **Reordenación de Campos en Registrar Reunión**
+  - [x] Mover el campo "Motivo" al lado de "Tipo Reunión" (ambos de una columna / half-width).
+  - [x] Mover el campo "En Copia (CC)" debajo de "Enviar A" y asignarle ancho completo (`full`).
+  - [x] Programar recarga reactiva automática de "En Copia (CC)" al cambiar la empresa (limpia valores antiguos, bloquea input temporalmente y re-consulta API).
+  - [x] Resetear perfiles ejecutivos al cambiar de empresa en perfiles administrativos (`admin`/`gerencia`) para sincronizar sus defaults de copia.
+  - [x] Compilar y verificar el bundle con `npm run build` de forma limpia y exitosa.

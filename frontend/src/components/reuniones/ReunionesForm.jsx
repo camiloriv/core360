@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import useSubmitReunion from "../../hooks/reuniones/useSubmitReunion";
+import { getDefaultCc } from "../../services/reunionesService";
 
 import FormSection from "../form/core/FormSection";
 import FormActions from "../form/core/FormActions";
@@ -20,6 +21,7 @@ function ReunionesForm({ onSuccess }) {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
 
   const { form, setField, setFiles, resetForm } = useReunionesForm();
+  const [isCcEditable, setIsCcEditable] = useState(false);
 
   const isUserDemo = user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba");
 
@@ -47,6 +49,32 @@ function ReunionesForm({ onSuccess }) {
       setField("enviado_por", user.nombre);
     }
   }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo, isUserDemo]);
+
+  // Resetear ejecutiva y CC cuando cambia de empresa
+  useEffect(() => {
+    setIsCcEditable(false);
+    setField("correos_cc", "");
+    if (user.permisos === "admin" || user.permisos === "gerencia") {
+      setField("ejecutiva_id", "");
+      setField("jefatura_id", "");
+    }
+  }, [form.empresa_id]);
+
+  // Si cambia de ejecutiva, también resetear el estado editable para recargar el CC correspondiente
+  useEffect(() => {
+    setIsCcEditable(false);
+  }, [form.ejecutiva_id]);
+
+  // Obtener CC por defecto desde el backend
+  useEffect(() => {
+    if (form.empresa_id && form.ejecutiva_id && !isCcEditable) {
+      getDefaultCc(form.empresa_id, form.ejecutiva_id, user.correo)
+        .then((res) => {
+          setField("correos_cc", res.data.cc);
+        })
+        .catch((err) => console.error("Error al obtener correos en copia:", err));
+    }
+  }, [form.empresa_id, form.ejecutiva_id, user.correo, isCcEditable]);
 
   const { submit, loading } = useSubmitReunion({
     form,
@@ -194,6 +222,7 @@ function ReunionesForm({ onSuccess }) {
               onChange={(e) => setField("motivo_reu", e.target.value)}
             />
           </FormSection>
+
           <FormSection
             label={
               <>
@@ -207,6 +236,43 @@ function ReunionesForm({ onSuccess }) {
               suggestions={destinatarios}
               onChange={(e) => setField("enviado_a", e.target.value)}
               placeholder="Nombre del destinatario..."
+            />
+          </FormSection>
+
+          <FormSection
+            label={
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                <span>EN COPIA (CC)</span>
+                {!isCcEditable && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCcEditable(true)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--primary-color)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textDecoration: "underline",
+                      padding: 0
+                    }}
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
+            }
+            full
+          >
+            <input
+              value={form.correos_cc || ""}
+              onChange={(e) => setField("correos_cc", e.target.value)}
+              readOnly={!isCcEditable}
+              style={{
+                backgroundColor: isCcEditable ? "white" : "#f0f0f0",
+                color: isCcEditable ? "black" : "#555",
+              }}
+              placeholder="Ej: correo1@ejemplo.com, correo2@ejemplo.com"
             />
           </FormSection>
 

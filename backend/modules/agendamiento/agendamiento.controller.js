@@ -42,8 +42,24 @@ const crearReunionTeams = async (req, res) => {
 
         // Parse dateTime and calculate end time
         // fecha = YYYY-MM-DD, hora = HH:mm
-        const startDateTime = new Date(`${fecha}T${hora}:00`);
-        const endDateTime = new Date(startDateTime.getTime() + parseInt(duracion) * 60000);
+        const startDateTimeStr = `${fecha}T${hora}:00`;
+        
+        // Calculate end using local arithmetic to avoid timezone shifts
+        const year = parseInt(fecha.split('-')[0]);
+        const month = parseInt(fecha.split('-')[1]) - 1;
+        const day = parseInt(fecha.split('-')[2]);
+        const hour = parseInt(hora.split(':')[0]);
+        const minute = parseInt(hora.split(':')[1]);
+        
+        const endObj = new Date(year, month, day, hour, minute + parseInt(duracion));
+        
+        const endYear = endObj.getFullYear();
+        const endMonth = String(endObj.getMonth() + 1).padStart(2, "0");
+        const endDay = String(endObj.getDate()).padStart(2, "0");
+        const endHour = String(endObj.getHours()).padStart(2, "0");
+        const endMinute = String(endObj.getMinutes()).padStart(2, "0");
+        
+        const endDateTimeStr = `${endYear}-${endMonth}-${endDay}T${endHour}:${endMinute}:00`;
 
         // Map attendees
         const attendees = [];
@@ -69,12 +85,12 @@ const crearReunionTeams = async (req, res) => {
                 content: detalle || "Reunión generada desde CORE 360"
             },
             start: {
-                dateTime: startDateTime.toISOString(),
-                timeZone: "UTC"
+                dateTime: startDateTimeStr,
+                timeZone: "America/Santiago"
             },
             end: {
-                dateTime: endDateTime.toISOString(),
-                timeZone: "UTC"
+                dateTime: endDateTimeStr,
+                timeZone: "America/Santiago"
             },
             attendees: attendees,
             isOnlineMeeting: true,
@@ -101,7 +117,7 @@ const crearReunionTeams = async (req, res) => {
         const data = await response.json();
         
         if (empresa_id) {
-            const fechaVal = startDateTime.toISOString().split('T')[0];
+            const fechaVal = fecha;
             await db.query("UPDATE empresas SET estado_seguimiento = ?, fecha_concretada = ? WHERE id = ?", ['agendada', fechaVal, empresa_id]);
             await db.query("INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id) VALUES (?, ?, ?, ?, ?)", [empresa_id, 'agendada', fechaVal, req.usuario.id, data.id]);
         }

@@ -20,6 +20,7 @@ const EditorEncuestas = lazy(() => import("./pages/EditorEncuestas"));
 const GestionEmpresas = lazy(() => import("./pages/GestionEmpresas"));
 const SeguimientoEmpresas = lazy(() => import("./pages/SeguimientoEmpresas"));
 const GestionUsuarios = lazy(() => import("./pages/GestionUsuarios"));
+const AgendarReunion = lazy(() => import("./pages/AgendarReunion"));
 
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', width: '100%' }}>
@@ -96,6 +97,7 @@ const MainLayout = () => {
             <Route path="/" element={<Navigate to="/registrar-reunion" replace />} />
             <Route path="/registrar-reunion" element={<ProtectedRoute path="/registrar-reunion"><Home /></ProtectedRoute>} />
             <Route path="/crear-encuesta" element={<ProtectedRoute path="/crear-encuesta"><CrearEncuesta /></ProtectedRoute>} />
+            <Route path="/agendar" element={<ProtectedRoute path="/agendar"><AgendarReunion /></ProtectedRoute>} />
             <Route path="/dashboard-reuniones" element={<ProtectedRoute path="/dashboard-reuniones"><DashboardReuniones /></ProtectedRoute>} />
             <Route path="/dashboard-encuestas" element={<ProtectedRoute path="/dashboard-encuestas"><DashboardEncuestas /></ProtectedRoute>} />
             

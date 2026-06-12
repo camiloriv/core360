@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const ALL_VIEWS = [
   { path: "/registrar-reunion", label: "Registrar Reunión" },
   { path: "/crear-encuesta", label: "Crear Encuesta" },
+  { path: "/agendar", label: "Agendar" },
   { path: "/dashboard-reuniones", label: "Mis reuniones" },
   { path: "/dashboard-encuestas", label: "Mis encuestas" },
   { path: "/editor-encuestas", label: "Editar encuestas" },
@@ -21,6 +22,7 @@ const getDefaultViewsForRole = (role) => {
       return [
         "/registrar-reunion",
         "/crear-encuesta",
+        "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
         "/editor-encuestas",
@@ -32,6 +34,7 @@ const getDefaultViewsForRole = (role) => {
       return [
         "/registrar-reunion",
         "/crear-encuesta",
+        "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
         "/seguimiento-empresas"
@@ -41,6 +44,7 @@ const getDefaultViewsForRole = (role) => {
       return [
         "/registrar-reunion",
         "/crear-encuesta",
+        "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
         "/editor-encuestas",
@@ -50,6 +54,7 @@ const getDefaultViewsForRole = (role) => {
       return [
         "/registrar-reunion",
         "/crear-encuesta",
+        "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
         "/seguimiento-empresas"

@@ -52,14 +52,14 @@ const ProtectedRoute = ({ children, allowedRoles, path }) => {
     ? (typeof user.vistas_permitidas === "string" ? JSON.parse(user.vistas_permitidas) : user.vistas_permitidas)
     : null;
 
-  if (vistas && path) {
+  if (vistas && path && user.permisos !== "admin" && user.permisos !== "ADMIN") {
     if (!vistas.includes(path)) {
       const fallback = vistas.includes("/registrar-reunion") 
         ? "/registrar-reunion" 
         : (vistas.length > 0 ? vistas[0] : "/login");
       return <Navigate to={fallback} replace />;
     }
-  } else if (allowedRoles && !allowedRoles.includes(user.permisos)) {
+  } else if (allowedRoles && !allowedRoles.includes(user.permisos) && user.permisos !== "admin" && user.permisos !== "ADMIN") {
     return <Navigate to="/registrar-reunion" replace />;
   }
 

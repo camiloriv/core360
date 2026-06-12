@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
-import axios from "axios";
+
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
@@ -198,10 +198,10 @@ const Sidebar = ({ isOpen, onClose }) => {
       : user.vistas_permitidas
     : null;
 
-  if (vistas) {
+  if (vistas && user.permisos !== "admin" && user.permisos !== "ADMIN") {
     menuItems = menuItems.filter((item) => vistas.includes(item.path));
   } else {
-    if (user.permisos !== "admin") {
+    if (user.permisos !== "admin" && user.permisos !== "ADMIN") {
       menuItems = menuItems.filter(
         (item) =>
           !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
@@ -211,7 +211,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     if (
       user.permisos !== "jefatura" &&
       user.permisos !== "ejecutiva" &&
-      user.permisos !== "admin"
+      user.permisos !== "admin" &&
+      user.permisos !== "ADMIN"
     ) {
       menuItems = menuItems.filter((item) => item.path !== "/editor-encuestas");
     }
@@ -429,7 +430,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       </nav>
 
       <div style={styles.footer}>
-        {user.nombre && (
+        {(user.nombre || user.correo) && (
           <div
             onClick={handleOpenPasswordModal}
             style={{
@@ -448,7 +449,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             }
             title="Seguridad / Cambiar Contraseña"
           >
-            {user.nombre}
+            {user.nombre || user.correo || "Administrador"}
           </div>
         )}
         <button

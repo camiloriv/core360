@@ -93,10 +93,21 @@ if (process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZ
             }).filter(att => att.contentBytes); // Ensure we only send valid attachments
             
             const toArray = Array.isArray(to) ? to : to.split(",").map(e => e.trim());
-            const ccArray = cc ? (Array.isArray(cc) ? cc : cc.split(",").map(e => e.trim())) : [];
-            const bccArray = bcc ? (Array.isArray(bcc) ? bcc : bcc.split(",").map(e => e.trim())) : [];
             
-            const mailFrom = process.env.SMTP_USER;
+            let mailFrom = process.env.SMTP_USER;
+            if (from) {
+                // Si el formato es "Nombre <correo@dominio.com>", extraemos el correo
+                const emailMatch = from.match(/<(.+)>/);
+                mailFrom = emailMatch ? emailMatch[1] : from;
+            }
+            console.log("=== DEBUG MAILER ===", { originalFrom: from, extractedMailFrom: mailFrom });
+
+            // Excluir al remitente de las copias (ya que queda en su carpeta de "Elementos enviados")
+            const rawCc = cc ? (Array.isArray(cc) ? cc : cc.split(",").map(e => e.trim())) : [];
+            const rawBcc = bcc ? (Array.isArray(bcc) ? bcc : bcc.split(",").map(e => e.trim())) : [];
+            
+            const ccArray = rawCc.filter(e => e && e.toLowerCase() !== mailFrom.toLowerCase());
+            const bccArray = rawBcc.filter(e => e && e.toLowerCase() !== mailFrom.toLowerCase());
 
             const messagePayload = {
                 message: {

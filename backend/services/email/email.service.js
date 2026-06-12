@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 
-const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
+const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail }) => {
 
   try {
 
@@ -124,8 +124,11 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
       emailSubject = `[DEV - Destinatario Original: ${to}] ${subject}`;
     }
 
+    const senderEmail = (userEmail && userEmail.endsWith('@proforma.cl')) ? userEmail : process.env.SMTP_USER;
+    console.log("=== DEBUG SENDER ===", { userEmail, senderEmail });
+
     const info = await transporter.sendMail({
-      from: `"Sistema Reuniones" <${process.env.SMTP_USER}>`,
+      from: `"Sistema Reuniones" <${senderEmail}>`,
       to: recipientTo,
       ...(recipientCc && { cc: recipientCc }),
       subject: emailSubject,
@@ -144,7 +147,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [] }) => {
   }
 };
 
-const enviarCorreoEncuesta = async (to, url, bcc, user_nombre) => {
+const enviarCorreoEncuesta = async (to, url, bcc, user_nombre, userEmail) => {
   try {
     const banner = {
       filename: "banner-header.png",
@@ -263,8 +266,10 @@ const enviarCorreoEncuesta = async (to, url, bcc, user_nombre) => {
       emailSubject = `[DEV - Destinatario Original: ${to}] ${emailSubject}`;
     }
 
+    const senderEmail = (userEmail && userEmail.endsWith('@proforma.cl')) ? userEmail : process.env.SMTP_USER;
+
     const info = await transporter.sendMail({
-      from: `"Sistema Encuestas" <${process.env.SMTP_USER}>`,
+      from: `"Sistema Encuestas" <${senderEmail}>`,
       to: recipientTo,
       ...(recipientBcc && { bcc: recipientBcc }),
       subject: emailSubject,

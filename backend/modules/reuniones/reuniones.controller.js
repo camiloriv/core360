@@ -60,11 +60,6 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
 
     let correosCcArray = [];
 
-    // Siempre incluir al remitente en el CC para que tenga su respaldo (envío desde centralizado)
-    const remitenteCorreo = loggedInUser?.correo || enviado_por_correo;
-    if (remitenteCorreo) {
-        correosCcArray.push(remitenteCorreo);
-    }
 
     if (userPermisos === 'ejecutiva') {
         // Ejecutiva: su jefatura y gerencia (Lilian Ortega)
@@ -354,6 +349,7 @@ exports.crearReunion = async (req, res) => {
                 enviarCorreo({
                     to: data.enviado_a,
                     cc: correosCc,
+                    userEmail: req.usuario?.correo,
                     subject: `Reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_reunion}`,
                     data: {
                         id_reunion: data.id_reunion,
@@ -461,6 +457,7 @@ exports.testSmtp = async (req, res) => {
     try {
         const sent = await enviarCorreo({
             to: targetEmail,
+            userEmail: req.usuario?.correo,
             subject: "Test de Diagnóstico SMTP - Core360",
             data: {
                 id_reunion: "TEST-1234",

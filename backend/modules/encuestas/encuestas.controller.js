@@ -74,7 +74,7 @@ const enviarCorreo = async (req, res) => {
       bcc = await service.obtenerCorreosBcc(encuesta_id);
     }
 
-    const enviado = await emailService.enviarCorreoEncuesta(email, url, bcc, user_nombre);
+    const enviado = await emailService.enviarCorreoEncuesta(email, url, bcc, user_nombre, req.usuario?.correo);
     if (enviado) {
       // Si se envió, registrar el correo en la tabla encuestas
       if (encuesta_id) {

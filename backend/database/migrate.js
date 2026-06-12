@@ -89,11 +89,18 @@ async function runMigrations() {
         estado VARCHAR(50) NOT NULL,
         fecha DATE NOT NULL,
         usuario_id INT NULL,
-        reunion_id VARCHAR(20) NULL,
+        reunion_id VARCHAR(255) NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
       )
     `);
+
+    // Ensure reunion_id is large enough in case it was created with VARCHAR(20) before
+    try {
+      await connection.query('ALTER TABLE empresa_seguimiento_log MODIFY reunion_id VARCHAR(255) NULL');
+    } catch (e) {
+      console.log("Migration: Note: reunion_id modify skipped or failed:", e.message);
+    }
 
     // Migrate existing logs to empresa_seguimiento_log
     const [solicitadas] = await connection.query(`

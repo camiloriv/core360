@@ -1,33 +1,36 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("./encuestas.controller");
+const { verificarToken } = require("../../middleware/auth.middleware");
 
 // 1. RUTAS ESTÁTICAS / ESPECÍFICAS (Deben ir primero)
-router.get("/templates", controller.obtenerTemplates);
-router.get("/catalogo-preguntas", controller.obtenerPreguntas);
-router.get("/respuestas/all", controller.obtenerRespuestas);
-router.get("/resumen/general", controller.obtenerStats);
-router.get("/resumen/kpis", controller.obtenerKpis);
+router.get("/templates", verificarToken, controller.obtenerTemplates);
+router.get("/catalogo-preguntas", verificarToken, controller.obtenerPreguntas);
+router.get("/respuestas/all", verificarToken, controller.obtenerRespuestas);
+router.get("/resumen/general", verificarToken, controller.obtenerStats);
+router.get("/resumen/kpis", verificarToken, controller.obtenerKpis);
 
 // 2. RUTAS DEL EDITOR
-router.get("/editor/templates", controller.listarTemplatesFull);
-router.post("/editor/templates", controller.crearTemplateBase);
-router.patch("/editor/templates", controller.actualizarTemplateBase);
-router.delete("/editor/templates/:id", controller.eliminarTemplate);
-router.get("/editor/dimensiones", controller.listarDimensiones);
-router.post("/editor/dimensiones", controller.crearDimension);
-router.delete("/editor/dimensiones/:id", controller.eliminarDimension);
-router.get("/editor/preguntas/:id", controller.listarPreguntasTemplate);
-router.post("/editor/preguntas", controller.guardarPregunta);
-router.delete("/editor/preguntas/:templateId/:preguntaId", controller.eliminarPregunta);
-router.delete("/editor/catalogo-preguntas/:id", controller.eliminarPreguntaCatalogo);
-router.post("/editor/preguntas/vincular", controller.vincularPregunta);
+router.get("/editor/templates", verificarToken, controller.listarTemplatesFull);
+router.post("/editor/templates", verificarToken, controller.crearTemplateBase);
+router.patch("/editor/templates", verificarToken, controller.actualizarTemplateBase);
+router.delete("/editor/templates/:id", verificarToken, controller.eliminarTemplate);
+router.get("/editor/dimensiones", verificarToken, controller.listarDimensiones);
+router.post("/editor/dimensiones", verificarToken, controller.crearDimension);
+router.delete("/editor/dimensiones/:id", verificarToken, controller.eliminarDimension);
+router.get("/editor/preguntas/:id", verificarToken, controller.listarPreguntasTemplate);
+router.post("/editor/preguntas", verificarToken, controller.guardarPregunta);
+router.delete("/editor/preguntas/:templateId/:preguntaId", verificarToken, controller.eliminarPregunta);
+router.delete("/editor/catalogo-preguntas/:id", verificarToken, controller.eliminarPreguntaCatalogo);
+router.post("/editor/preguntas/vincular", verificarToken, controller.vincularPregunta);
 
 // 3. RUTAS DE ACCIÓN
-router.post("/crear", controller.crearEncuesta);
+router.post("/crear", verificarToken, controller.crearEncuesta);
+router.post("/enviar-correo", verificarToken, controller.enviarCorreo);
+router.patch("/toggle-estado", verificarToken, controller.toggleEstado);
+
+// PÚBLICAS
 router.post("/responder", controller.responderEncuesta);
-router.post("/enviar-correo", controller.enviarCorreo);
-router.patch("/toggle-estado", controller.toggleEstado);
 
 // 4. RUTAS PARAMETRIZADAS (Deben ir al final)
 router.get("/:token", controller.obtenerEncuesta);

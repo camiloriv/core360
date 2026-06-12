@@ -69,14 +69,16 @@ const authRoutes = require("./modules/auth/auth.routes");
 const usuariosRoutes = require("./modules/usuarios/usuarios.routes");
 const zonasRoutes = require("./modules/zonas/zonas.routes");
 
-app.use("/reuniones", reunionesRoutes);
-app.use("/ejecutivas", ejecutivasRoutes);
-app.use("/empresas", empresasRoutes);
-app.use("/encuestas", encuestasRoutes);
-app.use("/jefaturas", jefaturasRoutes);
+const { verificarToken } = require("./middleware/auth.middleware");
+
+app.use("/reuniones", verificarToken, reunionesRoutes);
+app.use("/ejecutivas", verificarToken, ejecutivasRoutes);
+app.use("/empresas", verificarToken, empresasRoutes);
+app.use("/encuestas", encuestasRoutes); // Las encuestas tienen endpoints públicos y protegidos internamente
+app.use("/jefaturas", verificarToken, jefaturasRoutes);
 app.use("/auth", authRoutes);
-app.use("/usuarios", usuariosRoutes);
-app.use("/zonas", zonasRoutes);
+app.use("/usuarios", verificarToken, usuariosRoutes);
+app.use("/zonas", verificarToken, zonasRoutes);
 
 // 🔹 Test de Salud
 app.get("/health", (req, res) => {

@@ -19,6 +19,7 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
 
     const handleLogout = () => {
       // Remover usuario de la sesión y del timestamp
+      localStorage.removeItem('token');
       localStorage.removeItem('usuario');
       localStorage.removeItem('ultimoAcceso');
       

@@ -1,4 +1,5 @@
 const db = require("../../database/connection");
+const jwt = require('jsonwebtoken');
 
 exports.login = async (req, res) => {
   const { correo, contrasena } = req.body;
@@ -9,14 +10,31 @@ exports.login = async (req, res) => {
     if (rows.length === 0) return res.status(401).json({ error: "Credenciales incorrectas" });
 
     const usuario = rows[0];
-    res.json({
+    
+    // Generamos el token JWT
+    const payload = {
       id: usuario.id,
-      nombre: usuario.nombre,
       correo: usuario.correo,
-      permisos: usuario.permisos,
-      cargos: usuario.cargos,
-      jefatura_id: usuario.jefatura_id,
-      vistas_permitidas: usuario.vistas_permitidas
+      permisos: usuario.permisos
+    };
+    
+    const token = jwt.sign(
+      payload, 
+      process.env.JWT_SECRET || 'secretKey_temporal_123', 
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      token,
+      usuario: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        correo: usuario.correo,
+        permisos: usuario.permisos,
+        cargos: usuario.cargos,
+        jefatura_id: usuario.jefatura_id,
+        vistas_permitidas: usuario.vistas_permitidas
+      }
     });
   } catch (err) {
     console.error(err);

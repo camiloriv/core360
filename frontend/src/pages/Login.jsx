@@ -19,7 +19,8 @@ const Login = () => {
         correo,
         contrasena,
       });
-      localStorage.setItem("usuario", JSON.stringify(data));
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("usuario", JSON.stringify(data.usuario));
       localStorage.setItem("ultimoAcceso", Date.now().toString());
       navigate("/");
     } catch (err) {

@@ -26,6 +26,20 @@ const localizer = dateFnsLocalizer({
 const minTime = new Date(2026, 0, 1, 6, 0, 0); // 06:00
 const maxTime = new Date(2026, 0, 1, 20, 0, 0); // 20:00
 
+const CustomWeekHeader = ({ date }) => {
+  const dayName = format(date, "eee", { locale: esLocale });
+  const dayNumber = format(date, "d");
+  const cleanDayName = dayName.replace(".", "");
+  const capitalizedDayName = cleanDayName.charAt(0).toUpperCase() + cleanDayName.slice(1);
+
+  return (
+    <div className="custom-week-header-inner">
+      <span className="custom-week-header-name">{capitalizedDayName}</span>
+      <span className="custom-week-header-number">{dayNumber}</span>
+    </div>
+  );
+};
+
 const AgendarReunion = () => {
   const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -170,6 +184,11 @@ const AgendarReunion = () => {
             endAccessor="end"
             style={{ flex: 1 }}
             selectable
+            components={{
+              week: {
+                header: CustomWeekHeader
+              }
+            }}
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             date={currentDate}
@@ -219,6 +238,50 @@ const AgendarReunion = () => {
           font-family: 'Inter', system-ui, -apple-system, sans-serif;
           font-size: 13px;
           border: none !important;
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+        }
+        .rbc-time-view {
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+        .rbc-time-header, .rbc-time-content {
+          min-width: 0 !important;
+        }
+        .rbc-header, .rbc-day-slot {
+          min-width: 0 !important;
+        }
+        .rbc-time-header-gutter, .rbc-time-gutter {
+          width: 50px !important;
+          min-width: 50px !important;
+          max-width: 50px !important;
+          flex: 0 0 50px !important;
+          flex-shrink: 0 !important;
+        }
+
+        /* Alineación exacta entre cabecera y celdas de la grilla */
+        .rbc-row.rbc-time-header-cell {
+          display: flex !important;
+          flex: 1 !important;
+          min-width: 0 !important;
+        }
+        .rbc-allday-cell {
+          display: flex !important;
+          flex: none !important;
+          height: 15px !important;
+          min-height: 15px !important;
+          min-width: 0 !important;
+        }
+        .rbc-allday-cell .rbc-row-bg, 
+        .rbc-time-header-cell .rbc-row-bg {
+          width: 100% !important;
+          display: flex !important;
+        }
+        .rbc-allday-cell .rbc-row-bg .rbc-day-bg, 
+        .rbc-time-header-cell .rbc-header {
+          flex: 1 0 0% !important;
+          min-width: 0 !important;
         }
 
         /* Vista de Mes y Bordes */
@@ -240,14 +303,74 @@ const AgendarReunion = () => {
         /* Cabecera de días (lun, mar, mié...) */
         .rbc-header {
           background: #f8fafc;
-          padding: 12px 0;
+          padding: 6px 0;
           border-bottom: 1px solid #e2e8f0;
           border-left: 1px solid #e2e8f0;
-          font-weight: 700;
-          color: #475569;
-          text-transform: uppercase;
+          overflow: visible !important;
+          min-height: 52px !important;
+          height: auto !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-align: center !important;
+        }
+
+        /* Cabecera de la semana personalizada */
+        .custom-week-header-inner {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 4px 0;
+          width: 100% !important;
+        }
+        .custom-week-header-name {
           font-size: 11px;
-          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          font-weight: 600;
+          color: #64748b;
+          display: block !important;
+          text-align: center !important;
+          margin-bottom: 2px;
+        }
+        .custom-week-header-number {
+          font-size: 14px;
+          font-weight: 700;
+          color: #1e293b;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+        }
+        .rbc-today .custom-week-header-number {
+          background-color: #14b8a6 !important;
+          color: white !important;
+        }
+        .rbc-today .custom-week-header-name {
+          color: #14b8a6;
+          font-weight: 700;
+        }
+
+        /* Eliminar estilos por defecto del botón en la cabecera */
+        .rbc-header .rbc-button-link {
+          color: inherit !important;
+          font-weight: inherit !important;
+          font-size: inherit !important;
+          padding: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          background: none !important;
+          border-radius: 0 !important;
+        }
+        .rbc-header .rbc-button-link:hover {
+          background: none !important;
+          color: inherit !important;
         }
 
         /* Toolbar (Mes/Año y Botones) */
@@ -314,7 +437,7 @@ const AgendarReunion = () => {
         .rbc-today {
           background-color: #f0fdfa !important; /* Verde pastel muy sutil */
         }
-        .rbc-today .rbc-button-link {
+        .rbc-month-view .rbc-today .rbc-button-link {
           background-color: #14b8a6 !important;
           color: white !important;
         }
@@ -414,25 +537,30 @@ const AgendarReunion = () => {
           display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 14px; height: auto; border-radius: 6px; width: auto; flex-shrink: 0; margin: 0;
         }
         .agendar-body-wrapper {
-          flex: 1; width: 100%; overflow: hidden; display: flex; flex-direction: column;
+          flex: 1; width: 100%; min-width: 0; overflow: hidden; display: flex; flex-direction: column;
         }
         .calendar-card {
-          padding: 15px; height: 100%; display: flex; flex-direction: column; overflow-x: auto;
+          padding: 15px; height: 100%; width: 100%; min-width: 0; max-width: 100%; display: flex; flex-direction: column;
         }
         .calendar-scroll-wrapper {
-          min-width: 600px; height: 100%; display: flex; flex-direction: column; flex: 1;
+          width: 100%; min-width: 0; height: 100%; display: flex; flex-direction: column; flex: 1;
         }
 
         /* Responsive Mobile Styles */
         @media (max-width: 768px) {
+          .main-content {
+            overflow-x: hidden !important;
+          }
           .agendar-page-wrapper {
             padding: 10px;
             height: auto;
             min-height: 100vh;
-            overflow: auto;
+            overflow-x: hidden !important;
           }
           .agendar-body-wrapper {
             overflow: visible;
+            width: 100%;
+            min-width: 0;
           }
           .agendar-header-container {
             flex-direction: column;
@@ -470,8 +598,77 @@ const AgendarReunion = () => {
             order: 0;
           }
           .calendar-scroll-wrapper {
-            /* En mobile permitimos scroll horizontal para mantener proporción del calendario */
-            min-width: 500px; 
+            min-width: 0 !important; 
+          }
+          .rbc-time-header-gutter,
+          .rbc-time-gutter {
+            width: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+            flex: 0 0 40px !important;
+            flex-shrink: 0 !important;
+          }
+          .rbc-time-gutter .rbc-time-slot {
+            font-size: 9px;
+            padding: 0 2px;
+          }
+          .rbc-header {
+            padding: 3px 0;
+            overflow: visible !important;
+            min-height: 40px !important;
+            height: auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+          }
+          .rbc-header .rbc-button-link {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            background: none !important;
+          }
+          .custom-week-header-inner {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 2px 0;
+            width: 100% !important;
+          }
+          .custom-week-header-name {
+            font-size: 9px;
+            display: block !important;
+            text-align: center !important;
+            margin-bottom: 1px;
+          }
+          .custom-week-header-number {
+            font-size: 12px;
+            width: 22px;
+            height: 22px;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .rbc-event {
+            padding: 1px 2px !important;
+            font-size: 9px;
+            border-left-width: 2px !important;
+          }
+          .rbc-date-cell {
+            font-size: 10px;
+            padding: 2px;
+          }
+          .rbc-button-link {
+            font-size: 10px;
+            padding: 1px;
+            white-space: normal;
+            line-height: 1.1;
+            display: block;
+            text-align: center;
           }
           .modal-content {
             padding: 20px 15px;

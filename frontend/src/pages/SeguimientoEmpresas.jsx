@@ -240,7 +240,7 @@ export default function SeguimientoEmpresas() {
                 };
                 const color = colorMap[h.estado] || "#64748b";
                 const reunionTag = h.reunion_id
-                  ? ` <span style="color:#3b82f6;font-size:10px;">(${h.reunion_id})</span>`
+                  ? ` <span style="color:#3b82f6;font-size:10px;font-weight:bold;" title="ID: ${h.reunion_id}">(TEAMS)</span>`
                   : "";
                 return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f8fafc;">
                 <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
@@ -284,7 +284,7 @@ export default function SeguimientoEmpresas() {
       confirmButtonColor: "#1e40af",
       cancelButtonText: "Cancelar",
       confirmButtonText: "Guardar",
-      width: "420px",
+      width: "550px",
       didOpen: () => {
         const selectEl = document.getElementById("swal-estado");
         const fechaContainer = document.getElementById("swal-fecha-container");

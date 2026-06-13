@@ -148,7 +148,7 @@ const obtenerEventosCalendario = async (req, res) => {
         }
 
         const accessToken = await getGraphToken();
-        const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=100`;
+        const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=1000`;
 
         const response = await fetch(endpoint, {
             method: "GET",

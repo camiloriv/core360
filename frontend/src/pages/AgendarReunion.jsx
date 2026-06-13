@@ -449,10 +449,18 @@ const AgendarReunion = () => {
           font-weight: 500;
         }
 
-        /* Hover sobre casillas vacías */
+        /* Hover sobre casillas vacías y día completo */
         .rbc-day-bg:hover, .rbc-time-slot:hover {
           background-color: #f1f5f9;
           cursor: pointer;
+        }
+
+        /* En la vista de mes, desactivamos eventos de puntero en elementos internos
+           para que el hover y el click se apliquen directamente al día completo (.rbc-day-bg) */
+        .rbc-month-view .rbc-event,
+        .rbc-month-view .rbc-button-link,
+        .rbc-month-view .rbc-show-more {
+          pointer-events: none !important;
         }
 
         /* Tarjetas de Eventos */

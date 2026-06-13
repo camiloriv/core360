@@ -32,16 +32,30 @@ const AgendarReunion = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState("month");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     document.title = "CORE 360 - Agendar en Teams";
     fetchEvents();
   }, []);
 
-  const fetchEvents = async (dateParam = currentDate) => {
+  const fetchEvents = async (dateParam = currentDate, specificStart = null, specificEnd = null) => {
+    setIsLoading(true);
     try {
-      const start = new Date(dateParam.getFullYear(), dateParam.getMonth() - 1, 1).toISOString();
-      const end = new Date(dateParam.getFullYear(), dateParam.getMonth() + 2, 0).toISOString();
+      let start, end;
+      if (specificStart && specificEnd) {
+        start = new Date(specificStart);
+        start.setHours(0, 0, 0, 0);
+        
+        end = new Date(specificEnd);
+        end.setHours(23, 59, 59, 999);
+        
+        start = start.toISOString();
+        end = end.toISOString();
+      } else {
+        start = new Date(dateParam.getFullYear(), dateParam.getMonth() - 1, 1).toISOString();
+        end = new Date(dateParam.getFullYear(), dateParam.getMonth() + 2, 0).toISOString();
+      }
       
       const res = await obtenerEventosCalendario(start, end);
       if (res.data && res.data.events) {
@@ -54,15 +68,28 @@ const AgendarReunion = () => {
       }
     } catch (error) {
       console.error("Error al obtener eventos", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSelectSlot = (slotInfo) => {
-    setSelectedDate(slotInfo.start);
-    setIsModalOpen(true);
+    if (currentView === "month") {
+      setCurrentDate(slotInfo.start);
+      setCurrentView("day");
+    } else {
+      setSelectedDate(slotInfo.start);
+      setIsModalOpen(true);
+    }
   };
 
   const handleSelectEvent = (event) => {
+    if (currentView === "month") {
+      setCurrentDate(event.start);
+      setCurrentView("day");
+      return;
+    }
+
     Swal.fire({
       title: 'Detalles de Reunión',
       text: event.title,
@@ -108,28 +135,34 @@ const AgendarReunion = () => {
   };
 
   return (
-    <div className="encuesta-page" style={{ background: 'var(--bg-body)', height: '100vh', padding: '15px 20px', boxSizing: 'border-box', overflow: 'hidden', width: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="encuesta-page agendar-page-wrapper">
       
-      <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, width: '100%' }}>
+      <div className="agendar-header-container">
         <div>
           <h1 className="page-title" style={{ fontSize: '1.4rem', marginBottom: '4px', marginTop: 0 }}>Agendar Reunión (Teams)</h1>
-          <p className="page-subtitle" style={{ fontSize: '0.9rem', margin: 0, color: '#64748b' }}>Sincronizado con tu calendario de Microsoft</p>
+          <p className="page-subtitle" style={{ fontSize: '0.9rem', margin: 0, color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            Sincronizado con tu calendario de Microsoft
+            {isLoading ? (
+              <span style={{color: '#eab308', fontWeight: 'bold', fontSize: '0.85rem'}}>⏳ Cargando...</span>
+            ) : (
+              <span style={{color: '#10b981', fontWeight: 'bold', fontSize: '0.85rem'}}>✓ Listo</span>
+            )}
+          </p>
         </div>
         <button 
-          className="btn btn-primary" 
+          className="btn btn-primary btn-nueva-reunion" 
           onClick={() => { setSelectedDate(new Date()); setIsModalOpen(true); }}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '14px', height: 'auto', borderRadius: '6px', width: 'auto', flexShrink: 0, margin: 0 }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
           Nueva Reunión
         </button>
       </div>
 
-      <div style={{ flex: 1, width: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="agendar-body-wrapper">
         
         {/* Lado Derecho: Calendario ahora a ancho completo */}
-        <div className="card" style={{ padding: '15px', height: '100%', display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
-          <div style={{ minWidth: '600px', height: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div className="card calendar-card">
+          <div className="calendar-scroll-wrapper">
             <Calendar
               localizer={localizer}
               events={events}
@@ -143,9 +176,15 @@ const AgendarReunion = () => {
             view={currentView}
             min={minTime}
             max={maxTime}
+            onRangeChange={(range) => {
+              if (Array.isArray(range)) {
+                fetchEvents(currentDate, range[0], range[range.length - 1]);
+              } else {
+                fetchEvents(currentDate, range.start, range.end);
+              }
+            }}
             onNavigate={(newDate) => {
               setCurrentDate(newDate);
-              fetchEvents(newDate);
             }}
             onView={(newView) => setCurrentView(newView)}
             messages={{
@@ -175,114 +214,276 @@ const AgendarReunion = () => {
       )}
 
       <style>{`
+        /* Tipografía general y contenedor */
         .rbc-calendar {
-          font-family: var(--font-main);
-          font-size: 12px;
+          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          font-size: 13px;
+          border: none !important;
         }
-        .rbc-time-gutter .rbc-time-slot {
-          font-size: 11px;
-          color: var(--text-muted, #64748b);
+
+        /* Vista de Mes y Bordes */
+        .rbc-month-view {
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          overflow: hidden;
+          background: white;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
+        .rbc-month-row {
+          border-top: 1px solid #e2e8f0;
+        }
+        .rbc-day-bg {
+          border-left: 1px solid #e2e8f0;
+          transition: background-color 0.2s;
+        }
+
+        /* Cabecera de días (lun, mar, mié...) */
         .rbc-header {
-          font-size: 12px;
-          font-weight: 600;
-          padding: 6px 0;
-        }
-        .rbc-event {
+          background: #f8fafc;
+          padding: 12px 0;
+          border-bottom: 1px solid #e2e8f0;
+          border-left: 1px solid #e2e8f0;
+          font-weight: 700;
+          color: #475569;
+          text-transform: uppercase;
           font-size: 11px;
-          line-height: 1.2;
+          letter-spacing: 0.5px;
         }
-        .rbc-date-cell {
-          font-size: 12px;
-        }
+
+        /* Toolbar (Mes/Año y Botones) */
         .rbc-toolbar {
           display: flex;
           flex-wrap: wrap;
-          justify-content: center;
-          gap: 15px;
+          justify-content: space-between;
+          align-items: center;
           margin-bottom: 20px;
+          padding: 0 10px;
         }
         .rbc-toolbar .rbc-toolbar-label {
-          width: 100%;
-          text-align: center;
-          font-weight: 700;
-          font-size: 18px;
+          font-weight: 800;
+          font-size: 20px;
+          color: #1e293b;
           text-transform: capitalize;
-          order: -1; /* Mueve el mes/año arriba del todo */
-          color: var(--text-color, #1e293b);
         }
         .rbc-btn-group {
           display: flex;
-          gap: 0;
+          gap: 6px;
         }
         .rbc-btn-group button {
-          padding: 6px 16px;
+          border-radius: 8px !important;
+          padding: 8px 16px;
           font-size: 13px;
-          font-weight: 500;
-        }
-        .rbc-toolbar button.rbc-active {
-          background-color: var(--secondary-color);
-          color: white;
-          border-color: var(--secondary-color);
-        }
-        .rbc-toolbar button:active, .rbc-toolbar button:focus {
-          background-color: var(--primary-color);
-          color: white;
-        }
-        .rbc-event {
-          background-color: #e0e7ff; /* Azul pastel claro */
-          color: #1e40af; /* Texto azul oscuro */
-          border: 1px solid #c7d2fe; /* Borde sutil */
-          border-radius: 6px; /* Bordes redondeados suaves */
-          padding: 2px 6px;
+          font-weight: 600;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #475569;
           transition: all 0.2s ease;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .rbc-event:hover {
-          background-color: #c7d2fe; /* Azul pastel un poco más oscuro al pasar el mouse */
-          color: #1e3a8a;
-          transform: translateY(-1px);
-          box-shadow: 0 3px 5px rgba(0,0,0,0.08);
+        .rbc-btn-group button:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+          border-color: #cbd5e1;
         }
-        .rbc-event .rbc-event-label {
-          display: none; /* Opcional: Oculta la hora en formato feo del bloque si está */
+        .rbc-toolbar button.rbc-active {
+          background: #3b82f6 !important;
+          color: white !important;
+          border-color: #3b82f6 !important;
+          box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3) !important;
         }
-        .rbc-day-bg:hover, .rbc-time-slot:hover {
-          background-color: #f8fafc; /* Color muy sutil al hacer hover en casillas vacías */
-          cursor: pointer;
+
+        /* Casillas de Días */
+        .rbc-date-cell {
+          padding: 6px 8px;
+          text-align: right;
+        }
+        .rbc-button-link {
+          color: #475569 !important;
+          font-weight: 600;
+          font-size: 13px;
+          padding: 2px 6px;
+          display: inline-block;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+        .rbc-button-link:hover {
+          background-color: #e2e8f0 !important;
+          color: #0f172a !important;
+          text-decoration: none;
         }
         .rbc-today {
-          background-color: #fefce8; /* Amarillo pastel sutil para el día de hoy */
+          background-color: #f0fdfa !important; /* Verde pastel muy sutil */
         }
+        .rbc-today .rbc-button-link {
+          background-color: #14b8a6 !important;
+          color: white !important;
+        }
+        .rbc-off-range-bg {
+          background-color: #f8fafc;
+        }
+        .rbc-off-range .rbc-button-link {
+          color: #94a3b8 !important;
+          font-weight: 500;
+        }
+
+        /* Hover sobre casillas vacías */
+        .rbc-day-bg:hover, .rbc-time-slot:hover {
+          background-color: #f1f5f9;
+          cursor: pointer;
+        }
+
+        /* Tarjetas de Eventos */
+        .rbc-event {
+          background-color: #eff6ff !important;
+          color: #1d4ed8 !important;
+          border: none !important;
+          border-left: 3px solid #3b82f6 !important;
+          border-radius: 4px !important;
+          padding: 2px 4px !important;
+          margin-bottom: 2px;
+          margin-top: 1px;
+          font-size: 11px;
+          font-weight: 500;
+          line-height: 1.2;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          transition: all 0.2s ease;
+        }
+        .rbc-event:hover {
+          background-color: #dbeafe !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+          z-index: 5;
+        }
+        .rbc-event .rbc-event-label {
+          display: none;
+        }
+        .rbc-event-content {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        /* Botón de '+X more' */
+        .rbc-show-more {
+          color: #3b82f6;
+          font-weight: 600;
+          font-size: 11px;
+          background: transparent;
+          padding: 2px 6px;
+          display: block;
+          text-align: center;
+          margin: 2px 4px;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+        .rbc-show-more:hover {
+          background: #eff6ff;
+          text-decoration: none;
+        }
+
+        /* Modal */
         .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 9999;
-          backdrop-filter: blur(3px);
+          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+          background: rgba(15, 23, 42, 0.6);
+          display: flex; justify-content: center; align-items: center;
+          z-index: 9999; backdrop-filter: blur(4px);
         }
         .modal-content {
-          background: white;
-          padding: 30px;
-          border-radius: 12px;
-          width: 550px;
-          max-width: 95vw;
-          max-height: 90vh;
-          overflow-y: auto;
-          position: relative;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+          background: white; padding: 30px; border-radius: 16px;
+          width: 550px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+          position: relative; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
         .modal-close {
-          position: absolute;
-          top: 15px; right: 20px;
-          background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;
-          transition: color 0.2s;
+          position: absolute; top: 16px; right: 20px;
+          background: #f1f5f9; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #64748b;
+          width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s;
         }
         .modal-close:hover {
-          color: #ef4444;
+          background: #fee2e2; color: #ef4444; transform: scale(1.05);
+        }
+
+        /* Layout Classes */
+        .agendar-page-wrapper {
+          background: var(--bg-body); height: 100vh; padding: 15px 20px; box-sizing: border-box; overflow: hidden; width: 100%; display: flex; flex-direction: column;
+        }
+        .agendar-header-container {
+          margin-bottom: 15px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; flex-shrink: 0; width: 100%; gap: 15px;
+        }
+        .btn-nueva-reunion {
+          display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 14px; height: auto; border-radius: 6px; width: auto; flex-shrink: 0; margin: 0;
+        }
+        .agendar-body-wrapper {
+          flex: 1; width: 100%; overflow: hidden; display: flex; flex-direction: column;
+        }
+        .calendar-card {
+          padding: 15px; height: 100%; display: flex; flex-direction: column; overflow-x: auto;
+        }
+        .calendar-scroll-wrapper {
+          min-width: 600px; height: 100%; display: flex; flex-direction: column; flex: 1;
+        }
+
+        /* Responsive Mobile Styles */
+        @media (max-width: 768px) {
+          .agendar-page-wrapper {
+            padding: 10px;
+            height: auto;
+            min-height: 100vh;
+            overflow: auto;
+          }
+          .agendar-body-wrapper {
+            overflow: visible;
+          }
+          .agendar-header-container {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .btn-nueva-reunion {
+            width: 100%;
+            justify-content: center;
+            padding: 10px;
+          }
+          .calendar-card {
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: none;
+            border: 1px solid #e2e8f0;
+          }
+          .rbc-toolbar {
+            flex-direction: column;
+            gap: 12px;
+          }
+          .rbc-btn-group {
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+          }
+          .rbc-btn-group button {
+            flex: 1;
+            padding: 8px 4px;
+            font-size: 11px;
+            min-width: 60px;
+          }
+          .rbc-toolbar .rbc-toolbar-label {
+            font-size: 16px;
+            order: 0;
+          }
+          .calendar-scroll-wrapper {
+            /* En mobile permitimos scroll horizontal para mantener proporción del calendario */
+            min-width: 500px; 
+          }
+          .modal-content {
+            padding: 20px 15px;
+            width: 100%;
+            max-height: 100vh;
+            border-radius: 12px 12px 0 0;
+            position: absolute;
+            bottom: 0;
+          }
+          .modal-overlay {
+            align-items: flex-end;
+          }
         }
       `}</style>
     </div>

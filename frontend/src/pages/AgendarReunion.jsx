@@ -451,16 +451,18 @@ const AgendarReunion = () => {
 
         /* Hover sobre casillas vacías y día completo */
         .rbc-day-bg:hover, .rbc-time-slot:hover {
-          background-color: #f1f5f9;
-          cursor: pointer;
+          background-color: #e2e8f0 !important;
+          cursor: pointer !important;
         }
 
-        /* En la vista de mes, desactivamos eventos de puntero en elementos internos
-           para que el hover y el click se apliquen directamente al día completo (.rbc-day-bg) */
-        .rbc-month-view .rbc-event,
-        .rbc-month-view .rbc-button-link,
-        .rbc-month-view .rbc-show-more {
+        /* En la vista de mes, desactivamos eventos de puntero en todo lo que no sea el fondo (.rbc-row-bg)
+           para que el hover y el click se apliquen directamente al fondo del día (.rbc-day-bg) */
+        .rbc-month-view .rbc-month-row > *:not(.rbc-row-bg) {
           pointer-events: none !important;
+        }
+        .rbc-month-view .rbc-row-bg,
+        .rbc-month-view .rbc-day-bg {
+          pointer-events: auto !important;
         }
 
         /* Tarjetas de Eventos */

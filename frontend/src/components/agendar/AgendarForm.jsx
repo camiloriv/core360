@@ -7,7 +7,7 @@ import FormSection from "../form/core/FormSection";
 import SelectEmpresa from "../form/fields/SelectEmpresa";
 import AutocompleteInput from "../form/fields/AutocompleteInput";
 
-const AgendarForm = ({ selectedDate, onFormSubmitSuccess }) => {
+const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
   
   const [form, setForm] = useState({
@@ -26,15 +26,26 @@ const AgendarForm = ({ selectedDate, onFormSubmitSuccess }) => {
   // Hook existente para obtener empresas, destinatarios, etc.
   const { empresas, fetchEmpresas, destinatarios, ejecutivas } = useReunionesData(user, form.empresa_id);
 
-  // Cuando se hace click en el calendario (selectedDate), actualizar el form
+  // Cuando se hace click en el calendario (selectedDate / selectedEndDate), actualizar el form
   useEffect(() => {
     if (selectedDate) {
       const d = new Date(selectedDate);
       const fecha = d.toISOString().split("T")[0];
       const hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-      setForm(prev => ({ ...prev, fecha, hora }));
+      
+      let duracion = "30"; // Default
+      if (selectedEndDate) {
+        const startMs = d.getTime();
+        const endMs = new Date(selectedEndDate).getTime();
+        const diffMinutes = Math.round((endMs - startMs) / 60000);
+        if (diffMinutes > 0) {
+          duracion = String(diffMinutes);
+        }
+      }
+      
+      setForm(prev => ({ ...prev, fecha, hora, duracion }));
     }
-  }, [selectedDate]);
+  }, [selectedDate, selectedEndDate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -76,6 +87,9 @@ const AgendarForm = ({ selectedDate, onFormSubmitSuccess }) => {
       setLoading(false);
     }
   };
+
+  const defaultDurations = ["15", "30", "45", "60", "90", "120"];
+  const isCustomDuration = form.duracion && !defaultDurations.includes(form.duracion);
 
   return (
     <div className="form-container">
@@ -150,6 +164,13 @@ const AgendarForm = ({ selectedDate, onFormSubmitSuccess }) => {
                 <option value="60">1 hora</option>
                 <option value="90">1.5 horas</option>
                 <option value="120">2 horas</option>
+                {isCustomDuration && (
+                  <option value={form.duracion}>
+                    {form.duracion >= 60 
+                      ? `${(form.duracion / 60).toFixed(1).replace(".0", "")} horas`
+                      : `${form.duracion} minutos`} (personalizado)
+                  </option>
+                )}
               </select>
             </div>
           </div>

@@ -43,6 +43,7 @@ const CustomWeekHeader = ({ date }) => {
 const AgendarReunion = () => {
   const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEndDate, setSelectedEndDate] = useState(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState("month");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,8 +53,11 @@ const AgendarReunion = () => {
 
   // Limpiar la celda seleccionada al abrir/cerrar la modal o cambiar de vista
   useEffect(() => {
-    setLastSelectedSlot(null);
-    lastClickRef.current = { time: 0, slotTime: null };
+    if (!isModalOpen) {
+      setLastSelectedSlot(null);
+      setSelectedEndDate(null);
+      lastClickRef.current = { time: 0, slotTime: null };
+    }
   }, [isModalOpen, currentView]);
 
   useEffect(() => {
@@ -109,6 +113,7 @@ const AgendarReunion = () => {
     // Si la acción es de arrastre/selección de rango
     if (slotInfo.action === "select") {
       setSelectedDate(slotInfo.start);
+      setSelectedEndDate(slotInfo.end);
       setIsModalOpen(true);
       return;
     }
@@ -116,6 +121,7 @@ const AgendarReunion = () => {
     // Si la acción es doble clic nativo
     if (slotInfo.action === "doubleClick") {
       setSelectedDate(slotInfo.start);
+      setSelectedEndDate(slotInfo.end);
       setIsModalOpen(true);
       return;
     }
@@ -126,6 +132,7 @@ const AgendarReunion = () => {
       // (para evitar el doble disparo de un único evento físico de clic)
       if (prevClick.slotTime === slotTime && (now - prevClick.time) > 300) {
         setSelectedDate(slotInfo.start);
+        setSelectedEndDate(slotInfo.end);
         setIsModalOpen(true);
         lastClickRef.current = { time: 0, slotTime: null };
         setLastSelectedSlot(null);
@@ -275,7 +282,7 @@ const AgendarReunion = () => {
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
-            <AgendarForm selectedDate={selectedDate} onFormSubmitSuccess={handleFormSuccess} />
+            <AgendarForm selectedDate={selectedDate} selectedEndDate={selectedEndDate} onFormSubmitSuccess={handleFormSuccess} />
           </div>
         </div>
       )}

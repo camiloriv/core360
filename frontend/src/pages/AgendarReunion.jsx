@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import format from "date-fns/format";
 import parse from "date-fns/parse";
@@ -47,6 +47,14 @@ const AgendarReunion = () => {
   const [currentView, setCurrentView] = useState("month");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastSelectedSlot, setLastSelectedSlot] = useState(null);
+  const lastClickRef = useRef({ time: 0, slotTime: null });
+
+  // Limpiar la celda seleccionada al abrir/cerrar la modal o cambiar de vista
+  useEffect(() => {
+    setLastSelectedSlot(null);
+    lastClickRef.current = { time: 0, slotTime: null };
+  }, [isModalOpen, currentView]);
 
   useEffect(() => {
     document.title = "CORE 360 - Agendar en Teams";
@@ -91,9 +99,41 @@ const AgendarReunion = () => {
     if (currentView === "month") {
       setCurrentDate(slotInfo.start);
       setCurrentView("day");
-    } else {
+      return;
+    }
+
+    const now = Date.now();
+    const slotTime = slotInfo.start.getTime();
+    const prevClick = lastClickRef.current;
+
+    // Si la acción es de arrastre/selección de rango
+    if (slotInfo.action === "select") {
       setSelectedDate(slotInfo.start);
       setIsModalOpen(true);
+      return;
+    }
+
+    // Si la acción es doble clic nativo
+    if (slotInfo.action === "doubleClick") {
+      setSelectedDate(slotInfo.start);
+      setIsModalOpen(true);
+      return;
+    }
+
+    // Para clics simples:
+    if (slotInfo.action === "click") {
+      // Si la celda es la misma que ya estaba seleccionada y han pasado más de 300ms
+      // (para evitar el doble disparo de un único evento físico de clic)
+      if (prevClick.slotTime === slotTime && (now - prevClick.time) > 300) {
+        setSelectedDate(slotInfo.start);
+        setIsModalOpen(true);
+        lastClickRef.current = { time: 0, slotTime: null };
+        setLastSelectedSlot(null);
+      } else {
+        // Primer clic -> Guardamos la selección
+        lastClickRef.current = { time: now, slotTime: slotTime };
+        setLastSelectedSlot(slotTime);
+      }
     }
   };
 
@@ -153,13 +193,13 @@ const AgendarReunion = () => {
       
       <div className="agendar-header-container">
         <div>
-          <h1 className="page-title" style={{ fontSize: '1.4rem', marginBottom: '4px', marginTop: 0 }}>Agendar Reunión (Teams)</h1>
-          <p className="page-subtitle" style={{ fontSize: '0.9rem', margin: 0, color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h1 className="page-title" style={{ fontSize: '1.2rem', marginBottom: '2px', marginTop: 0 }}>Agendar Reunión (Teams)</h1>
+          <p className="page-subtitle" style={{ fontSize: '0.8rem', margin: 0, color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Sincronizado con tu calendario de Microsoft
             {isLoading ? (
-              <span style={{color: '#eab308', fontWeight: 'bold', fontSize: '0.85rem'}}>⏳ Cargando...</span>
+              <span style={{color: '#eab308', fontWeight: 'bold', fontSize: '0.75rem'}}>⏳ Cargando...</span>
             ) : (
-              <span style={{color: '#10b981', fontWeight: 'bold', fontSize: '0.85rem'}}>✓ Listo</span>
+              <span style={{color: '#10b981', fontWeight: 'bold', fontSize: '0.75rem'}}>✓ Listo</span>
             )}
           </p>
         </div>
@@ -167,7 +207,7 @@ const AgendarReunion = () => {
           className="btn btn-primary btn-nueva-reunion" 
           onClick={() => { setSelectedDate(new Date()); setIsModalOpen(true); }}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
           Nueva Reunión
         </button>
       </div>
@@ -184,6 +224,14 @@ const AgendarReunion = () => {
             endAccessor="end"
             style={{ flex: 1 }}
             selectable
+            slotPropGetter={(date) => {
+              if (lastSelectedSlot && date.getTime() === lastSelectedSlot) {
+                return {
+                  className: "selected-calendar-slot"
+                };
+              }
+              return {};
+            }}
             components={{
               week: {
                 header: CustomWeekHeader
@@ -236,7 +284,7 @@ const AgendarReunion = () => {
         /* Tipografía general y contenedor */
         .rbc-calendar {
           font-family: 'Inter', system-ui, -apple-system, sans-serif;
-          font-size: 13px;
+          font-size: 12px;
           border: none !important;
           width: 100% !important;
           min-width: 0 !important;
@@ -303,11 +351,11 @@ const AgendarReunion = () => {
         /* Cabecera de días (lun, mar, mié...) */
         .rbc-header {
           background: #f8fafc;
-          padding: 6px 0;
+          padding: 4px 0;
           border-bottom: 1px solid #e2e8f0;
           border-left: 1px solid #e2e8f0;
           overflow: visible !important;
-          min-height: 52px !important;
+          min-height: 44px !important;
           height: auto !important;
           display: flex !important;
           flex-direction: column !important;
@@ -322,11 +370,11 @@ const AgendarReunion = () => {
           flex-direction: column !important;
           align-items: center !important;
           justify-content: center !important;
-          padding: 4px 0;
+          padding: 2px 0;
           width: 100% !important;
         }
         .custom-week-header-name {
-          font-size: 11px;
+          font-size: 10px;
           text-transform: uppercase;
           font-weight: 600;
           color: #64748b;
@@ -335,14 +383,14 @@ const AgendarReunion = () => {
           margin-bottom: 2px;
         }
         .custom-week-header-number {
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 700;
           color: #1e293b;
           display: inline-flex !important;
           align-items: center !important;
           justify-content: center !important;
-          width: 28px;
-          height: 28px;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
         }
         .rbc-today .custom-week-header-number {
@@ -379,12 +427,12 @@ const AgendarReunion = () => {
           flex-wrap: wrap;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 10px;
           padding: 0 10px;
         }
         .rbc-toolbar .rbc-toolbar-label {
           font-weight: 800;
-          font-size: 20px;
+          font-size: 16px;
           color: #1e293b;
           text-transform: capitalize;
         }
@@ -394,8 +442,8 @@ const AgendarReunion = () => {
         }
         .rbc-btn-group button {
           border-radius: 8px !important;
-          padding: 8px 16px;
-          font-size: 13px;
+          padding: 5px 10px;
+          font-size: 12px;
           font-weight: 600;
           border: 1px solid #cbd5e1;
           background: #ffffff;
@@ -417,17 +465,25 @@ const AgendarReunion = () => {
 
         /* Casillas de Días */
         .rbc-date-cell {
-          padding: 6px 8px;
+          padding: 4px 6px;
           text-align: right;
+        }
+        .rbc-month-view .rbc-date-cell {
+          text-align: left !important;
+          padding: 4px 6px !important;
         }
         .rbc-button-link {
           color: #475569 !important;
           font-weight: 600;
-          font-size: 13px;
-          padding: 2px 6px;
+          font-size: 12px;
+          padding: 1px 4px;
           display: inline-block;
           border-radius: 6px;
           transition: all 0.2s ease;
+        }
+        .rbc-month-view .rbc-button-link {
+          font-size: 11px !important;
+          padding: 1px 3px !important;
         }
         .rbc-button-link:hover {
           background-color: #e2e8f0 !important;
@@ -455,6 +511,12 @@ const AgendarReunion = () => {
           cursor: pointer !important;
         }
 
+        /* Estilos para la celda horaria seleccionada */
+        .selected-calendar-slot {
+          background-color: #dbeafe !important;
+          border-left: 3px solid #3b82f6 !important;
+        }
+
         /* En la vista de mes, desactivamos eventos de puntero en todo lo que no sea el fondo (.rbc-row-bg)
            para que el hover y el click se apliquen directamente al fondo del día (.rbc-day-bg) */
         .rbc-month-view .rbc-month-row > *:not(.rbc-row-bg) {
@@ -472,10 +534,10 @@ const AgendarReunion = () => {
           border: none !important;
           border-left: 3px solid #3b82f6 !important;
           border-radius: 4px !important;
-          padding: 2px 4px !important;
-          margin-bottom: 2px;
+          padding: 1px 3px !important;
+          margin-bottom: 1px;
           margin-top: 1px;
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 500;
           line-height: 1.2;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -538,19 +600,19 @@ const AgendarReunion = () => {
 
         /* Layout Classes */
         .agendar-page-wrapper {
-          background: var(--bg-body); height: 100vh; padding: 15px 20px; box-sizing: border-box; overflow: hidden; width: 100%; display: flex; flex-direction: column;
+          background: var(--bg-body); height: 100vh; padding: 8px 12px; box-sizing: border-box; overflow: hidden; width: 100%; display: flex; flex-direction: column;
         }
         .agendar-header-container {
-          margin-bottom: 15px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; flex-shrink: 0; width: 100%; gap: 15px;
+          margin-bottom: 8px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; flex-shrink: 0; width: 100%; gap: 15px;
         }
         .btn-nueva-reunion {
-          display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 14px; height: auto; border-radius: 6px; width: auto; flex-shrink: 0; margin: 0;
+          display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; height: auto; border-radius: 6px; width: auto; flex-shrink: 0; margin: 0;
         }
         .agendar-body-wrapper {
           flex: 1; width: 100%; min-width: 0; overflow: hidden; display: flex; flex-direction: column;
         }
         .calendar-card {
-          padding: 15px; height: 100%; width: 100%; min-width: 0; max-width: 100%; display: flex; flex-direction: column;
+          padding: 8px; height: 100%; width: 100%; min-width: 0; max-width: 100%; display: flex; flex-direction: column;
         }
         .calendar-scroll-wrapper {
           width: 100%; min-width: 0; height: 100%; display: flex; flex-direction: column; flex: 1;
@@ -562,7 +624,7 @@ const AgendarReunion = () => {
             overflow-x: hidden !important;
           }
           .agendar-page-wrapper {
-            padding: 10px;
+            padding: 6px;
             height: auto;
             min-height: 100vh;
             overflow-x: hidden !important;
@@ -575,22 +637,25 @@ const AgendarReunion = () => {
           .agendar-header-container {
             flex-direction: column;
             align-items: flex-start;
-            gap: 12px;
+            gap: 6px;
+            margin-bottom: 4px;
           }
           .btn-nueva-reunion {
             width: 100%;
             justify-content: center;
-            padding: 10px;
+            padding: 6px;
+            font-size: 12px;
           }
           .calendar-card {
-            padding: 10px;
+            padding: 6px;
             border-radius: 8px;
             box-shadow: none;
             border: 1px solid #e2e8f0;
           }
           .rbc-toolbar {
             flex-direction: column;
-            gap: 12px;
+            gap: 6px;
+            margin-bottom: 8px;
           }
           .rbc-btn-group {
             flex-wrap: wrap;
@@ -599,12 +664,12 @@ const AgendarReunion = () => {
           }
           .rbc-btn-group button {
             flex: 1;
-            padding: 8px 4px;
-            font-size: 11px;
+            padding: 4px 2px;
+            font-size: 10px;
             min-width: 60px;
           }
           .rbc-toolbar .rbc-toolbar-label {
-            font-size: 16px;
+            font-size: 14px;
             order: 0;
           }
           .calendar-scroll-wrapper {
@@ -623,9 +688,9 @@ const AgendarReunion = () => {
             padding: 0 2px;
           }
           .rbc-header {
-            padding: 3px 0;
+            padding: 2px 0;
             overflow: visible !important;
-            min-height: 40px !important;
+            min-height: 32px !important;
             height: auto !important;
             display: flex !important;
             flex-direction: column !important;
@@ -646,39 +711,48 @@ const AgendarReunion = () => {
             flex-direction: column !important;
             align-items: center !important;
             justify-content: center !important;
-            padding: 2px 0;
+            padding: 1px 0;
             width: 100% !important;
           }
           .custom-week-header-name {
-            font-size: 9px;
+            font-size: 8px;
             display: block !important;
             text-align: center !important;
             margin-bottom: 1px;
           }
           .custom-week-header-number {
-            font-size: 12px;
-            width: 22px;
-            height: 22px;
+            font-size: 9px;
+            width: 16px;
+            height: 16px;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
           }
           .rbc-event {
-            padding: 1px 2px !important;
-            font-size: 9px;
+            padding: 0px 2px !important;
+            font-size: 8.5px;
             border-left-width: 2px !important;
+            margin-bottom: 0px;
           }
           .rbc-date-cell {
-            font-size: 10px;
-            padding: 2px;
+            font-size: 9px;
+            padding: 1px;
+          }
+          .rbc-month-view .rbc-date-cell {
+            text-align: left !important;
+            padding: 2px 4px !important;
           }
           .rbc-button-link {
-            font-size: 10px;
-            padding: 1px;
+            font-size: 9px;
+            padding: 0px 2px;
             white-space: normal;
             line-height: 1.1;
             display: block;
             text-align: center;
+          }
+          .rbc-month-view .rbc-button-link {
+            font-size: 9px !important;
+            padding: 0px 2px !important;
           }
           .modal-content {
             padding: 20px 15px;

@@ -1,9 +1,10 @@
 const db = require("../../database/connection");
+const bcrypt = require('bcrypt');
 
 exports.obtenerJefaturas = async (req, res) => {
   try {
     const { gerencia_id, jefatura_id } = req.query;
-    let query = "SELECT * FROM usuarios WHERE (permisos = 'jefatura' OR permisos = 'gerencia')";
+    let query = "SELECT id, nombre, correo, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas FROM usuarios WHERE (permisos = 'jefatura' OR permisos = 'gerencia')";
     const params = [];
     if (gerencia_id) {
       query += ` AND (id = ? OR id IN (
@@ -33,7 +34,9 @@ exports.crearJefatura = async (req, res) => {
   const { nombre, correo, contrasena } = req.body;
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
-    const [result] = await db.query("INSERT INTO usuarios (nombre, correo, permisos, contrasena) VALUES (?, ?, 'jefatura', ?)", [nombre, correo, contrasena || '123456']);
+    const rawContrasena = contrasena || '123456';
+    const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
+    const [result] = await db.query("INSERT INTO usuarios (nombre, correo, permisos, contrasena) VALUES (?, ?, 'jefatura', ?)", [nombre, correo, hashedContrasena]);
     res.json({ id: result.insertId, nombre, correo });
   } catch (err) {
     console.error(err);
@@ -47,7 +50,8 @@ exports.actualizarJefatura = async (req, res) => {
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
     if (contrasena) {
-      await db.query("UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ? WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, contrasena, id]);
+      const hashedContrasena = await bcrypt.hash(contrasena, 10);
+      await db.query("UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ? WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, hashedContrasena, id]);
     } else {
       await db.query("UPDATE usuarios SET nombre = ?, correo = ? WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, id]);
     }

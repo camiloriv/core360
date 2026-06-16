@@ -1,9 +1,10 @@
 const db = require("../../database/connection");
+const bcrypt = require('bcrypt');
 
 exports.obtenerEjecutivas = async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT u.*, c.nombre as cargo_nombre, j.nombre as jefatura_nombre
+      SELECT u.id, u.nombre, u.correo, u.jefatura_id, u.cargo_id, u.permisos, u.gerencia_id, u.zona_id, u.vistas_permitidas, c.nombre as cargo_nombre, j.nombre as jefatura_nombre
       FROM usuarios u 
       LEFT JOIN ejecutiva_cargos c ON u.cargo_id = c.id 
       LEFT JOIN usuarios j ON u.jefatura_id = j.id
@@ -21,9 +22,11 @@ exports.crearEjecutiva = async (req, res) => {
   const { nombre, correo, jefatura_id, cargo_id, contrasena } = req.body;
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
+    const rawContrasena = contrasena || '123456';
+    const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
     const [result] = await db.query(
       "INSERT INTO usuarios (nombre, correo, jefatura_id, cargo_id, permisos, contrasena) VALUES (?, ?, ?, ?, 'ejecutiva', ?)",
-      [nombre, correo || null, jefatura_id || null, cargo_id || 2, contrasena || '123456']
+      [nombre, correo || null, jefatura_id || null, cargo_id || 2, hashedContrasena]
     );
     res.json({ id: result.insertId, msg: "Creada" });
   } catch (err) {
@@ -38,9 +41,10 @@ exports.actualizarEjecutiva = async (req, res) => {
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
     if (contrasena) {
+      const hashedContrasena = await bcrypt.hash(contrasena, 10);
       await db.query(
         "UPDATE usuarios SET nombre = ?, correo = ?, jefatura_id = ?, cargo_id = ?, contrasena = ? WHERE id = ? AND permisos = 'ejecutiva'",
-        [nombre, correo || null, jefatura_id || null, cargo_id || 2, contrasena, id]
+        [nombre, correo || null, jefatura_id || null, cargo_id || 2, hashedContrasena, id]
       );
     } else {
       await db.query(

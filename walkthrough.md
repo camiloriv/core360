@@ -358,3 +358,29 @@ Hemos rediseñado por completo el comportamiento y la visualización del calenda
 ### Validación
 - El proyecto compila y construye correctamente mediante `npm run build` sin advertencias de CSS o compilación.
 
+---
+
+## 🔒 Migración de Seguridad: Hasheo de Contraseñas (Bcrypt)
+
+Para elevar la seguridad del sistema a los estándares modernos y proteger la confidencialidad de las credenciales, hemos migrado el almacenamiento de contraseñas de texto plano a hashes criptográficos irreversibles utilizando la librería `bcrypt`.
+
+### Cambios Clave Realizados:
+
+1. **Instalación de Bcrypt**:
+   - Se añadió el paquete `bcrypt` al backend para encriptación de grado industrial.
+
+2. **Encriptación en Creación y Actualización**:
+   - **`usuarios.controller.js`**: Cada vez que se crea un nuevo usuario, se edita un perfil, o el usuario cambia su propia contraseña, el backend captura el texto plano y genera un hash con factor de costo `10` (`bcrypt.hash(password, 10)`).
+   - **`ejecutivas.controller.js`** y **`jefaturas.controller.js`**: Se aseguró que cualquier contraseña proporcionada durante la creación o actualización de estas cuentas también sea encriptada antes de ejecutar el `INSERT` o `UPDATE` en la base de datos.
+
+3. **Verificación Segura en Autenticación**:
+   - **`auth.controller.js`**: El proceso de inicio de sesión (`login`) fue modificado para buscar al usuario en la BD únicamente por su correo. Posteriormente, se utiliza `bcrypt.compare()` para verificar matemáticamente si la contraseña digitada corresponde al hash encriptado de la base de datos, evitando guardar la clave de entrada en la memoria.
+
+4. **Remoción de Contraseñas en Consultas de Perfiles**:
+   - Por razones de seguridad, las consultas globales de usuarios (`obtenerUsuarios`, `obtenerEjecutivas`, `obtenerJefaturas`) han sido reescritas para pedir columnas explícitas (`SELECT id, nombre, correo...`), omitiendo el campo `contrasena`. De esta manera, los administradores pueden ver los perfiles en el frontend sin que la API envíe hashes sensibles o datos de contraseñas.
+
+5. **Migración Automática de la Base de Datos**:
+   - **`migrate_passwords.js`**: Se diseñó un script seguro que itera sobre la base de datos. Si detecta que una contraseña es texto plano, automáticamente la hashea; si detecta que ya es un hash (ej. `$2b$...`), la omite.
+   - **Arranque en `index.js`**: Este script ha sido anclado al proceso de arranque de la API en `database/migrate.js`, garantizando que en el momento del despliegue todas las cuentas existentes sean migradas a encriptación segura automáticamente, evitando que usuarios antiguos pierdan el acceso.
+
+

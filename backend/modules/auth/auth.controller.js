@@ -1,15 +1,19 @@
 const db = require("../../database/connection");
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 exports.login = async (req, res) => {
   const { correo, contrasena } = req.body;
   if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
 
   try {
-    const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ? AND contrasena = ?", [correo, contrasena]);
+    const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
     if (rows.length === 0) return res.status(401).json({ error: "Credenciales incorrectas" });
 
     const usuario = rows[0];
+
+    const validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
+    if (!validPassword) return res.status(401).json({ error: "Credenciales incorrectas" });
     
     // Generamos el token JWT
     const payload = {

@@ -1,4 +1,5 @@
 const db = require("./connection");
+const migratePasswords = require("./scripts/migrate_passwords");
 
 async function runMigrations() {
   let connection;
@@ -173,6 +174,9 @@ async function runMigrations() {
     await checkAndAddReunionColumn('encuesta_estado_envio', "VARCHAR(20) DEFAULT 'pendiente'");
     await checkAndAddReunionColumn('encuesta_relacionada', "TINYINT(1) DEFAULT 0");
     await checkAndAddReunionColumn('encuesta_destinatario', "VARCHAR(255) DEFAULT NULL");
+
+    // 12. Migrar contraseñas a bcrypt
+    await migratePasswords();
 
     console.log("Migration: All migrations verified and applied successfully!");
   } catch (error) {

@@ -330,3 +330,31 @@ Reorganizamos la estructura de los campos en el formulario para registrar reunio
 
 ### Validación
 - El proyecto compila de manera impecable y sin errores en Vite tras realizar `npm run build`.
+
+---
+
+## 📅 Vista Móvil del Calendario (Estilo de Tarjetas y Cronológico)
+
+Hemos rediseñado por completo el comportamiento y la visualización del calendario (`/agendar`) para dispositivos móviles (`max-width: 768px`) para proporcionar una experiencia de usuario premium adaptada:
+
+1. **Ocultamiento del Calendario Tradicional**:
+   - En pantallas móviles, se oculta completamente la grilla pesada del calendario estándar (React Big Calendar).
+
+2. **Visualización de Tarjetas Cronológicas**:
+   - **Vista de Día**: Muestra bloques horarios hora por hora desde las **06:00 hasta las 19:00**.
+     - Los horarios con reuniones agendadas muestran una tarjeta detallada con el nombre del evento, rango de tiempo, y botones para unirse a Teams o eliminar/anular.
+     - Los horarios disponibles se muestran como tarjetas discontinuas con la palabra **"Libre"**. Al hacer clic en ellas, se abre el modal de agendamiento preconfigurado para esa fecha y hora.
+   - **Vista de Semana**: Agrupa los eventos día a día en la semana actual.
+   - **Vista de Mes**: Agrupa los eventos del mes de forma cronológica vertical.
+
+3. **Navegación e Interacción**:
+   - Agregamos selectores de vista ("Día", "Semana", "Mes") en formato de barra de botones píldora.
+   - Flechas de navegación para avanzar o retroceder de día/semana/mes de forma intuitiva.
+   - Integración de un selector de fecha nativo oculto tras el indicador de fecha para saltos rápidos.
+
+4. **Diseño de Botones Circulares Perfectos (Sin Óvalos)**:
+   - Para las flechas de navegación (`‹` / `›`) y el botón de cierre del modal (`✕`), se ajustaron las propiedades CSS (`width`, `height`, `min-width`, `max-width`, `flex-shrink: 0`, `padding: 0` y `border-radius: 50%` con prioridad `!important`) para evitar que la flexbox o paddings heredados los estirasen como óvalos.
+
+### Validación
+- El proyecto compila y construye correctamente mediante `npm run build` sin advertencias de CSS o compilación.
+

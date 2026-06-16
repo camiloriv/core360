@@ -145,6 +145,10 @@ const Login = () => {
             usuario_id: user.id,
             contrasena_actual: currentPassword,
             nueva_contrasena: newPassword,
+          }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`
+            }
           })
           .then((response) => {
             return response.data;

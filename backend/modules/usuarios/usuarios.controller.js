@@ -75,7 +75,7 @@ exports.crearUsuario = async (req, res) => {
     const hashedContrasena = await bcrypt.hash(contrasena, 10);
 
     const [result] = await db.query(
-      "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas, requiere_cambio_clave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
       [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas]
     );
 
@@ -119,7 +119,7 @@ exports.actualizarUsuario = async (req, res) => {
     if (contrasena) {
       const hashedContrasena = await bcrypt.hash(contrasena, 10);
       await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ? WHERE id = ?",
+        "UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, requiere_cambio_clave = 1 WHERE id = ?",
         [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, id]
       );
     } else {
@@ -183,7 +183,7 @@ exports.cambiarContrasena = async (req, res) => {
 
     // Actualizar contraseña
     const hashedNuevaContrasena = await bcrypt.hash(nueva_contrasena, 10);
-    await db.query("UPDATE usuarios SET contrasena = ? WHERE id = ?", [hashedNuevaContrasena, usuario_id]);
+    await db.query("UPDATE usuarios SET contrasena = ?, requiere_cambio_clave = 0 WHERE id = ?", [hashedNuevaContrasena, usuario_id]);
     
     res.json({ msg: "Contraseña actualizada exitosamente" });
   } catch (err) {

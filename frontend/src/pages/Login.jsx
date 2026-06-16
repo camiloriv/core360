@@ -22,10 +22,154 @@ const Login = () => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("usuario", JSON.stringify(data.usuario));
       localStorage.setItem("ultimoAcceso", Date.now().toString());
-      navigate("/");
+      if (data.usuario.requiere_cambio_clave) {
+        handleForcePasswordChange(data.usuario);
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err.response?.data?.error || "Error al iniciar sesión");
     }
+  };
+
+  const handleForcePasswordChange = (user) => {
+    Swal.fire({
+      title: "Cambio de Contraseña Obligatorio",
+      html: `
+        <div style="text-align: left; font-family: 'Outfit', 'Inter', sans-serif;">
+          <p style="font-size: 14px; color: #475569; margin-bottom: 15px;">Por tu seguridad, debes cambiar la contraseña temporal asignada antes de acceder al panel.</p>
+          <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; font-size: 13px; color: #475569;">Contraseña Actual (Temporal)</label>
+            <input type="password" id="swal-current-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Ingresa tu contraseña actual" required />
+          </div>
+
+          <div style="margin-bottom: 8px;">
+            <label style="font-weight: 600; font-size: 13px; color: #475569;">Nueva Contraseña</label>
+            <input type="password" id="swal-new-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Mínimo 8 caracteres" required />
+          </div>
+          
+          <div style="margin-bottom: 12px;">
+            <div style="height: 6px; width: 100%; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 6px;">
+              <div id="swal-strength-bar" style="height: 100%; width: 0%; transition: all 0.3s ease; background: #cbd5e1;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+              <span id="swal-strength-text" style="font-size: 11px; font-weight: 600; color: #94a3b8;">Fuerza: Sin contraseña</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 8px;">
+            <label style="font-weight: 600; font-size: 13px; color: #475569;">Confirmar Nueva Contraseña</label>
+            <input type="password" id="swal-confirm-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Repite la nueva contraseña" required />
+          </div>
+        </div>
+      `,
+      showCancelButton: false,
+      allowEscapeKey: false,
+      allowOutsideClick: false,
+      confirmButtonText: "Actualizar y Entrar",
+      confirmButtonColor: "var(--secondary-color, #e05e2b)",
+      focusConfirm: false,
+      didOpen: () => {
+        const newPasswordInput = document.getElementById("swal-new-password");
+        const strengthBar = document.getElementById("swal-strength-bar");
+        const strengthText = document.getElementById("swal-strength-text");
+
+        newPasswordInput.addEventListener("input", (e) => {
+          const password = e.target.value;
+          if (!password) {
+            strengthBar.style.width = "0%";
+            strengthBar.style.background = "#e2e8f0";
+            strengthText.textContent = "Fuerza: Sin contraseña";
+            strengthText.style.color = "#94a3b8";
+            return;
+          }
+
+          let score = 0;
+          if (password.length >= 8) score++;
+          if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+          if (/[0-9]/.test(password)) score++;
+          if (/[^A-Za-z0-9]/.test(password)) score++;
+
+          let strength = "Débil";
+          let color = "#ef4444";
+          let width = "33%";
+
+          if (password.length < 8) {
+            strength = "Débil (muy corta)";
+            color = "#ef4444";
+            width = "20%";
+          } else if (score >= 4) {
+            strength = "Fuerte 💪";
+            color = "#22c55e";
+            width = "100%";
+          } else if (score >= 2) {
+            strength = "Medio ⚠️";
+            color = "#eab308";
+            width = "66%";
+          } else {
+            strength = "Débil";
+            color = "#ef4444";
+            width = "33%";
+          }
+
+          strengthBar.style.width = width;
+          strengthBar.style.background = color;
+          strengthText.textContent = `Fuerza: ${strength}`;
+          strengthText.style.color = color;
+        });
+      },
+      preConfirm: () => {
+        const currentPassword = document.getElementById("swal-current-password").value;
+        const newPassword = document.getElementById("swal-new-password").value;
+        const confirmPassword = document.getElementById("swal-confirm-password").value;
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          Swal.showValidationMessage("Todos los campos son obligatorios");
+          return false;
+        }
+        if (newPassword.length < 8) {
+          Swal.showValidationMessage("La nueva contraseña debe tener al menos 8 caracteres");
+          return false;
+        }
+        if (newPassword === currentPassword) {
+          Swal.showValidationMessage("La nueva contraseña debe ser distinta a la actual");
+          return false;
+        }
+        if (newPassword !== confirmPassword) {
+          Swal.showValidationMessage("Las nuevas contraseñas no coinciden");
+          return false;
+        }
+
+        return axios
+          .post(`${API_URL}/usuarios/cambiar-contrasena`, {
+            usuario_id: user.id,
+            contrasena_actual: currentPassword,
+            nueva_contrasena: newPassword,
+          })
+          .then((response) => {
+            return response.data;
+          })
+          .catch((err) => {
+            Swal.showValidationMessage(err.response?.data?.error || "Error al cambiar la contraseña");
+            return false;
+          });
+      },
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({
+          title: "¡Contraseña Actualizada!",
+          text: "Bienvenido a CORE 360.",
+          icon: "success",
+          confirmButtonColor: "var(--secondary-color, #e05e2b)",
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          user.requiere_cambio_clave = false;
+          localStorage.setItem("usuario", JSON.stringify(user));
+          navigate("/");
+        });
+      }
+    });
   };
 
   const handleHelpClick = () => {

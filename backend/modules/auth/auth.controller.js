@@ -37,7 +37,8 @@ exports.login = async (req, res) => {
         permisos: usuario.permisos,
         cargos: usuario.cargos,
         jefatura_id: usuario.jefatura_id,
-        vistas_permitidas: usuario.vistas_permitidas
+        vistas_permitidas: usuario.vistas_permitidas,
+        requiere_cambio_clave: usuario.requiere_cambio_clave === 1
       }
     });
   } catch (err) {

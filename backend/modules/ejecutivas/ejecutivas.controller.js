@@ -25,7 +25,7 @@ exports.crearEjecutiva = async (req, res) => {
     const rawContrasena = contrasena || '123456';
     const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
     const [result] = await db.query(
-      "INSERT INTO usuarios (nombre, correo, jefatura_id, cargo_id, permisos, contrasena) VALUES (?, ?, ?, ?, 'ejecutiva', ?)",
+      "INSERT INTO usuarios (nombre, correo, jefatura_id, cargo_id, permisos, contrasena, requiere_cambio_clave) VALUES (?, ?, ?, ?, 'ejecutiva', ?, 1)",
       [nombre, correo || null, jefatura_id || null, cargo_id || 2, hashedContrasena]
     );
     res.json({ id: result.insertId, msg: "Creada" });
@@ -43,7 +43,7 @@ exports.actualizarEjecutiva = async (req, res) => {
     if (contrasena) {
       const hashedContrasena = await bcrypt.hash(contrasena, 10);
       await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, jefatura_id = ?, cargo_id = ?, contrasena = ? WHERE id = ? AND permisos = 'ejecutiva'",
+        "UPDATE usuarios SET nombre = ?, correo = ?, jefatura_id = ?, cargo_id = ?, contrasena = ?, requiere_cambio_clave = 1 WHERE id = ? AND permisos = 'ejecutiva'",
         [nombre, correo || null, jefatura_id || null, cargo_id || 2, hashedContrasena, id]
       );
     } else {

@@ -36,7 +36,7 @@ exports.crearJefatura = async (req, res) => {
   try {
     const rawContrasena = contrasena || '123456';
     const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
-    const [result] = await db.query("INSERT INTO usuarios (nombre, correo, permisos, contrasena) VALUES (?, ?, 'jefatura', ?)", [nombre, correo, hashedContrasena]);
+    const [result] = await db.query("INSERT INTO usuarios (nombre, correo, permisos, contrasena, requiere_cambio_clave) VALUES (?, ?, 'jefatura', ?, 1)", [nombre, correo, hashedContrasena]);
     res.json({ id: result.insertId, nombre, correo });
   } catch (err) {
     console.error(err);
@@ -51,7 +51,7 @@ exports.actualizarJefatura = async (req, res) => {
   try {
     if (contrasena) {
       const hashedContrasena = await bcrypt.hash(contrasena, 10);
-      await db.query("UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ? WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, hashedContrasena, id]);
+      await db.query("UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, requiere_cambio_clave = 1 WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, hashedContrasena, id]);
     } else {
       await db.query("UPDATE usuarios SET nombre = ?, correo = ? WHERE id = ? AND permisos = 'jefatura'", [nombre, correo, id]);
     }

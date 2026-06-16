@@ -43,6 +43,12 @@ async function runMigrations() {
       await connection.query('ALTER TABLE usuarios ADD COLUMN vistas_permitidas TEXT NULL');
     }
 
+    const [userReqCambioCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'requiere_cambio_clave'");
+    if (userReqCambioCol.length === 0) {
+      console.log("Migration: Adding 'requiere_cambio_clave' column to 'usuarios'...");
+      await connection.query('ALTER TABLE usuarios ADD COLUMN requiere_cambio_clave TINYINT(1) DEFAULT 0');
+    }
+
     // 4. Columns in empresas table (zona_id)
     const [empZonaCol] = await connection.query("SHOW COLUMNS FROM empresas LIKE 'zona_id'");
     if (empZonaCol.length === 0) {

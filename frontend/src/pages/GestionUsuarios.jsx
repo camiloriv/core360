@@ -906,17 +906,9 @@ const GestionUsuarios = () => {
                     name="contrasena" 
                     value={form.contrasena} 
                     onChange={handleChange} 
-                    style={{
-                      ...styles.input,
-                      backgroundColor: isEditing ? '#f8fafc' : 'white',
-                      cursor: isEditing ? 'not-allowed' : 'text',
-                      color: isEditing ? '#64748b' : '#334155',
-                      borderColor: isEditing ? '#e2e8f0' : '#cbd5e1'
-                    }} 
+                    style={styles.input} 
                     required={!isEditing} 
-                    readOnly={isEditing}
-                    title={isEditing ? "La contraseña no se puede modificar desde aquí por seguridad" : ""}
-                    placeholder="Contraseña" 
+                    placeholder={isEditing ? "Dejar en blanco para mantener" : "Escribir contraseña"} 
                   />
                 </div>
                 

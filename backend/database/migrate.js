@@ -237,6 +237,30 @@ async function runMigrations() {
       )
     `);
 
+    // 11b. Columnas faltantes en reuniones_huerfanas (ical_uid fue agregada después de la creación inicial)
+    try {
+      const [hIcalCol] = await connection.query("SHOW COLUMNS FROM reuniones_huerfanas LIKE 'ical_uid'");
+      if (hIcalCol.length === 0) {
+        console.log("Migration: Adding 'ical_uid' column to 'reuniones_huerfanas'...");
+        await connection.query("ALTER TABLE reuniones_huerfanas ADD COLUMN ical_uid VARCHAR(500) DEFAULT NULL");
+      }
+    } catch (e) {
+      console.log("Migration: Note: ical_uid check in reuniones_huerfanas failed:", e.message);
+    }
+
+    // 11c. Columnas faltantes en reuniones (event_id, asunto_teams, ical_uid)
+    await checkAndAddReunionColumn('event_id', "VARCHAR(255) DEFAULT NULL");
+    await checkAndAddReunionColumn('asunto_teams', "VARCHAR(500) DEFAULT NULL");
+    try {
+      const [rIcalCol] = await connection.query("SHOW COLUMNS FROM reuniones LIKE 'ical_uid'");
+      if (rIcalCol.length === 0) {
+        console.log("Migration: Adding 'ical_uid' column to 'reuniones'...");
+        await connection.query("ALTER TABLE reuniones ADD COLUMN ical_uid VARCHAR(500) DEFAULT NULL");
+      }
+    } catch (e) {
+      console.log("Migration: Note: ical_uid check in reuniones failed:", e.message);
+    }
+
     // 12. Migrar contraseñas a bcrypt
     await migratePasswords();
 

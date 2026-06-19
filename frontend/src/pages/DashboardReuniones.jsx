@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDashboardData } from "../hooks/useDashboardData";
+import { useNavigate } from "react-router-dom";
+import { syncEventosPasados, desvincularBorrador, vincularHuerfana } from "../services/agendamientoService";
+import { marcarNoAplica } from "../services/reunionesService";
 import {
   BarChart,
   Bar,
@@ -37,10 +40,10 @@ function getPeriodoActual() {
 function buildPeriodoOptions() {
   const now = new Date();
   const y = now.getFullYear();
-  const opts = [{ value: `anio-${y}`, label: `AÑO ${y}` }];
+  const opts = [{ value: `anio-${y}`, label: `Año ${y}` }];
   for (let i = 0; i < 12; i++) {
     const m = String(i + 1).padStart(2, "0");
-    opts.push({ value: `${y}-${m}`, label: `${MESES[i].toUpperCase()}` });
+    opts.push({ value: `${y}-${m}`, label: MESES[i] });
   }
   return opts;
 }
@@ -55,8 +58,100 @@ const TYPE_COLORS = {
 const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // Default gris claro
 
 export default function DashboardReuniones() {
-  const { user, reuniones, jefaturas, empresas, loading } = useDashboardData();
+  const { user, reuniones, jefaturas, empresas, loading, refetch } = useDashboardData();
   const userRol = user?.permisos;
+  const navigate = useNavigate();
+
+  const [loadingSync, setLoadingSync] = useState(true);
+
+  useEffect(() => {
+    const runSync = async () => {
+      try {
+        await syncEventosPasados();
+        refetch();
+      } catch (e) {
+        console.error("Error sincronizando calendario", e);
+      } finally {
+        setLoadingSync(false);
+      }
+    };
+    runSync();
+  }, []);
+
+  const handleDesvincular = async (idReunion) => {
+    const result = await Swal.fire({
+      title: "¿Desvincular reunión?",
+      text: "Se eliminará el borrador de la minuta y la reunión volverá a la bandeja de 'Reuniones Pasadas sin Clasificar' para que puedas volver a enlazarla.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#be123c",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Sí, desvincular",
+      cancelButtonText: "Cancelar"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await desvincularBorrador(idReunion);
+        Swal.fire("Desvinculada", "La reunión ha sido desvinculada correctamente.", "success");
+        window.location.reload();
+      } catch (e) {
+        Swal.fire("Error", "No se pudo desvincular la reunión", "error");
+      }
+    }
+  };
+
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedOrphanId, setSelectedOrphanId] = useState(null);
+  const [selectedOrphan, setSelectedOrphan] = useState(null);
+  const [selectedEmpresaId, setSelectedEmpresaId] = useState("");
+  const [searchEmpresa, setSearchEmpresa] = useState("");
+  const [showEmpresaDropdown, setShowEmpresaDropdown] = useState(false);
+
+  const externalAttendees = useMemo(() => {
+    if (!selectedOrphan || !selectedOrphan.participantes) return [];
+    try {
+      const parsed = JSON.parse(selectedOrphan.participantes);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(p => p && p.email && !p.email.toLowerCase().endsWith("@proforma.cl"));
+      }
+    } catch (e) {
+      return selectedOrphan.participantes
+        .split(",")
+        .map(name => ({ name: name.trim(), email: "" }))
+        .filter(p => p.name && !p.name.toLowerCase().includes("@proforma.cl"));
+    }
+    return [];
+  }, [selectedOrphan]);
+
+  const handleMarcarNoAplica = async (id, isHuerfana, isCurrentlyNoAplica) => {
+    try {
+      await marcarNoAplica(id, isHuerfana, !isCurrentlyNoAplica);
+      refetch();
+    } catch (e) {
+      console.error(e);
+      Swal.fire("Error", "No se pudo actualizar el estado", "error");
+    }
+  };
+
+  const handleAsignarEmpresa = async () => {
+    if (!selectedEmpresaId) {
+      Swal.fire("Atención", "Debes seleccionar una empresa", "warning");
+      return;
+    }
+    try {
+      await vincularHuerfana(selectedOrphanId, selectedEmpresaId);
+      Swal.fire("Éxito", "Empresa asignada correctamente. Borrador generado.", "success");
+      setIsAssignModalOpen(false);
+      setSelectedOrphanId(null);
+      setSelectedOrphan(null);
+      setSelectedEmpresaId("");
+      refetch();
+    } catch (e) {
+      console.error(e);
+      Swal.fire("Error", "No se pudo vincular la reunión", "error");
+    }
+  };
 
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
   const [filtroJefatura, setFiltroJefatura] = useState("");
@@ -148,9 +243,10 @@ export default function DashboardReuniones() {
 
   const filteredReuniones = useMemo(() => {
     const result = reuniones.filter((r) => {
-      const pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === r.empresa_id);
-      const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa;
-      const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo;
+      const isHuerfana = Boolean(r.is_huerfana);
+      const pasaMacroYJef = isHuerfana || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
+      const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
 
       let pasaPeriodo = true;
       if (r.fecha_reu) {
@@ -168,7 +264,7 @@ export default function DashboardReuniones() {
         }
       }
 
-      return pasaMacroYJef && pasaEmpresa && pasaTipo && pasaPeriodo && r.estado_envio !== "pendiente";
+      return pasaMacroYJef && pasaEmpresa && pasaTipo && pasaPeriodo;
     });
 
     return result.sort(
@@ -183,7 +279,12 @@ export default function DashboardReuniones() {
     filtroPeriodo,
     userRol,
     user,
+    empresasPorJefatura
   ]);
+
+  const huerfanasCount = useMemo(() => {
+    return reuniones.filter(r => r.is_huerfana).length;
+  }, [reuniones]);
 
   // Reiniciar página a 1 cuando cambien los filtros
   useEffect(() => {
@@ -191,8 +292,12 @@ export default function DashboardReuniones() {
   }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo]);
 
   // 🔹 CÁLCULO DE DATOS DE REUNIONES ÚNICAS
+  const realizedReuniones = useMemo(() => {
+    return filteredReuniones.filter(r => r.estado_envio !== 'agendada');
+  }, [filteredReuniones]);
+
   const reunionesEsteMes = useMemo(() => {
-    return filteredReuniones.filter((r) => {
+    return realizedReuniones.filter((r) => {
       const d = new Date(r.fecha_reu);
       const now = new Date();
       return (
@@ -200,32 +305,32 @@ export default function DashboardReuniones() {
         d.getFullYear() === now.getFullYear()
       );
     });
-  }, [filteredReuniones]);
+  }, [realizedReuniones]);
 
   const empresasUnicasEsteMes = useMemo(() => new Set(reunionesEsteMes.map((r) => r.empresa_id)).size, [reunionesEsteMes]);
-  const empresasUnicasTotal = useMemo(() => new Set(filteredReuniones.map((r) => r.empresa_id)).size, [filteredReuniones]);
+  const empresasUnicasTotal = useMemo(() => new Set(realizedReuniones.map((r) => r.empresa_id)).size, [realizedReuniones]);
 
   // 🔹 CÁLCULO DE DATOS PARA GRÁFICOS DINÁMICOS
 
   // 1. Gráfico de Barras: Cantidad por Tipo
   const barData = useMemo(() => {
     return Object.entries(
-      filteredReuniones.reduce((acc, r) => {
+      realizedReuniones.reduce((acc, r) => {
         acc[r.tipo_reu] = (acc[r.tipo_reu] || 0) + 1;
         return acc;
       }, {}),
     ).map(([name, total]) => ({ name, total }));
-  }, [filteredReuniones]);
+  }, [realizedReuniones]);
 
   // 2. Gráfico de Líneas: Evolución por Fecha y Tipo
   const timelineMap = useMemo(() => {
-    return filteredReuniones.reduce((acc, r) => {
+    return realizedReuniones.reduce((acc, r) => {
       const date = new Date(r.fecha_reu).toISOString().split("T")[0];
       if (!acc[date]) acc[date] = {};
       acc[date][r.tipo_reu] = (acc[date][r.tipo_reu] || 0) + 1;
       return acc;
     }, {});
-  }, [filteredReuniones]);
+  }, [realizedReuniones]);
 
   const lineData = useMemo(() => {
     return Object.entries(timelineMap)
@@ -238,7 +343,7 @@ export default function DashboardReuniones() {
 
   // 3. Top 5 Empresas con más Reuniones
   const topEmpresasData = useMemo(() => {
-    const counts = filteredReuniones.reduce((acc, r) => {
+    const counts = realizedReuniones.reduce((acc, r) => {
       const nombre = r.empresa_nombre || "Desconocida";
       acc[nombre] = (acc[nombre] || 0) + 1;
       return acc;
@@ -248,7 +353,7 @@ export default function DashboardReuniones() {
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [filteredReuniones]);
+  }, [realizedReuniones]);
 
   const handleExport = () => {
     const dataToExport = filteredReuniones.map((r) => ({
@@ -312,6 +417,32 @@ export default function DashboardReuniones() {
           </h1>
           <p className="page-subtitle">ANÁLISIS DE REUNIONES REALIZADAS</p>
         </div>
+
+        {huerfanasCount > 0 && (
+          <div style={{
+            background: "#fef2f2",
+            borderLeft: "4px solid #ef4444",
+            padding: "16px",
+            marginBottom: "30px",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}>⚠️</span>
+              <div>
+                <h3 style={{ margin: 0, color: "#991b1b", fontSize: "16px", fontWeight: "bold" }}>
+                  Reuniones sin clasificar detectadas
+                </h3>
+                <p style={{ margin: "4px 0 0 0", color: "#b91c1c", fontSize: "14px" }}>
+                  Tienes <strong>{huerfanasCount}</strong> {huerfanasCount === 1 ? "reunión" : "reuniones"} pendiente{huerfanasCount === 1 ? "" : "s"} de asignar a una empresa. Búscalas en la tabla inferior y presiona "Sin empresa asignada" para vincularlas.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CONTENEDOR DE FILTROS HOMOLOGADO CON COBERTURA */}
         <div style={{ 
@@ -386,23 +517,31 @@ export default function DashboardReuniones() {
 
             {/* Seleccionar Período */}
             <div style={{ minWidth: "200px", flex: "1 1 200px" }}>
-              <div style={{ marginBottom: "8px", fontWeight: "600", fontSize: "14px", color: "#475569" }}>
+              <label style={{ 
+                display: "block", 
+                fontSize: "11px", 
+                fontWeight: "bold", 
+                color: "var(--text-muted)", 
+                textTransform: "uppercase",
+                marginBottom: "6px"
+              }}>
                 Seleccionar Período
-              </div>
+              </label>
               <select
                 value={filtroPeriodo}
                 onChange={(e) => setFiltroPeriodo(e.target.value)}
                 style={{
                   width: "100%",
-                  height: "45px",
+                  height: "41.5px",
                   borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  padding: "0 15px",
-                  fontSize: "14px",
-                  backgroundColor: "#f8fafc",
+                  border: "1.5px solid #e2e8f0",
+                  padding: "10px 12px",
+                  fontSize: "13px",
+                  backgroundColor: "var(--bg-container)",
                   color: "#334155",
                   outline: "none",
                   cursor: "pointer",
+                  boxSizing: "border-box"
                 }}
               >
                 {periodoOptions.map((opt) => (
@@ -430,7 +569,7 @@ export default function DashboardReuniones() {
         <div className="responsive-grid-6" style={{ marginBottom: "30px" }}>
           <KpiCard
             title="Total Histórico"
-            value={filteredReuniones.length}
+            value={realizedReuniones.length}
             sub="Reuniones filtradas"
             color="#4338ca" // Deep Indigo
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>}
@@ -445,7 +584,7 @@ export default function DashboardReuniones() {
           <KpiCard
             title="Reuniones Presenciales"
             value={
-              filteredReuniones.filter((r) => r.lugar === "Presencial").length
+              realizedReuniones.filter((r) => r.lugar === "Presencial").length
             }
             sub="Modalidad física"
             color="#0891b2" // Teal/Cyan
@@ -454,7 +593,7 @@ export default function DashboardReuniones() {
           <KpiCard
             title="Reuniones Online"
             value={
-              filteredReuniones.filter((r) => r.lugar !== "Presencial").length
+              realizedReuniones.filter((r) => r.lugar !== "Presencial").length
             }
             sub="Modalidad remota"
             color="#9333ea" // Purple
@@ -745,7 +884,7 @@ export default function DashboardReuniones() {
                   <th style={styles.thCell}>FECHA / ID</th>
                   <th style={styles.thCell}>EMPRESA / EJECUTIVA</th>
                   <th style={styles.thCell}>TIPO / MOTIVO</th>
-                  <th style={styles.thCell}>ENVÍO</th>
+                  <th style={styles.thCell}>MINUTA</th>
                   <th style={styles.thCell}>FECHA DE ENVÍO</th>
                   <th style={styles.thCell}>ADJUNTOS</th>
                 </tr>
@@ -762,54 +901,177 @@ export default function DashboardReuniones() {
                         <div style={styles.companyName}>
                           {new Date(r.fecha_reu).toLocaleDateString()}
                         </div>
-                        <div style={{ ...styles.meetingIdText, whiteSpace: "nowrap" }}>{r.id_reunion}</div>
+                        <div style={{ ...styles.meetingIdText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={r.id_reunion}>
+                          {r.id_reunion.length > 25 ? "En Teams" : r.id_reunion}
+                        </div>
                       </td>
                       <td style={styles.tdCell}>
-                        <div style={styles.companyName}>{r.empresa_nombre}</div>
+                        {r.is_huerfana ? (
+                          <div 
+                            style={{ ...styles.companyName, color: "#2563eb", cursor: "pointer", textDecoration: "underline" }}
+                            onClick={() => {
+                              setSelectedOrphan(r);
+                              setSelectedOrphanId(r.id_reunion);
+                              setSearchEmpresa("");
+                              setSelectedEmpresaId("");
+                              setShowEmpresaDropdown(false);
+                              setIsAssignModalOpen(true);
+                            }}
+                          >
+                            {r.empresa_nombre}
+                          </div>
+                        ) : (
+                          <div style={styles.companyName}>{r.empresa_nombre}</div>
+                        )}
                         <div style={styles.ejecutivaName}>
                           {r.ejecutiva_nombre}
                         </div>
                       </td>
                       <td style={styles.tdCell}>
-                        <div style={{ fontWeight: "bold", color: "#334155" }}>
-                          {r.tipo_reu}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "var(--text-muted)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            maxWidth: "250px",
-                          }}
-                          title={r.motivo_reu}
+                        <div 
+                          style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "250px" }}
+                          title={r.asunto_teams || r.motivo_reu || 'Sin asunto'}
                         >
-                          {r.motivo_reu}
+                          {r.asunto_teams || r.motivo_reu || 'Sin asunto'}
                         </div>
+                        {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (r.asunto_teams && r.asunto_teams !== r.motivo_reu) && (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "var(--text-muted)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: "250px",
+                            }}
+                            title={`${r.tipo_reu || ''} - ${r.motivo_reu || ''}`}
+                          >
+                            {r.tipo_reu ? `${r.tipo_reu} - ${r.motivo_reu}` : r.motivo_reu}
+                          </div>
+                        )}
+                        {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (!r.asunto_teams || r.asunto_teams === r.motivo_reu) && r.tipo_reu && (
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "var(--text-muted)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: "250px",
+                            }}
+                            title={r.tipo_reu}
+                          >
+                            {r.tipo_reu}
+                          </div>
+                        )}
                       </td>
                       <td style={styles.tdCell}>
                         <div style={{ position: "relative" }} onMouseLeave={() => setOpenDropdownId(null)}>
-                          <div
-                            onClick={() => setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion)}
-                            style={{
-                              color: "#166534",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                              textDecoration: "none",
-                              fontSize: "12px",
-                              background: "#dcfce7",
-                              padding: "4px 8px",
-                              borderRadius: "4px",
-                              display: "inline-block",
-                              whiteSpace: "nowrap",
-                              transition: "background 0.2s"
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
-                          >
-                            Enviado
-                          </div>
+                          {r.estado_envio === "huerfana" ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                              <div style={{
+                                color: "#991b1b", fontWeight: "bold", fontSize: "12px",
+                                background: "#fee2e2", padding: "4px 8px", borderRadius: "4px",
+                                display: "inline-block", whiteSpace: "nowrap"
+                              }}>
+                                ⏳ Esperando Empresa
+                              </div>
+                              <span
+                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, true, false); }}
+                                style={{
+                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                }}
+                              >🚫 No aplica</span>
+                            </div>
+                          ) : r.estado_envio === "no_aplica" ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                              <div style={{
+                                color: "#475569", fontWeight: "bold", fontSize: "12px",
+                                background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
+                                display: "inline-block", whiteSpace: "nowrap"
+                              }}>
+                                🚫 No aplica
+                              </div>
+                              <span
+                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true); }}
+                                style={{
+                                  fontSize: "10px", color: "#2563eb", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
+                                }}
+                              >↩️ Revertir</span>
+                            </div>
+                          ) : r.estado_envio === "borrador" ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                              <div
+                                onClick={() => navigate("/registrar-reunion", { state: { draft: r } })}
+                                style={{
+                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                  background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
+                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
+                              >
+                                ✍️ Pendiente de Minuta
+                              </div>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                {r.event_id && (
+                                  <span
+                                    onClick={(e) => { e.stopPropagation(); handleDesvincular(r.id_reunion); }}
+                                    style={{
+                                      fontSize: "10px", color: "#be123c", cursor: "pointer", textDecoration: "underline",
+                                      fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#ffe4e6"
+                                    }}
+                                  >🔗 Desvincular</span>
+                                )}
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
+                                  style={{
+                                    fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
+                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                  }}
+                                >🚫 No aplica</span>
+                              </div>
+                            </div>
+                          ) : r.estado_envio === "agendada" ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                              <div
+                                onClick={() => navigate("/registrar-reunion", { state: { draft: r } })}
+                                style={{
+                                  color: "#1e40af", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                  background: "#dbeafe", padding: "4px 8px", borderRadius: "4px",
+                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#bfdbfe")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "#dbeafe")}
+                              >
+                                🗓️ Agendada
+                              </div>
+                              <span
+                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
+                                style={{
+                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                }}
+                              >🚫 No aplica</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                              <div
+                                onClick={() => setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion)}
+                                style={{
+                                  color: "#166534", fontWeight: "bold", cursor: "pointer", textDecoration: "none",
+                                  fontSize: "12px", background: "#dcfce7", padding: "4px 8px", borderRadius: "4px",
+                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
+                              >
+                                Enviado
+                              </div>
+                            </div>
+                          )}
 
                           {openDropdownId === r.id_reunion && (
                             <div style={{
@@ -1061,6 +1323,139 @@ export default function DashboardReuniones() {
           )}
         </div>
       </div>
+
+      {/* MODAL PARA ASIGNAR EMPRESA A REUNION HUERFANA */}
+      {isAssignModalOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.5)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "white", padding: "24px", borderRadius: "8px",
+            width: "420px", maxWidth: "95%", boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: "16px", color: "var(--primary-color)" }}>Asignar Empresa</h3>
+            
+            {selectedOrphan && (
+              <div style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                padding: "12px",
+                marginBottom: "16px",
+                fontSize: "13px",
+                color: "#334155"
+              }}>
+                <div style={{ marginBottom: "6px" }}>
+                  <strong>Reunión:</strong> {selectedOrphan.asunto_teams || selectedOrphan.motivo_reu || 'Sin asunto'}
+                </div>
+                <div style={{ marginBottom: "8px" }}>
+                  <strong>Fecha:</strong> {new Date(selectedOrphan.fecha_reu).toLocaleDateString()} {selectedOrphan.hora}
+                </div>
+                {externalAttendees.length > 0 ? (
+                  <div>
+                    <strong>Participantes Externos:</strong>
+                    <ul style={{ margin: "4px 0 0 0", paddingLeft: "16px", maxHeight: "100px", overflowY: "auto", listStyleType: "disc" }}>
+                      {externalAttendees.map((p, idx) => (
+                        <li key={idx} style={{ fontSize: "12px", marginBottom: "2px" }}>
+                          {p.name} {p.email ? `(${p.email})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div>
+                    <strong>Participantes Externos:</strong> Ninguno detectado
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
+              Selecciona la empresa correspondiente. Una vez asignada, el dominio se guardará para auto-vincular futuras reuniones.
+            </p>
+            <div style={{ marginBottom: "20px", position: "relative" }}>
+              <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "bold", color: "#334155" }}>
+                Empresa
+              </label>
+              <input
+                type="text"
+                placeholder="Escribe para buscar empresa..."
+                value={searchEmpresa}
+                onChange={(e) => {
+                  setSearchEmpresa(e.target.value);
+                  setSelectedEmpresaId(""); // Resetea id si escribe algo distinto
+                  setShowEmpresaDropdown(true);
+                }}
+                onFocus={() => setShowEmpresaDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmpresaDropdown(false), 200)}
+                className="core360-input"
+                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid var(--border-input)" }}
+              />
+              {showEmpresaDropdown && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  background: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  marginTop: "4px",
+                  zIndex: 10,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                }}>
+                  {empresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).length > 0 ? (
+                    empresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).map(emp => (
+                      <div
+                        key={emp.id}
+                        onClick={() => {
+                          setSelectedEmpresaId(emp.id);
+                          setSearchEmpresa(emp.nombre);
+                          setShowEmpresaDropdown(false);
+                        }}
+                        style={{
+                          padding: "10px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid #f1f5f9",
+                          backgroundColor: selectedEmpresaId === emp.id ? "#f1f5f9" : "transparent"
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = "#f8fafc"}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = selectedEmpresaId === emp.id ? "#f1f5f9" : "transparent"}
+                      >
+                        {emp.nombre}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ padding: "10px", color: "#64748b", fontSize: "13px" }}>
+                      No se encontraron empresas.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button
+                className="core360-btn secondary"
+                onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="core360-btn primary"
+                onClick={handleAsignarEmpresa}
+                disabled={!selectedEmpresaId}
+              >
+                Asignar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -117,30 +117,162 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
     return correosCcFiltered.join(', ');
 };
 
-// ­ƒö╣ LISTAR REUNIONES
+// 📋 LISTAR REUNIONES
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
 
-    const sql = `
-        SELECT 
-            r.*, 
-            e.nombre AS ejecutiva_nombre, 
-            emp.nombre AS empresa_nombre,
-            j.nombre AS jefatura_nombre
+    const columnasReuniones = `
+        r.id, r.id_reunion, r.ejecutiva_id, r.enviado_a, r.enviado_por,
+        r.participantes, r.tipo_reu, r.fecha_reu, r.hora, r.lugar,
+        r.documentos_adjuntos, r.motivo_reu, r.minuta, r.form_f, r.created_at,
+        r.empresa_id, r.direccion, r.programado_para, r.estado_envio, r.archivos_nombres,
+        r.programar_encuesta, r.encuesta_tipo, r.encuesta_programada_para, r.encuesta_estado_envio,
+        r.encuesta_relacionada, r.encuesta_destinatario, r.event_id, r.asunto_teams,
+        e.nombre AS ejecutiva_nombre, 
+        emp.nombre AS empresa_nombre,
+        j.nombre AS jefatura_nombre,
+        FALSE AS is_huerfana
+    `;
+
+    const sqlReuniones = `
+        SELECT ${columnasReuniones}
         FROM reuniones r
         LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
         LEFT JOIN empresas emp ON r.empresa_id = emp.id
         LEFT JOIN usuarios j ON emp.jefatura_id = j.id
         ${whereClause}
-        ORDER BY r.fecha_reu DESC, r.hora DESC
+    `;
+
+    const sqlAgendadas = `
+        SELECT 
+            0 AS id,
+            log.reunion_id AS id_reunion,
+            log.usuario_id AS ejecutiva_id,
+            NULL AS enviado_a,
+            NULL AS enviado_por,
+            '' AS participantes,
+            '' AS tipo_reu,
+            log.fecha AS fecha_reu,
+            '12:00' AS hora,
+            'Teams' AS lugar,
+            NULL AS documentos_adjuntos,
+            COALESCE(log.asunto, 'Reunión agendada en Teams') AS motivo_reu,
+            NULL AS minuta,
+            NULL AS form_f,
+            log.created_at,
+            log.empresa_id,
+            NULL AS direccion,
+            NULL AS programado_para,
+            log.estado AS estado_envio,
+            NULL AS archivos_nombres,
+            0 AS programar_encuesta,
+            NULL AS encuesta_tipo,
+            NULL AS encuesta_programada_para,
+            NULL AS encuesta_estado_envio,
+            0 AS encuesta_relacionada,
+            NULL AS encuesta_destinatario,
+            NULL AS event_id,
+            COALESCE(log.asunto, 'Reunión agendada en Teams') AS asunto_teams,
+            u.nombre AS ejecutiva_nombre,
+            emp.nombre AS empresa_nombre,
+            j.nombre AS jefatura_nombre,
+            FALSE AS is_huerfana
+        FROM empresa_seguimiento_log log
+        JOIN empresas emp ON log.empresa_id = emp.id
+        JOIN usuarios u ON log.usuario_id = u.id
+        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+        WHERE log.estado IN ('agendada', 'no_aplica')
+          AND log.reunion_id IS NOT NULL
+          AND log.reunion_id NOT IN (
+              SELECT event_id FROM reuniones WHERE event_id IS NOT NULL
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM empresa_seguimiento_log log2
+              WHERE log2.reunion_id = log.reunion_id AND log2.estado = 'cancelada'
+          )
+          ${whereClause.replace('WHERE 1=1', 'AND 1=1').replace(/r\./g, 'log.').replace(/empresa_id/g, 'log.empresa_id').replace(/ejecutiva_id/g, 'usuario_id')}
+    `;
+
+    const sqlHuerfanas = `
+        SELECT 
+            h.id AS id,
+            CONCAT('huerfana-', h.id) AS id_reunion,
+            h.usuario_id AS ejecutiva_id,
+            NULL AS enviado_a,
+            NULL AS enviado_por,
+            h.asistentes AS participantes,
+            'No clasificada' AS tipo_reu,
+            h.fecha AS fecha_reu,
+            h.hora AS hora,
+            'Teams' AS lugar,
+            NULL AS documentos_adjuntos,
+            h.asunto AS motivo_reu,
+            NULL AS minuta,
+            NULL AS form_f,
+            h.created_at,
+            NULL AS empresa_id,
+            NULL AS direccion,
+            NULL AS programado_para,
+            IF(h.estado = 'no_aplica', 'no_aplica', 'huerfana') AS estado_envio,
+            NULL AS archivos_nombres,
+            0 AS programar_encuesta,
+            NULL AS encuesta_tipo,
+            NULL AS encuesta_programada_para,
+            NULL AS encuesta_estado_envio,
+            0 AS encuesta_relacionada,
+            NULL AS encuesta_destinatario,
+            h.event_id AS event_id,
+            h.asunto AS asunto_teams,
+            u.nombre AS ejecutiva_nombre,
+            'Sin empresa asignada' AS empresa_nombre,
+            NULL AS jefatura_nombre,
+            TRUE AS is_huerfana
+        FROM reuniones_huerfanas h
+        JOIN usuarios u ON h.usuario_id = u.id
+        WHERE h.estado IN ('pendiente', 'no_aplica')
+          ${whereClause.replace('WHERE 1=1', 'AND 1=1').replace(/r\./g, 'h.').replace(/empresa_id/g, 'NULL').replace(/emp\.jefatura_id/g, 'NULL').replace(/j\.id/g, 'NULL').replace(/ejecutiva_id/g, 'usuario_id')}
+    `;
+
+    const sqlCombined = `
+        (${sqlReuniones})
+        UNION ALL
+        (${sqlAgendadas})
+        UNION ALL
+        (${sqlHuerfanas})
+        ORDER BY fecha_reu DESC, hora DESC
     `;
 
     try {
-        const [result] = await db.query(sql, params);
+        const combinedParams = [...params, ...params, ...params];
+        const [result] = await db.query(sqlCombined, combinedParams);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
+        return res.status(500).json({ error: "Error en la BD" });
+    }
+};
+
+// 🔹 MARCAR REUNIÓN COMO NO APLICA (O REVERTIR)
+exports.marcarNoAplica = async (req, res) => {
+    const { id } = req.params;
+    const { noAplica, isHuerfana } = req.body;
+
+    try {
+        if (isHuerfana) {
+            // If it's huerfana, we just update the huerfana state to no_aplica or pendiente
+            const newEstado = noAplica ? 'no_aplica' : 'pendiente';
+            const cleanId = id.toString().replace('huerfana-', '');
+            await db.query("UPDATE reuniones_huerfanas SET estado = ? WHERE id = ?", [newEstado, cleanId]);
+            return res.json({ success: true, message: "Estado de reunión huérfana actualizado" });
+        } else {
+            // For standard meetings
+            const newEstado = noAplica ? 'no_aplica' : 'borrador'; // borrador = Pendiente de Minuta
+            await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [newEstado, id]);
+            return res.json({ success: true, message: "Estado de reunión actualizado" });
+        }
+    } catch (err) {
+        console.error("Error al marcar como no aplica:", err);
         return res.status(500).json({ error: "Error en la BD" });
     }
 };
@@ -272,33 +404,73 @@ exports.crearReunion = async (req, res) => {
     }
 
     try {
-        const id_reunion = await generarIdReunion();
         const isSurveyProgrammed = programar_encuesta === "true" || programar_encuesta === true;
+        let id_reunion = req.body.id_reunion;
+        let event_id = null;
+        let exists = false;
 
-        const sql = `
-            INSERT INTO reuniones (
+        if (id_reunion) {
+            const [rows] = await db.query("SELECT id_reunion FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+            if (rows.length > 0) {
+                exists = true;
+            } else {
+                event_id = id_reunion;
+                id_reunion = null; // Fuerza un insert nuevo
+            }
+        }
+
+        if (exists && id_reunion) {
+            // Es un update de un borrador existente en la tabla reuniones
+            const sql = `
+                UPDATE reuniones SET 
+                    ejecutiva_id=?, enviado_a=?, enviado_por=?, participantes=?,
+                    tipo_reu=?, fecha_reu=?, hora=?, lugar=?, documentos_adjuntos=?,
+                    motivo_reu=?, minuta=?, form_f=?, empresa_id=?, programado_para=?,
+                    estado_envio='enviado', archivos_nombres=?, programar_encuesta=?,
+                    encuesta_tipo=?, encuesta_programada_para=?, encuesta_estado_envio=?, encuesta_relacionada=?,
+                    encuesta_destinatario=?
+                WHERE id_reunion=?
+            `;
+            const values = [
+                ejecutiva_id, enviado_a, enviado_por, participantes,
+                tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
+                motivo_reu, minuta, form_f, empresa_id, null,
+                archivosNombres, isSurveyProgrammed ? 1 : 0,
+                isSurveyProgrammed ? encuesta_tipo : null,
+                isSurveyProgrammed ? encuesta_programada_para : null,
+                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+                isSurveyProgrammed ? encuesta_destinatario : null,
+                id_reunion
+            ];
+            await db.query(sql, values);
+        } else {
+            // Es un insert nuevo (incluye el caso de registrar minuta para una reunión agendada)
+            id_reunion = await generarIdReunion();
+            const sql = `
+                INSERT INTO reuniones (
+                    id_reunion, ejecutiva_id, enviado_a, enviado_por, participantes,
+                    tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
+                    motivo_reu, minuta, form_f, empresa_id, programado_para,
+                    estado_envio, archivos_nombres, programar_encuesta,
+                    encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada,
+                    encuesta_destinatario, event_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const values = [
                 id_reunion, ejecutiva_id, enviado_a, enviado_por, participantes,
                 tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
-                motivo_reu, minuta, form_f, empresa_id, programado_para,
-                estado_envio, archivos_nombres, programar_encuesta,
-                encuesta_tipo, encuesta_programada_para, encuesta_estado_envio, encuesta_relacionada,
-                encuesta_destinatario
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        const values = [
-            id_reunion, ejecutiva_id, enviado_a, enviado_por, participantes,
-            tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
-            motivo_reu, minuta, form_f, empresa_id, null,
-            'enviado', archivosNombres, isSurveyProgrammed ? 1 : 0,
-            isSurveyProgrammed ? encuesta_tipo : null,
-            isSurveyProgrammed ? encuesta_programada_para : null,
-            isSurveyProgrammed ? 'pendiente' : 'enviado',
-            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
-            isSurveyProgrammed ? encuesta_destinatario : null
-        ];
-
-        await db.query(sql, values);
+                motivo_reu, minuta, form_f, empresa_id, null,
+                archivosNombres, isSurveyProgrammed ? 1 : 0,
+                isSurveyProgrammed ? encuesta_tipo : null,
+                isSurveyProgrammed ? encuesta_programada_para : null,
+                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+                isSurveyProgrammed ? encuesta_destinatario : null,
+                event_id
+            ];
+            await db.query(sql, values);
+        }
 
         // Auto-mark empresa as 'gestionada' with the meeting date (NOT server date)
         await db.query(
@@ -306,9 +478,50 @@ exports.crearReunion = async (req, res) => {
           [fecha_reu, empresa_id]
         );
         await db.query(
-          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id) VALUES (?, 'gestionada', ?, ?, ?)",
-          [empresa_id, fecha_reu, ejecutiva_id, id_reunion]
+          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
+          [empresa_id, fecha_reu, ejecutiva_id, id_reunion, motivo_reu || 'Minuta de reunión registrada']
         );
+
+        // Auto-learning de dominios
+        if (enviado_a) {
+            try {
+                let correos = [];
+                if (typeof enviado_a === 'string') {
+                    if (enviado_a.startsWith('[')) {
+                        correos = JSON.parse(enviado_a);
+                    } else {
+                        correos = enviado_a.split(',').map(e => e.trim());
+                    }
+                } else if (Array.isArray(enviado_a)) {
+                    correos = enviado_a;
+                }
+
+                const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+                
+                for (const correo of correos) {
+                    if (correo && correo.includes('@')) {
+                        const dominio = '@' + correo.split('@')[1].toLowerCase();
+                        const domSinArroba = dominio.substring(1);
+                        
+                        if (!dominiosGenericos.includes(domSinArroba)) {
+                            // Aprender dominio
+                            await db.query(
+                                "INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)",
+                                [empresa_id, dominio]
+                            );
+                            
+                            // Aprender contacto exacto
+                            await db.query(
+                                "INSERT IGNORE INTO empresa_contactos (empresa_id, correo) VALUES (?, ?)",
+                                [empresa_id, correo.toLowerCase()]
+                            );
+                        }
+                    }
+                }
+            } catch (errDom) {
+                console.error("Error aprendiendo dominios:", errDom);
+            }
+        }
 
         // Enviar inmediatamente
         const sqlDetalle = `
@@ -393,17 +606,15 @@ exports.obtenerDestinatarios = async (req, res) => {
     }
 
     const sql = `
-        SELECT DISTINCT enviado_a 
-        FROM reuniones 
+        SELECT correo 
+        FROM empresa_contactos 
         WHERE empresa_id = ? 
-        AND enviado_a IS NOT NULL 
-        AND enviado_a != ''
-        ORDER BY enviado_a ASC
+        ORDER BY correo ASC
     `;
 
     try {
         const [result] = await db.query(sql, [empresa_id]);
-        res.json(result.map(r => r.enviado_a));
+        res.json(result.map(r => r.correo));
     } catch (err) {
         console.error("Error en obtenerDestinatarios:", err);
         res.status(500).json({ error: "Error en la BD" });
@@ -496,5 +707,41 @@ exports.obtenerDefaultCc = async (req, res) => {
     } catch (err) {
         console.error("Error en obtenerDefaultCc:", err);
         res.status(500).json({ error: "Error obteniendo CC por defecto" });
+    }
+};
+
+exports.marcarNoAplica = async (req, res) => {
+    const { id } = req.params;
+    const { isHuerfana, noAplica } = req.body;
+
+    try {
+        if (isHuerfana) {
+            const realId = id.replace("huerfana-", "");
+            const nuevoEstado = noAplica ? 'no_aplica' : 'pendiente';
+            await db.query("UPDATE reuniones_huerfanas SET estado = ? WHERE id = ?", [nuevoEstado, realId]);
+            return res.json({ success: true, message: "Estado de huérfana actualizado" });
+        } else {
+            const nuevoEstadoEnvio = noAplica ? 'no_aplica' : 'borrador';
+            const [resultReuniones] = await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [nuevoEstadoEnvio, id]);
+            
+            if (resultReuniones.affectedRows > 0) {
+                return res.json({ success: true, message: "Estado de minuta actualizado" });
+            }
+
+            const nuevoEstadoLog = noAplica ? 'no_aplica' : 'agendada';
+            const [resultLog] = await db.query(
+                "UPDATE empresa_seguimiento_log SET estado = ? WHERE reunion_id = ? AND estado IN ('agendada', 'no_aplica')",
+                [nuevoEstadoLog, id]
+            );
+
+            if (resultLog.affectedRows > 0) {
+                return res.json({ success: true, message: "Estado de agendamiento actualizado" });
+            }
+
+            return res.status(404).json({ error: "Reunión no encontrada" });
+        }
+    } catch (err) {
+        console.error("Error en marcarNoAplica:", err);
+        res.status(500).json({ error: "Error interno" });
     }
 };

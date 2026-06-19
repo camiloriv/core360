@@ -383,4 +383,100 @@ Para elevar la seguridad del sistema a los estándares modernos y proteger la co
    - **`migrate_passwords.js`**: Se diseñó un script seguro que itera sobre la base de datos. Si detecta que una contraseña es texto plano, automáticamente la hashea; si detecta que ya es un hash (ej. `$2b$...`), la omite.
    - **Arranque en `index.js`**: Este script ha sido anclado al proceso de arranque de la API en `database/migrate.js`, garantizando que en el momento del despliegue todas las cuentas existentes sean migradas a encriptación segura automáticamente, evitando que usuarios antiguos pierdan el acceso.
 
+---
+
+## 💅 Rediseño y Mejora de Proporciones en la Bandeja de Reuniones sin Clasificar
+
+Hemos rediseñado la bandeja de **Reuniones Pasadas sin Clasificar** (huérfanas) en [DashboardReuniones.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/DashboardReuniones.jsx) para lograr una presentación visual sumamente limpia y premium, utilizando de manera óptima el espacio a la derecha:
+
+1. **Alineación de Alturas Consistente**:
+   - Ajustamos la altura de los botones **Vincular** y **No requiere minuta** a un estándar de `42px` para coincidir de forma idéntica con la altura del buscador de empresas (`SearchableFilter`), evitando saltos y desalineaciones verticales de píxeles.
+
+2. **Distribución Responsiva y Proporciones Mejoradas**:
+   - Reemplazamos la alineación estática compacta por una distribución flexible basada en `flexWrap: "wrap"` con `flex: "2 1 600px"` en el contenedor de controles.
+   - Ahora, el buscador de empresas (`SearchableFilter`) se expande de manera inteligente para rellenar de forma fluida el espacio disponible a la derecha, mientras que los botones de acción se alinean perfectamente a su lado en una disposición sumamente premium y balanceada.
+
+3. **Formateo y Limpieza de Asistentes**:
+   - Añadimos lógica de sanitización e interpretación segura para la lista de asistentes (`h.asistentes`).
+   - Anteriormente se mostraba una cadena cruda en formato de arreglo JSON (`["user1@email.com", "user2@email.com"]`). Ahora, la lista se decodifica y muestra como una elipsis o enumeración limpia separada por comas (`user1@email.com, user2@email.com`), lo cual mejora de manera radical la legibilidad.
+
+4. **Micro-interacciones y Efectos Hover**:
+   - Agregamos transiciones CSS y efectos visuales interactivos (`onMouseOver` y `onMouseOut`) en ambos botones para realzar la experiencia de usuario (cambios sutiles de brillo, colores de fondo y bordes al pasar el cursor).
+
+### Validación
+- Verificamos con éxito el empaquetado del bundle de producción mediante `npm run build` sin errores en el compilador Vite.
+
+---
+
+## 📝 Comportamiento del Formulario al Cargar un Borrador (Minuta)
+
+Modificamos el comportamiento por defecto de la precarga del formulario de Minutas al ingresar desde un Borrador (vinculado manualmente o detectado del calendario de Teams):
+
+1. **Campo "Tipo Reunión" Vacío**:
+   - Forzamos a que el campo **Tipo Reunión** (`tipo_reu`) se cargue completamente vacío (`""`), tanto en las inserciones de base de datos del backend ([agendamiento.controller.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.controller.js)) como al renderizar el borrador en el formulario del frontend ([ReunionesForm.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/reuniones/ReunionesForm.jsx)). Esto obliga al usuario a ingresar manualmente este dato.
+
+2. **Campo "Enviar a" Filtrado (Solo Externos)**:
+   - Para el campo **Enviar a** (`enviado_a`), implementamos un filtro automático de correos en [ReunionesForm.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/components/reuniones/ReunionesForm.jsx) que descarta cualquier correo de dominio interno (`@proforma.cl`). 
+   - De esta manera, el campo solo contiene las direcciones de los participantes de la empresa externa. Las direcciones de los colaboradores internos se gestionan de forma dinámica en la sección **Copia (CC)**, calculada automáticamente según el usuario logueado que envía la minuta.
+
+---
+
+## 👥 Extracción y Almacenamiento de Nombres de Contactos (Borradores y Minutas)
+
+Implementamos el flujo completo para extraer y utilizar los nombres completos de los asistentes desde los eventos de Teams/Outlook, poblando automáticamente la información de los borradores y alimentando la base de datos de contactos:
+
+1. **Backend - Sincronización de Eventos**:
+   - Modificamos `syncEventosPasados` en [agendamiento.controller.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.controller.js) para mapear tanto `emailAddress.name` como `emailAddress.address` en una estructura de objetos JSON en la columna `asistentes` de la base de datos.
+   - Al crear una reunión autoclasificada, pobla el campo `participantes` de la tabla `reuniones` con los nombres de pila concatenados de todos los participantes y filtra la columna `enviado_a` para contener solo los correos externos.
+
+2. **Backend - Vinculación Manual y Auto-aprendizaje**:
+   - En `vincularHuerfana` ([agendamiento.controller.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.controller.js)), parseamos de forma segura la lista estructurada de asistentes.
+   - Insertamos los nombres de pila concatenados directamente en el campo `participantes` de la tabla `reuniones` para rellenar de forma automatizada este input en el formulario de minutas.
+   - Modificamos el ciclo de inserción de contactos en `empresa_contactos` para guardar/actualizar la columna `nombre` con el nombre de pila extraído del evento.
+
+3. **Frontend - Visualización en el Dashboard**:
+   - Actualizamos el renderizado de la bandeja en [DashboardReuniones.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/DashboardReuniones.jsx) para soportar el renderizado mixto (soporta tanto los borradores con arreglos de correos tradicionales como los nuevos con estructuras de objetos).
+   - Los asistentes de las reuniones sin clasificar ahora se visualizan con un formato altamente legible y corporativo: `"Nombre (correo@dominio.com)"` si el nombre está disponible.
+
+### Validación
+- El bundle de producción de Vite compila perfectamente sin warnings ni errores de tipos.
+
+---
+
+## 🔍 Motor de Resolución y Embellecimiento de Nombres de Contactos (Corrección)
+
+Para solucionar el caso donde las reuniones agendadas con anterioridad (o sin nombres en la invitación de Teams) cargan el campo de participantes con el nombre del usuario de correo (e.g. `gpereira`, `vmejias`), implementamos un motor de resolución inteligente:
+
+1. **Helper `resolveDisplayName`**:
+   - Agregamos la función `resolveDisplayName` en [agendamiento.controller.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.controller.js).
+   - Intenta resolver el nombre real de cada correo electrónico consultando de forma secuencial:
+     1. La tabla `usuarios` del sistema (para identificar y recuperar nombres de pila de colaboradores internos como `bsilva@proforma.cl` -> `"Beatriz Silva"`).
+     2. La tabla `empresa_contactos` (para recuperar nombres de contactos externos ya registrados).
+     3. El nombre provisto por Microsoft Graph API si no es una dirección de correo.
+     4. Un formateador de fallback para el nombre de usuario de correo que elimina caracteres especiales (puntos, guiones, etc.) y capitaliza cada palabra (e.g. `a.penaloza` -> `"A Penaloza"`, `vmejias` -> `"Vmejias"`).
+
+2. **Resolución Asíncrona**:
+   - Actualizamos tanto la sincronización de calendario como la vinculación manual para realizar búsquedas asíncronas concurrentes con `Promise.all` y resolver todos los nombres reales antes de escribir en la columna `participantes` de la tabla `reuniones`.
+
+---
+
+## 🔗 Opción de Desvinculación de Minuta / Reunión (Borradores)
+
+Implementamos el flujo para desvincular borradores mal asignados y devolverlos a la bandeja de reuniones sin clasificar (huérfanas):
+
+1. **Backend - Endpoint `/api/agendamiento/huerfanas/desvincular`**:
+   - Creado en [agendamiento.controller.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.controller.js) y expuesto en [agendamiento.routes.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/backend/modules/agendamiento/agendamiento.routes.js).
+   - Recibe el `id_reunion`. Valida que el borrador exista y no haya sido enviado como minuta finalizada.
+   - Elimina físicamente el borrador de la tabla `reuniones` y actualiza el estado del evento original en `reuniones_huerfanas` de `'vinculada'` de vuelta a `'pendiente'`.
+
+2. **Frontend - Conexión de API**:
+   - Agregamos la función `desvincularBorrador` en [agendamientoService.js](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/services/agendamientoService.js) para realizar la llamada HTTP POST correspondiente.
+
+3. **Frontend - Interfaz de Usuario**:
+   - En [DashboardReuniones.jsx](file:///c:/Users/Proforma5/OneDrive%20-%20CENTRO%20INTERMEDIO%20PARA%20CAPACITACI%C3%93N%20PROFORMA%20%281%29/Escritorio/core360/frontend/src/pages/DashboardReuniones.jsx), dentro de la tabla de reuniones (columna Envío), añadimos el botón **`🔗 Desvincular`** debajo de la etiqueta amarilla `"✍️ Pendiente de Minuta"`.
+   - Este botón solo se muestra para aquellos borradores que contienen un `event_id` válido (sincronizados de Teams/Outlook).
+   - Al hacer clic, se dispara un cuadro de diálogo SweetAlert2 de confirmación. Si el usuario confirma, elimina el borrador y recarga la vista, haciendo que la reunión vuelva a figurar en el panel de reuniones sin clasificar para permitir asociarla a la empresa correcta.
+
+
+
 

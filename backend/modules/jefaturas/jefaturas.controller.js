@@ -34,7 +34,7 @@ exports.crearJefatura = async (req, res) => {
   const { nombre, correo, contrasena } = req.body;
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
-    const rawContrasena = contrasena || '123456';
+    const rawContrasena = contrasena || process.env.DEFAULT_PASSWORD || '123456';
     const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
     const [result] = await db.query("INSERT INTO usuarios (nombre, correo, permisos, contrasena, requiere_cambio_clave) VALUES (?, ?, 'jefatura', ?, 1)", [nombre, correo, hashedContrasena]);
     res.json({ id: result.insertId, nombre, correo });

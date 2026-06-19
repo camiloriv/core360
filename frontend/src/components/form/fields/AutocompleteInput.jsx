@@ -9,8 +9,9 @@ function AutocompleteInput({ value, suggestions = [], onChange, placeholder, req
     setSearchTerm(value || "");
   }, [value]);
 
+  const currentTypingWord = searchTerm.split(',').pop().trim();
   const filteredSuggestions = suggestions.filter((s) =>
-    s.toLowerCase().includes(searchTerm.toLowerCase())
+    s.toLowerCase().includes(currentTypingWord.toLowerCase()) && currentTypingWord !== ""
   );
 
   useEffect(() => {
@@ -24,8 +25,18 @@ function AutocompleteInput({ value, suggestions = [], onChange, placeholder, req
   }, []);
 
   const handleSelect = (val) => {
-    onChange({ target: { value: val } });
-    setSearchTerm(val);
+    const currentList = searchTerm.split(',').map(s => s.trim());
+    currentList.pop(); // remove the partial word being typed
+    if (currentList.length > 0) {
+      currentList.push(val);
+      const newValue = currentList.join(', ') + ', ';
+      onChange({ target: { value: newValue } });
+      setSearchTerm(newValue);
+    } else {
+      const newValue = val + ', ';
+      onChange({ target: { value: newValue } });
+      setSearchTerm(newValue);
+    }
     setIsOpen(false);
   };
 

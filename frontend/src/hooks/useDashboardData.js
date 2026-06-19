@@ -1,16 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 
 // Cache global en memoria para evitar llamadas redundantes
 let globalCache = null;
 let fetchPromise = null;
 
+export const clearDashboardCache = () => {
+  globalCache = null;
+  fetchPromise = null;
+};
+
 export const useDashboardData = (forceRefresh = false) => {
   const [data, setData] = useState(globalCache || { jefaturas: [], empresas: [], reuniones: [] });
   const [loading, setLoading] = useState(!globalCache || forceRefresh);
   const [error, setError] = useState(null);
 
-  const user = JSON.parse(localStorage.getItem("usuario") || "null");
+  const userString = localStorage.getItem("usuario") || "null";
+  const user = useMemo(() => JSON.parse(userString), [userString]);
 
   const fetchData = useCallback(async (ignoreCache = false) => {
     if (!user) {
@@ -93,7 +99,7 @@ export const useDashboardData = (forceRefresh = false) => {
           const empDemo =
             emp.nombre?.toLowerCase().includes("demo") ||
             emp.nombre?.toLowerCase().includes("prueba") ||
-            emp.jefatura_id === 28; // Hardcodeado en el código original para excluir id 28
+            emp.jefatura_id === Number(import.meta.env.VITE_EXCLUDED_JEFATURA_ID || 28); // Hardcodeado en el código original para excluir id 28
           return isUserDemo ? empDemo : !empDemo;
         });
 

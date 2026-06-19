@@ -1,5 +1,3 @@
-import "./ReunionesForm.css";
-
 function PreviewCorreo({ data }) {
 
   // Lógica para no mostrar fecha por defecto si no hay dato

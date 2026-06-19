@@ -21,6 +21,7 @@ const GestionEmpresas = lazy(() => import("./pages/GestionEmpresas"));
 const SeguimientoEmpresas = lazy(() => import("./pages/SeguimientoEmpresas"));
 const GestionUsuarios = lazy(() => import("./pages/GestionUsuarios"));
 const AgendarReunion = lazy(() => import("./pages/AgendarReunion"));
+const VincularReuniones = lazy(() => import("./pages/VincularReuniones"));
 
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', width: '100%' }}>
@@ -54,7 +55,8 @@ const ProtectedRoute = ({ children, allowedRoles, path }) => {
     : null;
 
   if (vistas && path && user.permisos !== "admin" && user.permisos !== "ADMIN") {
-    if (!vistas.includes(path)) {
+    const isVincularPermitted = path === "/vincular-reuniones" && vistas.includes("/dashboard-reuniones");
+    if (!vistas.includes(path) && !isVincularPermitted) {
       const fallback = vistas.includes("/registrar-reunion") 
         ? "/registrar-reunion" 
         : (vistas.length > 0 ? vistas[0] : "/login");
@@ -99,6 +101,7 @@ const MainLayout = () => {
             <Route path="/crear-encuesta" element={<ProtectedRoute path="/crear-encuesta"><CrearEncuesta /></ProtectedRoute>} />
             <Route path="/agendar" element={<ProtectedRoute path="/agendar"><AgendarReunion /></ProtectedRoute>} />
             <Route path="/dashboard-reuniones" element={<ProtectedRoute path="/dashboard-reuniones"><DashboardReuniones /></ProtectedRoute>} />
+            <Route path="/vincular-reuniones" element={<ProtectedRoute path="/vincular-reuniones"><VincularReuniones /></ProtectedRoute>} />
             <Route path="/dashboard-encuestas" element={<ProtectedRoute path="/dashboard-encuestas"><DashboardEncuestas /></ProtectedRoute>} />
             
             {/* Jefatura y Ejecutiva tienen los mismos permisos */}

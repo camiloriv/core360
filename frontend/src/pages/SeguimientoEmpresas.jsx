@@ -31,16 +31,16 @@ function getPeriodoActual() {
 function buildPeriodoOptions() {
   const now = new Date();
   const y = now.getFullYear();
-  const opts = [{ value: `anio-${y}`, label: `AÑO ${y}` }];
+  const opts = [{ value: `anio-${y}`, label: `Año ${y}` }];
   for (let i = 0; i < 12; i++) {
     const m = String(i + 1).padStart(2, "0");
-    opts.push({ value: `${y}-${m}`, label: `${MESES[i].toUpperCase()}` });
+    opts.push({ value: `${y}-${m}`, label: MESES[i] });
   }
   return opts;
 }
 
 export default function SeguimientoEmpresas() {
-  const { user, jefaturas, empresas, loading: dataLoading } = useDashboardData();
+  const { user, jefaturas, empresas, reuniones, loading: dataLoading } = useDashboardData();
   const userRol = user?.permisos;
 
   const [seguimientoLogs, setSeguimientoLogs] = useState([]);
@@ -101,14 +101,41 @@ export default function SeguimientoEmpresas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroPeriodo, loading]);
 
-  // Temporal state resolution: determines the state of an empresa based on the filtered period logs
+  const getReunionesDelPeriodo = useCallback((empresaId) => {
+    return (reuniones || []).filter((r) => {
+      if (r.empresa_id !== empresaId) return false;
+      if (!r.fecha_reu) return false;
+      
+      const d = new Date(r.fecha_reu);
+      const rYear = d.getFullYear();
+      const rMonth = String(d.getMonth() + 1).padStart(2, "0");
+      
+      if (filtroPeriodo.startsWith("anio-")) {
+        const anioSeleccionado = Number(filtroPeriodo.replace("anio-", ""));
+        return rYear === anioSeleccionado;
+      } else {
+        const [fYear, fMonth] = filtroPeriodo.split("-");
+        return rYear === Number(fYear) && rMonth === fMonth;
+      }
+    });
+  }, [reuniones, filtroPeriodo]);
+
+  // Temporal state resolution: determines the state of an empresa based on the filtered period logs and actual meetings
   const getEstadoTemporal = useCallback((empresaId) => {
+    const meetings = getReunionesDelPeriodo(empresaId);
+    
+    // Si hay reuniones en el periodo de tipo borrador o enviado, la empresa ha sido gestionada en este periodo
+    const hasRealized = meetings.some(r => r.estado_envio === 'enviado' || r.estado_envio === 'borrador');
+    if (hasRealized) return "gestionada";
+
+    const hasAgendadaMeeting = meetings.some(r => r.estado_envio === 'agendada');
+
     const logs = seguimientoLogs.filter((l) => l.empresa_id === empresaId);
     if (logs.some((l) => l.estado === "gestionada")) return "gestionada";
-    if (logs.some((l) => l.estado === "agendada")) return "agendada";
+    if (hasAgendadaMeeting || logs.some((l) => l.estado === "agendada")) return "agendada";
     if (logs.some((l) => l.estado === "solicitada")) return "solicitada";
     return "pendiente";
-  }, [seguimientoLogs]);
+  }, [getReunionesDelPeriodo, seguimientoLogs]);
 
   const getLogsSolicitada = (empresaId) => {
     return seguimientoLogs.filter(
@@ -211,132 +238,212 @@ export default function SeguimientoEmpresas() {
   };
 
   const handleEstadoClick = async (emp) => {
-    const estadoActual = getEstadoTemporal(emp.id);
-
-    // Load historial for this empresa
-    let historial = [];
+    // 1. Obtener historial de seguimiento del backend (logs de agendamiento/solicitud)
+    let logs = [];
     try {
       const hRes = await api.get(`/empresas/${emp.id}/historial`);
-      historial = hRes.data || [];
-    } catch {
-      /* ignore */
+      logs = hRes.data || [];
+    } catch (e) {
+      console.error("Error obteniendo historial:", e);
     }
 
-    const historialHtml =
-      historial.length > 0
-        ? `<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">
-          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">📋 Historial de seguimiento</div>
-          <div style="max-height:150px;overflow-y:auto;font-size:12px;">
-            ${historial
-              .slice(0, 15)
-              .map((h) => {
-                const fecha = h.fecha
-                  ? new Date(h.fecha).toLocaleDateString("es-CL")
-                  : "";
-                const colorMap = {
-                  solicitada: "#f97316",
-                  agendada: "#ca8a04",
-                  gestionada: "#10b981",
-                };
-                const color = colorMap[h.estado] || "#64748b";
-                const reunionTag = h.reunion_id
-                  ? ` <span style="color:#3b82f6;font-size:10px;font-weight:bold;" title="ID: ${h.reunion_id}">(TEAMS)</span>`
-                  : "";
-                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f8fafc;">
-                <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
-                <span style="font-weight:600;color:${color};min-width:80px;">${h.estado.toUpperCase()}</span>
-                <span style="color:#64748b;">${fecha}</span>
-                ${reunionTag}
-              </div>`;
-              })
-              .join("")}
-          </div>
-        </div>`
-        : "";
+    // 2. Obtener reuniones asociadas a esta empresa desde el dashboard
+    const companyMeetings = (reuniones || []).filter((r) => r.empresa_id === emp.id);
 
-    const solicitudesCount = historial.filter(
-      (h) => h.estado === "solicitada",
-    ).length;
-    const intentoLabel =
-      solicitudesCount > 0
-        ? ` (${solicitudesCount} solicitud${solicitudesCount > 1 ? "es" : ""} previa${solicitudesCount > 1 ? "s" : ""})`
-        : "";
+    // 3. Consolidar la línea de tiempo histórica
+    const timeline = [];
 
-    const { value: formValues } = await Swal.fire({
-      title: `<div style="font-size:20px;font-weight:700;">Estado de seguimiento</div>`,
-      html: `
-        <div style="font-size:15px;color:var(--text-muted);margin-bottom:16px;">${emp.nombre}${intentoLabel}</div>
-        <div style="text-align:left;">
-          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Estado</label>
-          <select id="swal-estado" class="swal2-select" style="width:100%;max-width:300px;margin:0 auto;display:block;font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid #cbd5e1;">
-            <option value="pendiente" ${estadoActual === "pendiente" ? "selected" : ""}>Pendiente</option>
-            <option value="solicitada" ${estadoActual === "solicitada" ? "selected" : ""}>Solicitada</option>
-            <option value="agendada" ${estadoActual === "agendada" ? "selected" : ""}>Agendada</option>
-          </select>
-        </div>
-        <div id="swal-fecha-container" style="text-align:left;margin-top:14px;display:none;">
-          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;" id="swal-fecha-label">Fecha</label>
-          <input type="date" id="swal-fecha" class="swal2-input" style="width:100%;max-width:300px;margin:0 auto;display:block;font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid #cbd5e1;" value="${new Date().toISOString().split("T")[0]}" />
-        </div>
-        ${historialHtml}
-      `,
-      showCancelButton: true,
-      confirmButtonColor: "#1e40af",
-      cancelButtonText: "Cancelar",
-      confirmButtonText: "Guardar",
-      width: "550px",
-      didOpen: () => {
-        const selectEl = document.getElementById("swal-estado");
-        const fechaContainer = document.getElementById("swal-fecha-container");
-        const fechaLabel = document.getElementById("swal-fecha-label");
+    // Agregar reuniones de la tabla reuniones (realizadas, con o sin minuta, y agendadas)
+    companyMeetings.forEach((r) => {
+      let tipoText = "Realizada (Con Minuta)";
+      let estadoVal = "gestionada";
+      if (r.estado_envio === "borrador") {
+        tipoText = "Realizada (Sin Minuta)";
+        estadoVal = "borrador";
+      } else if (r.estado_envio === "agendada") {
+        tipoText = "Agendada (Teams)";
+        estadoVal = "agendada";
+      }
 
-        const toggleFecha = () => {
-          const val = selectEl.value;
-          if (val === "solicitada") {
-            fechaContainer.style.display = "block";
-            fechaLabel.textContent = "📅 Fecha de solicitud";
-          } else if (val === "agendada") {
-            fechaContainer.style.display = "block";
-            fechaLabel.textContent = "📅 Fecha de reunión acordada";
-          } else {
-            fechaContainer.style.display = "none";
-          }
-        };
-        selectEl.addEventListener("change", toggleFecha);
-        toggleFecha();
-      },
-      preConfirm: () => {
-        const estado = document.getElementById("swal-estado").value;
-        const fecha = document.getElementById("swal-fecha").value;
-        if ((estado === "solicitada" || estado === "agendada") && !fecha) {
-          Swal.showValidationMessage("Debes ingresar una fecha");
-          return false;
-        }
-        return { estado, fecha };
-      },
+      timeline.push({
+        key: `meeting-${r.id_reunion || r.id}`,
+        fecha: r.fecha_reu,
+        hora: r.hora || "",
+        tipo: tipoText,
+        detalle: r.motivo_reu || "Reunión comercial",
+        responsable: r.ejecutiva_nombre || "",
+        estado: estadoVal,
+      });
     });
 
-    if (formValues) {
-      try {
-        const res = await api.patch(`/empresas/${emp.id}/estado`, {
-          estado_seguimiento: formValues.estado,
-          fecha: formValues.fecha,
-          usuario_id: user?.id,
-        });
-        // Refresh data from server instead of local mutation
-        void res.data;
-        // Reload logs for the current period
-        await cargarLogs();
-        Swal.fire({
-          title: "¡Actualizado!",
-          icon: "success",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } catch {
-        Swal.fire("Error", "No se pudo actualizar el estado", "error");
+    // Agregar logs de agendamiento y solicitudes (filtrando gestionadas y agendadas duplicadas)
+    logs.forEach((log) => {
+      if (log.estado === "gestionada") return; // ya representada por las reuniones con minuta
+
+      // Si ya hay un item en timeline con el mismo event_id (reunion_id), evitar duplicar!
+      if (log.estado === "agendada" && log.reunion_id) {
+        const existeEnTimeline = companyMeetings.some(r => r.event_id === log.reunion_id || r.id_reunion === log.reunion_id);
+        if (existeEnTimeline) return;
       }
-    }
+
+      let tipoText = "Solicitud de Reunión";
+      let detalleText = "Contacto iniciado / Solicitada";
+      if (log.estado === "agendada") {
+         tipoText = "Agendada (Teams)";
+         detalleText = log.asunto || "Reunión agendada en Teams";
+      } else if (log.estado === "cancelada") {
+         tipoText = "Cancelada (Teams)";
+         detalleText = log.asunto || "Reunión cancelada en Teams";
+      } else if (log.estado === "reagendada") {
+         tipoText = "Reagendada (Teams)";
+         detalleText = log.asunto || "Reunión reagendada en Teams";
+      }
+
+      timeline.push({
+        key: `log-${log.id}`,
+        fecha: log.fecha,
+        hora: "",
+        tipo: tipoText,
+        detalle: detalleText,
+        responsable: log.usuario_nombre || "",
+        estado: log.estado,
+      });
+    });
+
+    // Ordenar de más reciente a más antigua
+    timeline.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const colorMap = {
+      gestionada: "#10b981", // verde
+      borrador: "#ca8a04",   // amarillo
+      agendada: "#3b82f6",   // azul
+      reagendada: "#6366f1", // indigo
+      solicitada: "#f97316", // naranja
+      cancelada: "#ef4444",  // rojo
+    };
+
+    const bgBadgeMap = {
+      gestionada: "#dcfce7",
+      borrador: "#fef08a",
+      agendada: "#dbeafe",
+      reagendada: "#e0e7ff",
+      solicitada: "#ffedd5",
+      cancelada: "#fee2e2",
+    };
+
+    const textBadgeMap = {
+      gestionada: "#166534",
+      borrador: "#854d0e",
+      agendada: "#1e40af",
+      reagendada: "#3730a3",
+      solicitada: "#c2410c",
+      cancelada: "#991b1b",
+    };
+
+    const meetingsHtml = timeline.length > 0 
+      ? `
+        <div style="margin-top: 25px; text-align: left;">
+          <h4 style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">
+            📋 Historial de Reuniones y Eventos (${timeline.length})
+          </h4>
+          <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10;">
+                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Fecha</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Tipo / Estado</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Motivo / Detalle</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Responsable</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${timeline.map(item => {
+                  const dateStr = formatearFecha(item.fecha);
+                  const bulletColor = colorMap[item.estado] || "#64748b";
+                  const bgBadge = bgBadgeMap[item.estado] || "#f1f5f9";
+                  const textBadge = textBadgeMap[item.estado] || "#475569";
+                  const respText = item.responsable ? `👤 ${item.responsable}` : "-";
+
+                  return `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                      <td style="padding: 10px; font-weight: 500; color: #334155; white-space: nowrap;">📅 ${dateStr}</td>
+                      <td style="padding: 10px; white-space: nowrap;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; background: ${bgBadge}; color: ${textBadge}; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">
+                          <span style="width: 6px; height: 6px; border-radius: 50%; background: ${bulletColor}; flex-shrink: 0;"></span>
+                          ${item.tipo}
+                        </span>
+                      </td>
+                      <td style="padding: 10px; color: #475569; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.detalle}">${item.detalle}</td>
+                      <td style="padding: 10px; color: #475569; white-space: nowrap;">${respText}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `
+      : `
+        <div style="margin-top: 25px; text-align: center; padding: 30px; border: 1.5px dashed #e2e8f0; border-radius: 12px; background: #f8fafc;">
+          <div style="font-size: 30px; margin-bottom: 10px;">📅</div>
+          <h4 style="margin: 0 0 5px 0; color: #475569; font-size: 14px; font-weight: 600;">Sin Eventos</h4>
+          <p style="margin: 0; color: #94a3b8; font-size: 12px;">No se registran visitas, solicitudes ni reuniones comerciales.</p>
+        </div>
+      `;
+
+    const initial = emp.nombre.charAt(0).toUpperCase();
+    const gradients = [
+      "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+      "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+      "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+      "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+      "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+    ];
+    const gradient = gradients[emp.id % gradients.length];
+
+    const carnetHtml = `
+      <div style="background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 15px;">
+        <div style="background: ${gradient}; padding: 25px 20px; color: white; display: flex; align-items: center; gap: 20px; text-align: left; position: relative;">
+          <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); border: 2.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;">
+            ${initial}
+          </div>
+          <div>
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.8); display: block; margin-bottom: 2px;">
+              Ficha de Empresa
+            </span>
+            <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; line-height: 1.2;">
+              ${emp.nombre}
+            </h3>
+          </div>
+        </div>
+        
+        <div style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left; background: #fafafa;">
+          <div>
+            <span style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 4px;">Macro-Zona</span>
+            <span style="font-size: 13px; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
+              🏢 ${emp.zona_nombre || 'Sin Zona'}
+            </span>
+          </div>
+          <div>
+            <span style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 4px;">Jefatura Asignada</span>
+            <span style="font-size: 13px; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
+              👤 ${emp.jefatura_nombre || 'Sin Jefatura'}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    Swal.fire({
+      html: `
+        ${carnetHtml}
+        ${meetingsHtml}
+      `,
+      showConfirmButton: true,
+      confirmButtonText: "Cerrar",
+      confirmButtonColor: "#3b82f6",
+      width: "650px",
+    });
   };
 
   const totalEmpresas = empresasFiltradas.length;
@@ -949,6 +1056,7 @@ export default function SeguimientoEmpresas() {
                     return (
                       <li
                         key={emp.id}
+                        onClick={() => handleEstadoClick(emp)}
                         style={{
                           padding: "12px 10px",
                           borderBottom: "1px solid #f1f5f9",
@@ -957,7 +1065,15 @@ export default function SeguimientoEmpresas() {
                           display: "flex",
                           alignItems: "center",
                           gap: "10px",
+                          cursor: "pointer",
+                          transition: "background 0.2s",
                         }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = "#f8fafc")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
                       >
                         <span
                           style={{

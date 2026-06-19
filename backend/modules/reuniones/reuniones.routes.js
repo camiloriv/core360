@@ -29,7 +29,7 @@ router.get("/default-cc", reunionesController.obtenerDefaultCc);
 router.get("/tipos", reunionesController.obtenerTiposReunion);
 router.get("/test-smtp", reunionesController.testSmtp);
 router.get("/", reunionesController.listarReuniones);
-router.post("/", upload.array("archivos"), reunionesController.crearReunion);
+router.post("/", upload.array("archivos", 5), reunionesController.crearReunion);
+router.put("/:id/no-aplica", reunionesController.marcarNoAplica);
 
 module.exports = router;
-

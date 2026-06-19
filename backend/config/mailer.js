@@ -100,7 +100,7 @@ if (process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZ
                 const emailMatch = from.match(/<(.+)>/);
                 mailFrom = emailMatch ? emailMatch[1] : from;
             }
-            console.log("=== DEBUG MAILER ===", { originalFrom: from, extractedMailFrom: mailFrom });
+
 
             // Excluir al remitente de las copias (ya que queda en su carpeta de "Elementos enviados")
             const rawCc = cc ? (Array.isArray(cc) ? cc : cc.split(",").map(e => e.trim())) : [];

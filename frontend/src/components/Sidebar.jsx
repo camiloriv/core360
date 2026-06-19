@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
-
+import axios from "axios";
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
@@ -94,6 +94,27 @@ const Sidebar = ({ isOpen, onClose }) => {
           <path d="m21 3 1 11h-2" />
           <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" />
           <path d="M3 4h8" />
+        </svg>
+      ),
+    },
+    {
+      path: "/vincular-reuniones",
+      label: "Vincular reuniones",
+      title: "Vincular reuniones",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       ),
     },
@@ -214,7 +235,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     : null;
 
   if (vistas && user.permisos !== "admin" && user.permisos !== "ADMIN") {
-    menuItems = menuItems.filter((item) => vistas.includes(item.path));
+    menuItems = menuItems.filter((item) => {
+      if (item.path === "/vincular-reuniones") {
+        return vistas.includes("/dashboard-reuniones");
+      }
+      return vistas.includes(item.path);
+    });
   } else {
     if (user.permisos !== "admin" && user.permisos !== "ADMIN") {
       menuItems = menuItems.filter(

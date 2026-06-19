@@ -109,6 +109,17 @@ async function runMigrations() {
       console.log("Migration: Note: reunion_id modify skipped or failed:", e.message);
     }
 
+    // Ensure asunto exists in log
+    try {
+      const [logCols] = await connection.query("SHOW COLUMNS FROM empresa_seguimiento_log LIKE 'asunto'");
+      if (logCols.length === 0) {
+        console.log("Migration: Adding 'asunto' column to 'empresa_seguimiento_log'...");
+        await connection.query("ALTER TABLE empresa_seguimiento_log ADD COLUMN asunto VARCHAR(255) DEFAULT NULL");
+      }
+    } catch (e) {
+      console.log("Migration: Note: log columns check failed:", e.message);
+    }
+
     // Migrate existing logs to empresa_seguimiento_log
     const [solicitadas] = await connection.query(`
       SELECT id, fecha_solicitada FROM empresas 
@@ -180,9 +191,63 @@ async function runMigrations() {
     await checkAndAddReunionColumn('encuesta_estado_envio', "VARCHAR(20) DEFAULT 'pendiente'");
     await checkAndAddReunionColumn('encuesta_relacionada', "TINYINT(1) DEFAULT 0");
     await checkAndAddReunionColumn('encuesta_destinatario', "VARCHAR(255) DEFAULT NULL");
+    await checkAndAddReunionColumn('asunto_teams', "VARCHAR(500) DEFAULT NULL");
+
+    // 9. Tabla empresa_dominios
+    console.log("Migration: Checking/creating 'empresa_dominios' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS empresa_dominios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id INT NOT NULL,
+        dominio VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_empresa_dominio (empresa_id, dominio),
+        FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 10. Tabla reuniones_huerfanas
+    console.log("Migration: Checking/creating 'reuniones_huerfanas' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS reuniones_huerfanas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT NOT NULL,
+        event_id VARCHAR(255) NOT NULL UNIQUE,
+        asunto VARCHAR(255) NOT NULL,
+        fecha DATE NOT NULL,
+        hora VARCHAR(10) NOT NULL,
+        asistentes TEXT,
+        estado VARCHAR(50) DEFAULT 'pendiente',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 11. Tabla empresa_contactos
+    console.log("Migration: Checking/creating 'empresa_contactos' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS empresa_contactos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id INT NOT NULL,
+        correo VARCHAR(255) NOT NULL,
+        nombre VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_empresa_correo (empresa_id, correo),
+        FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+      )
+    `);
 
     // 12. Migrar contraseñas a bcrypt
     await migratePasswords();
+
+    // 13. Opcional: Resetear contraseñas de todos a 123 en desarrollo
+    if (process.env.RESET_PASSWORDS_DEV === 'true') {
+      console.log("Migration: RESET_PASSWORDS_DEV is active. Setting everyone's password to '123'...");
+      const bcrypt = require('bcrypt');
+      const hashed = await bcrypt.hash('123', 10);
+      const [pwdResult] = await connection.query('UPDATE usuarios SET contrasena = ?', [hashed]);
+      console.log(`Migration: Successfully reset passwords for ${pwdResult.affectedRows} users.`);
+    }
 
     console.log("Migration: All migrations verified and applied successfully!");
   } catch (error) {

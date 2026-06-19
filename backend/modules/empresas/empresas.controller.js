@@ -123,7 +123,11 @@ exports.actualizarEstadoEmpresa = async (req, res) => {
     // Return updated empresa + historial
     const [[updatedEmp]] = await db.query("SELECT fecha_solicitada, fecha_concretada FROM empresas WHERE id = ?", [id]);
     const [historial] = await db.query(
-      "SELECT * FROM empresa_seguimiento_log WHERE empresa_id = ? ORDER BY fecha DESC, created_at DESC",
+      `SELECT log.*, u.nombre AS usuario_nombre 
+       FROM empresa_seguimiento_log log
+       LEFT JOIN usuarios u ON log.usuario_id = u.id
+       WHERE log.empresa_id = ? 
+       ORDER BY log.fecha DESC, log.created_at DESC`,
       [id]
     );
     res.json({ 
@@ -143,7 +147,11 @@ exports.obtenerHistorialSeguimiento = async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await db.query(
-      "SELECT * FROM empresa_seguimiento_log WHERE empresa_id = ? ORDER BY fecha DESC, created_at DESC",
+      `SELECT log.*, u.nombre AS usuario_nombre 
+       FROM empresa_seguimiento_log log
+       LEFT JOIN usuarios u ON log.usuario_id = u.id
+       WHERE log.empresa_id = ? 
+       ORDER BY log.fecha DESC, log.created_at DESC`,
       [id]
     );
     res.json(rows);
@@ -163,16 +171,20 @@ exports.obtenerLogsEmpresas = async (req, res) => {
 
     if (periodo) {
       // periodo format: "2026-05" → filter by that month
-      whereClause = "WHERE DATE_FORMAT(fecha, '%Y-%m') = ?";
+      whereClause = "WHERE DATE_FORMAT(log.fecha, '%Y-%m') = ?";
       params = [periodo];
     } else if (anio) {
       // anio format: "2026" → filter by that year
-      whereClause = "WHERE YEAR(fecha) = ?";
+      whereClause = "WHERE YEAR(log.fecha) = ?";
       params = [parseInt(anio)];
     }
 
     const [rows] = await db.query(
-      `SELECT * FROM empresa_seguimiento_log ${whereClause} ORDER BY fecha DESC, created_at DESC`,
+      `SELECT log.*, u.nombre AS usuario_nombre 
+       FROM empresa_seguimiento_log log
+       LEFT JOIN usuarios u ON log.usuario_id = u.id
+       ${whereClause} 
+       ORDER BY log.fecha DESC, log.created_at DESC`,
       params
     );
     res.json(rows);

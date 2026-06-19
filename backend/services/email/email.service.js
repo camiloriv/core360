@@ -29,8 +29,6 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
     // 🔹 4. Contenido de Minuta (Ya viene como HTML desde el nuevo editor)
     const htmlMinuta = data.minuta || "";
 
-    console.log(data)
-
     // 🔹 5. Reemplazo variables
     html = html
       .replace(/{{id}}/g, data.id_reunion || "")
@@ -81,9 +79,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
     }
 
     // 🔍 Debug útil para el log de Node
-    console.log("🔹 Procesando firma para:", nombreRaw);
-    console.log("🔹 Nombre normalizado:", nombreNormalizado);
-    console.log("🔹 Ruta final encontrada:", finalFirmaPath || "NINGUNA");
+
 
     // 🔥 8. ADJUNTOS DINÁMICOS (los del formulario)
     const adjuntosArchivos = (attachments || []).map(file => {
@@ -94,7 +90,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
       return adj;
     });
 
-    console.log("📎 Adjuntos finales:", adjuntosArchivos);
+
 
     const baseAttachments = [
       banner,
@@ -125,7 +121,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
     }
 
     const senderEmail = (userEmail && userEmail.endsWith('@proforma.cl')) ? userEmail : process.env.SMTP_USER;
-    console.log("=== DEBUG SENDER ===", { userEmail, senderEmail });
+
 
     const info = await transporter.sendMail({
       from: `"Sistema Reuniones" <${senderEmail}>`,

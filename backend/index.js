@@ -2,6 +2,10 @@ const app = require("./app");
 const { startScheduler } = require("./services/scheduler/scheduler.service");
 const { runMigrations } = require("./database/migrate");
 
+if (!process.env.JWT_SECRET) {
+  throw new Error("❌ JWT_SECRET no está definido en el archivo .env. Por seguridad, el servidor no puede iniciar.");
+}
+
 const PORT = process.env.PORT || 8080;
 
 (async () => {

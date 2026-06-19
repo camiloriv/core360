@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearDashboardCache } from "../hooks/useDashboardData";
 
 // ✅ Base URL dinámica desde variables de entorno
 const api = axios.create({
@@ -22,6 +23,7 @@ api.interceptors.response.use((response) => {
 }, (error) => {
   if (error.response && error.response.status === 401) {
     // Si el error es de autorización (token expirado o inválido), limpiar datos y redirigir
+    clearDashboardCache();
     localStorage.removeItem("usuario");
     localStorage.removeItem("token");
     window.dispatchEvent(new Event("storage")); // Para disparar la actualización de estado en App.jsx si es necesario

@@ -22,7 +22,7 @@ exports.crearEjecutiva = async (req, res) => {
   const { nombre, correo, jefatura_id, cargo_id, contrasena } = req.body;
   if (!nombre) return res.status(400).json({ error: "Nombre requerido" });
   try {
-    const rawContrasena = contrasena || '123456';
+    const rawContrasena = contrasena || process.env.DEFAULT_PASSWORD || '123456';
     const hashedContrasena = await bcrypt.hash(rawContrasena, 10);
     const [result] = await db.query(
       "INSERT INTO usuarios (nombre, correo, jefatura_id, cargo_id, permisos, contrasena, requiere_cambio_clave) VALUES (?, ?, ?, ?, 'ejecutiva', ?, 1)",

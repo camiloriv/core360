@@ -41,7 +41,7 @@ export default function useReunionesData(user, empresa_id) {
       return (list || []).filter(emp => {
         const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
                         emp.nombre?.toLowerCase().includes("prueba") ||
-                        emp.jefatura_id === 28;
+                        emp.jefatura_id === Number(import.meta.env.VITE_EXCLUDED_JEFATURA_ID || 28);
         return isUserDemo ? empDemo : !empDemo;
       });
     };

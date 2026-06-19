@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
@@ -19,6 +20,8 @@ import AutocompleteInput from "../form/fields/AutocompleteInput";
 
 function ReunionesForm({ onSuccess }) {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const { form, setField, setFiles, resetForm } = useReunionesForm();
   const [isCcEditable, setIsCcEditable] = useState(false);
@@ -79,6 +82,47 @@ function ReunionesForm({ onSuccess }) {
     }
   }, [form.empresa_id, form.ejecutiva_id, user.correo, user.id, isCcEditable]);
 
+  // Si abrimos la pantalla con un borrador, precargarlo
+  useEffect(() => {
+    if (location.state && location.state.draft) {
+      const draft = location.state.draft;
+      setField("id_reunion", draft.id_reunion);
+      setField("empresa_id", draft.empresa_id);
+      setField("fecha_reu", new Date(draft.fecha_reu).toISOString().split('T')[0]);
+      setField("hora", draft.hora);
+      setField("tipo_reu", ""); // Dejar vacío para que el usuario seleccione
+      setField("participantes", draft.participantes || "");
+      
+      let filteredEnviadoA = "";
+      try {
+        const correos = JSON.parse(draft.enviado_a);
+        if (Array.isArray(correos)) {
+          filteredEnviadoA = correos
+            .map(email => email.trim())
+            .filter(email => !email.toLowerCase().endsWith("@proforma.cl"))
+            .join(", ");
+        } else {
+          filteredEnviadoA = String(draft.enviado_a || "")
+            .split(/[\s,;]+/)
+            .map(email => email.trim())
+            .filter(email => email && !email.toLowerCase().endsWith("@proforma.cl"))
+            .join(", ");
+        }
+      } catch (e) {
+        filteredEnviadoA = String(draft.enviado_a || "")
+          .split(/[\s,;]+/)
+          .map(email => email.trim())
+          .filter(email => email && !email.toLowerCase().endsWith("@proforma.cl"))
+          .join(", ");
+      }
+      setField("enviado_a", filteredEnviadoA);
+      
+      setField("lugar", draft.lugar || "");
+      // Limpiamos el state para que si el usuario recarga no se vuelva a sobreescribir si ya hizo cambios
+      window.history.replaceState({}, document.title);
+    }
+  }, []);
+
   const { submit, loading } = useSubmitReunion({
     form,
     resetForm,
@@ -136,6 +180,102 @@ function ReunionesForm({ onSuccess }) {
       });
     }
   };
+
+  if (!location.state || !location.state.draft) {
+    return (
+      <div 
+        className="container" 
+        style={{ 
+          position: "relative", 
+          maxWidth: "600px", 
+          margin: "50px auto", 
+          padding: "40px 30px", 
+          borderRadius: "16px", 
+          background: "white", 
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)", 
+          textAlign: "center",
+          border: "1px solid #f1f5f9"
+        }}
+      >
+        <div style={{ marginBottom: "24px" }}>
+          <div 
+            style={{ 
+              display: "inline-flex", 
+              justifyContent: "center", 
+              alignItems: "center", 
+              width: "72px", 
+              height: "72px", 
+              borderRadius: "50%", 
+              background: "rgba(99, 102, 241, 0.08)", 
+              color: "rgb(99, 102, 241)", 
+              marginBottom: "24px" 
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 2v4" />
+              <path d="M8 2v4" />
+              <rect width="18" height="18" x="3" y="4" rx="2" />
+              <path d="M3 10h18" />
+              <path d="m9 16 2 2 4-4" />
+            </svg>
+          </div>
+          <h2 style={{ fontSize: "22px", fontWeight: "700", color: "#0f172a", marginBottom: "12px", fontFamily: "Outfit, sans-serif" }}>
+            Registro de Minutas Exclusivo para Teams
+          </h2>
+          <p style={{ fontSize: "14.5px", color: "#64748b", lineHeight: "1.6", marginBottom: "30px", fontFamily: "Inter, sans-serif" }}>
+            Para garantizar la limpieza e integridad del proyecto, todas las minutas registradas deben estar vinculadas a una reunión comercial agendada a través de <b>Microsoft Teams</b>.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <button 
+              onClick={() => navigate("/vincular-reuniones")}
+              style={{
+                width: "100%",
+                padding: "13px 20px",
+                borderRadius: "8px",
+                border: "none",
+                background: "var(--secondary-color)",
+                color: "white",
+                fontSize: "14.5px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.filter = "brightness(0.95)"}
+              onMouseLeave={(e) => e.currentTarget.style.filter = "none"}
+            >
+              Ir a Vincular Reuniones Comerciales
+            </button>
+            <button 
+              onClick={() => navigate("/agendar")}
+              style={{
+                width: "100%",
+                padding: "13px 20px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                background: "white",
+                color: "#475569",
+                fontSize: "14.5px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#f8fafc";
+                e.currentTarget.style.borderColor = "#94a3b8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "white";
+                e.currentTarget.style.borderColor = "#cbd5e1";
+              }}
+            >
+              Agendar Nueva Reunión en Teams
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container" style={{ position: "relative" }}>

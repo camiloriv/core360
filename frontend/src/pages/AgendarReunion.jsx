@@ -48,8 +48,7 @@ const AgendarReunion = () => {
   const [currentView, setCurrentView] = useState("month");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastSelectedSlot, setLastSelectedSlot] = useState(null);
-  const lastClickRef = useRef({ time: 0, slotTime: null });
+  const [selectedRange, setSelectedRange] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [mobileViewMode, setMobileViewMode] = useState("day");
 
@@ -66,9 +65,8 @@ const AgendarReunion = () => {
   // Limpiar la celda seleccionada al abrir/cerrar la modal o cambiar de vista
   useEffect(() => {
     if (!isModalOpen) {
-      setLastSelectedSlot(null);
+      setSelectedRange(null);
       setSelectedEndDate(null);
-      lastClickRef.current = { time: 0, slotTime: null };
     }
   }, [isModalOpen, currentView]);
 
@@ -245,39 +243,25 @@ const AgendarReunion = () => {
       return;
     }
 
-    const now = Date.now();
-    const slotTime = slotInfo.start.getTime();
-    const prevClick = lastClickRef.current;
+    // Si ya hay un rango seleccionado y el usuario hace clic dentro de él, abrimos el modal
+    if (selectedRange) {
+      const clickTime = slotInfo.start.getTime();
+      const rangeStart = selectedRange.start.getTime();
+      const rangeEnd = selectedRange.end.getTime();
 
-    // Si la acción es de arrastre/selección de rango
-    if (slotInfo.action === "select") {
-      setSelectedDate(slotInfo.start);
-      setSelectedEndDate(slotInfo.end);
-      setIsModalOpen(true);
-      return;
-    }
-
-    // Si la acción es doble clic nativo
-    if (slotInfo.action === "doubleClick") {
-      setSelectedDate(slotInfo.start);
-      setSelectedEndDate(slotInfo.end);
-      setIsModalOpen(true);
-      return;
-    }
-
-    // Para clics simples:
-    if (slotInfo.action === "click") {
-      if (prevClick.slotTime === slotTime && (now - prevClick.time) > 300) {
-        setSelectedDate(slotInfo.start);
-        setSelectedEndDate(slotInfo.end);
+      if (clickTime >= rangeStart && clickTime < rangeEnd) {
+        setSelectedDate(selectedRange.start);
+        setSelectedEndDate(selectedRange.end);
         setIsModalOpen(true);
-        lastClickRef.current = { time: 0, slotTime: null };
-        setLastSelectedSlot(null);
-      } else {
-        lastClickRef.current = { time: now, slotTime: slotTime };
-        setLastSelectedSlot(slotTime);
+        return;
       }
     }
+
+    // En cualquier otro caso (arrastrar o primer clic fuera), guardamos el nuevo rango para marcarlo
+    setSelectedRange({
+      start: slotInfo.start,
+      end: slotInfo.end
+    });
   };
 
   // Abre el modal SweetAlert con el menú de detalles completo
@@ -569,10 +553,15 @@ const AgendarReunion = () => {
                 style={{ flex: 1 }}
                 selectable
                 slotPropGetter={(date) => {
-                  if (lastSelectedSlot && date.getTime() === lastSelectedSlot) {
-                    return {
-                      className: "selected-calendar-slot"
-                    };
+                  if (selectedRange) {
+                    const time = date.getTime();
+                    const rangeStart = selectedRange.start.getTime();
+                    const rangeEnd = selectedRange.end.getTime();
+                    if (time >= rangeStart && time < rangeEnd) {
+                      return {
+                        className: "selected-calendar-slot"
+                      };
+                    }
                   }
                   return {};
                 }}

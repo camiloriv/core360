@@ -8,4 +8,11 @@ router.post('/', verificarToken, agendamientoController.crearReunionTeams);
 router.post('/anular', verificarToken, agendamientoController.anularReunionTeams);
 router.get('/calendario', verificarToken, agendamientoController.obtenerEventosCalendario);
 
+// Sincronización híbrida
+router.post('/sync-past', verificarToken, agendamientoController.syncEventosPasados);
+router.get('/huerfanas', verificarToken, agendamientoController.getHuerfanas);
+router.post('/huerfanas/vincular', verificarToken, agendamientoController.vincularHuerfana);
+router.post('/huerfanas/descartar', verificarToken, agendamientoController.descartarHuerfana);
+router.post('/huerfanas/desvincular', verificarToken, agendamientoController.desvincularBorrador);
+
 module.exports = router;

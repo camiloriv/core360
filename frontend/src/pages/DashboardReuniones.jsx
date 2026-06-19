@@ -60,6 +60,21 @@ const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // D
 export default function DashboardReuniones() {
   const { user, reuniones, jefaturas, empresas, loading, refetch } = useDashboardData();
   const userRol = user?.permisos;
+
+  // DEBUG TEMPORAL: log datos recibidos para diagnosticar problemas en entorno de desarrollo
+  useEffect(() => {
+    if (!loading) {
+      console.group('[DEBUG DashboardReuniones]');
+      console.log('user:', user);
+      console.log('userRol:', userRol);
+      console.log('reuniones total:', reuniones.length, reuniones);
+      console.log('empresas total:', empresas.length, empresas);
+      console.log('jefaturas total:', jefaturas.length, jefaturas);
+      const muestra = reuniones.slice(0, 3);
+      muestra.forEach(r => console.log(`  reunion ejecutiva_id=${r.ejecutiva_id} (${typeof r.ejecutiva_id}), user.id=${user?.id} (${typeof user?.id}), empresa_id=${r.empresa_id}, is_huerfana=${r.is_huerfana}`));
+      console.groupEnd();
+    }
+  }, [loading, reuniones.length]);
   const navigate = useNavigate();
 
   const [loadingSync, setLoadingSync] = useState(true);
@@ -248,8 +263,9 @@ export default function DashboardReuniones() {
       // propias siempre deben mostrarse aunque la empresa no esté en empresasPorJefatura
       // (puede ocurrir cuando hay datos de empresa incompletos en el entorno).
       const esRolRestringido = userRol === 'ejecutiva' || userRol === 'jefatura';
-      const esReuionPropia = esRolRestringido && r.ejecutiva_id === user?.id;
-      const pasaMacroYJef = isHuerfana || esReuionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      // Usar Number() para evitar type mismatch: la BD devuelve número pero localStorage puede devolver string
+      const esReunionPropia = esRolRestringido && Number(r.ejecutiva_id) === Number(user?.id);
+      const pasaMacroYJef = isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
       const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
 

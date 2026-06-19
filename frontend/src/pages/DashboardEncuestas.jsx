@@ -171,35 +171,11 @@ export default function DashboardEncuestas() {
           api.get(`/encuestas/resumen/kpis${queryParams}`)
         ]);
 
-        const isUserDemo = (user?.nombre?.toLowerCase().includes("prueba") || 
-                            user?.nombre?.toLowerCase().includes("demo") ||
-                            user?.correo?.toLowerCase().includes("prueba") ||
-                            user?.correo?.toLowerCase().includes("demo") ||
-                            user?.cargos?.toLowerCase().includes("prueba") ||
-                            user?.cargos?.toLowerCase().includes("demo")) &&
-                           !user?.correo?.toLowerCase().includes("prueba_");
+        const filteredResponses = respRes.data || [];
 
-        const filteredResponses = (respRes.data || []).filter(r => {
-          const isDemoEmp = r.empresa?.toLowerCase().includes("demo") || 
-                            r.empresa?.toLowerCase().includes("prueba") ||
-                            r.jefatura?.toLowerCase().includes("prueba") ||
-                            r.jefatura?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoEmp : !isDemoEmp;
-        });
+        const filteredRanking = kpiRes.data.ranking || [];
 
-        const filteredRanking = (kpiRes.data.ranking || []).filter(r => {
-          const isDemoJef = r.jefatura?.toLowerCase().includes("prueba") || 
-                            r.jefatura?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoJef : !isDemoJef;
-        });
-
-        const filteredDetalles = (kpiRes.data.detalles || []).filter(d => {
-          const isDemoEmp = d.empresa?.toLowerCase().includes("demo") || 
-                            d.empresa?.toLowerCase().includes("prueba") ||
-                            d.jefatura?.toLowerCase().includes("prueba") ||
-                            d.jefatura?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoEmp : !isDemoEmp;
-        });
+        const filteredDetalles = kpiRes.data.detalles || [];
 
         const masterData = filteredResponses.map((r) => ({
           ...r,

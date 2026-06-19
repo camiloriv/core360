@@ -38,44 +38,9 @@ export default function GestionEmpresas() {
       const resEmp = await api.get("/empresas");
       const resZonas = await api.get("/zonas");
 
-      const isUserDemo =
-        (user?.nombre?.toLowerCase().includes("prueba") ||
-        user?.nombre?.toLowerCase().includes("demo") ||
-        user?.correo?.toLowerCase().includes("prueba") ||
-        user?.correo?.toLowerCase().includes("demo") ||
-        user?.cargos?.toLowerCase().includes("prueba") ||
-        user?.cargos?.toLowerCase().includes("demo")) &&
-        !user?.correo?.toLowerCase().includes("prueba_");
-
-      const filteredEjecutivas = (resE.data || []).filter((ej) => {
-        const ejDemo =
-          ej.nombre?.toLowerCase().includes("prueba") ||
-          ej.nombre?.toLowerCase().includes("demo") ||
-          ej.correo?.toLowerCase().includes("prueba") ||
-          ej.correo?.toLowerCase().includes("demo");
-        return isUserDemo ? ejDemo : !ejDemo;
-      });
-
-      const filteredJefaturas = (resJ.data || []).filter((j) => {
-        const jDemo =
-          j.nombre?.toLowerCase().includes("prueba") ||
-          j.nombre?.toLowerCase().includes("demo") ||
-          j.correo?.toLowerCase().includes("prueba") ||
-          j.correo?.toLowerCase().includes("demo");
-        return isUserDemo ? jDemo : !jDemo;
-      });
-
-      const filteredEmpresas = (resEmp.data || []).filter((emp) => {
-        const empDemo =
-          emp.nombre?.toLowerCase().includes("demo") ||
-          emp.nombre?.toLowerCase().includes("prueba") ||
-          emp.jefatura_id === Number(import.meta.env.VITE_EXCLUDED_JEFATURA_ID || 28);
-        return isUserDemo ? empDemo : !empDemo;
-      });
-
-      setEjecutivas(filteredEjecutivas);
-      setJefaturas(filteredJefaturas);
-      setEmpresas(filteredEmpresas);
+      setEjecutivas(resE.data || []);
+      setJefaturas(resJ.data || []);
+      setEmpresas(resEmp.data || []);
       setZonas(resZonas.data || []);
     } catch (err) {
       console.error(err);

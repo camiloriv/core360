@@ -77,31 +77,9 @@ export const useDashboardData = (forceRefresh = false) => {
           api.get(reunionesUrl),
         ]);
 
-        const isUserDemo =
-          (user?.nombre?.toLowerCase().includes("prueba") ||
-          user?.nombre?.toLowerCase().includes("demo") ||
-          user?.correo?.toLowerCase().includes("prueba") ||
-          user?.correo?.toLowerCase().includes("demo") ||
-          user?.cargos?.toLowerCase().includes("prueba") ||
-          user?.cargos?.toLowerCase().includes("demo")) &&
-          !user?.correo?.toLowerCase().includes("prueba_");
+        let filteredJefaturas = resJ.data || [];
 
-        let filteredJefaturas = (resJ.data || []).filter((j) => {
-          const jDemo =
-            j.nombre?.toLowerCase().includes("prueba") ||
-            j.nombre?.toLowerCase().includes("demo") ||
-            j.correo?.toLowerCase().includes("prueba") ||
-            j.correo?.toLowerCase().includes("demo");
-          return isUserDemo ? jDemo : !jDemo;
-        });
-
-        let filteredEmpresas = (resE.data || []).filter((emp) => {
-          const empDemo =
-            emp.nombre?.toLowerCase().includes("demo") ||
-            emp.nombre?.toLowerCase().includes("prueba") ||
-            emp.jefatura_id === Number(import.meta.env.VITE_EXCLUDED_JEFATURA_ID || 28); // Hardcodeado en el código original para excluir id 28
-          return isUserDemo ? empDemo : !empDemo;
-        });
+        let filteredEmpresas = resE.data || [];
 
         if (rol === "jefatura" && id) {
           filteredJefaturas = filteredJefaturas.filter((j) => j.id === id);
@@ -111,15 +89,7 @@ export const useDashboardData = (forceRefresh = false) => {
         }
 
         // Filtro base de reuniones (asegurarse de que existan las empresas a nivel global)
-        let filteredReunionesList = (resR.data || []).filter((r) => {
-          const isDemoEmp = r.empresa_nombre?.toLowerCase().includes("demo") || 
-                            r.empresa_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("prueba") ||
-                            r.ejecutiva_nombre?.toLowerCase().includes("demo") ||
-                            r.jefatura_nombre?.toLowerCase().includes("prueba") ||
-                            r.jefatura_nombre?.toLowerCase().includes("demo");
-          return isUserDemo ? isDemoEmp : !isDemoEmp;
-        });
+        let filteredReunionesList = resR.data || [];
 
         const newData = {
           jefaturas: filteredJefaturas,

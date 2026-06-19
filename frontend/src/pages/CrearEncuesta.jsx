@@ -34,31 +34,14 @@ function CrearEncuesta() {
     document.title = "CORE 360 - Crear Encuesta";
     obtenerTemplates().then(setTemplates);
 
-    const isUserDemo = (user.nombre?.toLowerCase().includes("prueba") || 
-                        user.nombre?.toLowerCase().includes("demo") ||
-                        user.correo?.toLowerCase().includes("prueba") ||
-                        user.correo?.toLowerCase().includes("demo") ||
-                        user.cargos?.toLowerCase().includes("prueba") ||
-                        user.cargos?.toLowerCase().includes("demo")) &&
-                       !user.correo?.toLowerCase().includes("prueba_");
-
-    const filterEmpresas = (list) => {
-      return (list || []).filter(emp => {
-        const empDemo = emp.nombre?.toLowerCase().includes("demo") || 
-                        emp.nombre?.toLowerCase().includes("prueba") ||
-                        emp.jefatura_id === Number(import.meta.env.VITE_EXCLUDED_JEFATURA_ID || 28);
-        return isUserDemo ? empDemo : !empDemo;
-      });
-    };
-
     if (user.permisos === "admin") {
-      getEmpresas().then(list => setEmpresas(filterEmpresas(list)));
+      getEmpresas().then(list => setEmpresas(list || []));
     } else if (user.permisos === "gerencia") {
-      getEmpresasByGerencia(user.id).then(list => setEmpresas(filterEmpresas(list)));
+      getEmpresasByGerencia(user.id).then(list => setEmpresas(list || []));
     } else if (user.permisos === "jefatura") {
-      getEmpresasByJefatura(user.id).then(list => setEmpresas(filterEmpresas(list)));
+      getEmpresasByJefatura(user.id).then(list => setEmpresas(list || []));
     } else if (user.jefatura_id) {
-      getEmpresasByJefatura(user.jefatura_id).then(list => setEmpresas(filterEmpresas(list)));
+      getEmpresasByJefatura(user.jefatura_id).then(list => setEmpresas(list || []));
     }
   }, []);
 

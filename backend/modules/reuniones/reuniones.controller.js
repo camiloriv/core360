@@ -36,6 +36,37 @@ const buildRoleWhereClause = (usuario_id, rol) => {
     return { whereClause, params };
 };
 
+const buildHuerfanasRoleWhereClause = (usuario_id, rol) => {
+    let whereClause = "WHERE 1=1";
+    let params = [];
+
+    if (rol === 'ejecutiva') {
+        whereClause += ` AND (
+            u.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
+            OR h.usuario_id = ?
+        )`;
+        params.push(usuario_id, usuario_id);
+    } else if (rol === 'jefatura') {
+        whereClause += ` AND (u.jefatura_id = ? OR h.usuario_id = ?)`;
+        params.push(usuario_id, usuario_id);
+    } else if (rol === 'gerencia') {
+        whereClause += ` AND (
+            u.id IN (
+                SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
+                UNION
+                SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+                    SELECT ug.usuario_id FROM usuario_gerencias ug 
+                    JOIN usuarios u ON ug.usuario_id = u.id 
+                    WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
+                )
+            ) OR u.jefatura_id = ? OR h.usuario_id = ?
+        )`;
+        params.push(usuario_id, usuario_id, usuario_id, usuario_id);
+    }
+    
+    return { whereClause, params };
+};
+
 const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id) => {
     // 1. Obtener datos de Lilian Ortega (Gerencia)
     const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
@@ -121,6 +152,7 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
+    const { whereClause: huerfanasWhereClause, params: huerfanasParams } = buildHuerfanasRoleWhereClause(usuario_id, rol);
 
     const columnasReuniones = `
         r.id, r.id_reunion, r.ejecutiva_id, r.enviado_a, r.enviado_por,
@@ -230,8 +262,7 @@ exports.listarReuniones = async (req, res) => {
             TRUE AS is_huerfana
         FROM reuniones_huerfanas h
         JOIN usuarios u ON h.usuario_id = u.id
-        WHERE h.estado IN ('pendiente', 'no_aplica')
-          ${whereClause.replace('WHERE 1=1', 'AND 1=1').replace(/r\./g, 'h.').replace(/empresa_id/g, 'NULL').replace(/emp\.jefatura_id/g, 'NULL').replace(/j\.id/g, 'NULL').replace(/ejecutiva_id/g, 'usuario_id')}
+        ${huerfanasWhereClause.replace('WHERE 1=1', "WHERE h.estado IN ('pendiente', 'no_aplica')")}
     `;
 
     const sqlCombined = `
@@ -244,35 +275,11 @@ exports.listarReuniones = async (req, res) => {
     `;
 
     try {
-        const combinedParams = [...params, ...params, ...params];
+        const combinedParams = [...params, ...params, ...huerfanasParams];
         const [result] = await db.query(sqlCombined, combinedParams);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
-        return res.status(500).json({ error: "Error en la BD" });
-    }
-};
-
-// 🔹 MARCAR REUNIÓN COMO NO APLICA (O REVERTIR)
-exports.marcarNoAplica = async (req, res) => {
-    const { id } = req.params;
-    const { noAplica, isHuerfana } = req.body;
-
-    try {
-        if (isHuerfana) {
-            // If it's huerfana, we just update the huerfana state to no_aplica or pendiente
-            const newEstado = noAplica ? 'no_aplica' : 'pendiente';
-            const cleanId = id.toString().replace('huerfana-', '');
-            await db.query("UPDATE reuniones_huerfanas SET estado = ? WHERE id = ?", [newEstado, cleanId]);
-            return res.json({ success: true, message: "Estado de reunión huérfana actualizado" });
-        } else {
-            // For standard meetings
-            const newEstado = noAplica ? 'no_aplica' : 'borrador'; // borrador = Pendiente de Minuta
-            await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [newEstado, id]);
-            return res.json({ success: true, message: "Estado de reunión actualizado" });
-        }
-    } catch (err) {
-        console.error("Error al marcar como no aplica:", err);
         return res.status(500).json({ error: "Error en la BD" });
     }
 };

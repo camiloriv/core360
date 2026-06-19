@@ -26,12 +26,10 @@ function ReunionesForm({ onSuccess }) {
   const { form, setField, setFiles, resetForm } = useReunionesForm();
   const [isCcEditable, setIsCcEditable] = useState(false);
 
-  const isUserDemo = (user.nombre?.toLowerCase().includes("prueba") || user.correo?.toLowerCase().includes("prueba")) && !user.correo?.toLowerCase().includes("prueba_");
-
   const { empresas, setEmpresas, fetchEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);
 
-  // Para no-admin o usuarios de prueba: inicializar ejecutiva_id y enviado_por desde el usuario logueado
+  // Para no-admin: inicializar ejecutiva_id y enviado_por desde el usuario logueado
   // Excepción: "gerencia" debe seleccionar ejecutiva, así que no autocompletamos su ejecutiva_id ni jefatura_id
   useEffect(() => {
     if (!form.enviado_por_correo) {
@@ -41,7 +39,7 @@ function ReunionesForm({ onSuccess }) {
       setField("enviado_por_id", user.id);
     }
     
-    if (((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia") || isUserDemo) && !user.nombre?.toLowerCase().includes("lilian")) {
+    if ((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia") && !user.nombre?.toLowerCase().includes("lilian")) {
       if (!form.jefatura_id) {
         setField("jefatura_id", user.jefatura_id || user.id);
       }
@@ -54,7 +52,7 @@ function ReunionesForm({ onSuccess }) {
     } else if ((user.permisos === "admin" || user.permisos === "gerencia") && !form.enviado_por) {
       setField("enviado_por", user.nombre);
     }
-  }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo, isUserDemo]);
+  }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo]);
 
   // Resetear ejecutiva y CC cuando cambia de empresa
   useEffect(() => {
@@ -303,8 +301,8 @@ function ReunionesForm({ onSuccess }) {
             required
           />
 
-          {/* Selector de usuario asignado: visible para admin y gerencia (que no sea de prueba) */}
-          {(user.permisos === "admin" || user.permisos === "gerencia") && !isUserDemo && (
+          {/* Selector de usuario asignado: visible para admin y gerencia */}
+          {(user.permisos === "admin" || user.permisos === "gerencia") && (
             <FormSection
               label={
                 <>

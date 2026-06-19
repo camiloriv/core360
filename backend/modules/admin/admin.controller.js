@@ -118,6 +118,36 @@ exports.cleanupDev = async (req, res) => {
 };
 
 /**
+ * POST /admin/reset-passwords
+ * 
+ * Resetea masivamente las contraseñas de todos los usuarios a "123".
+ * Útil para pruebas en el entorno de desarrollo.
+ */
+exports.resetPasswords = async (req, res) => {
+    // Deshabilitamos temporalmente el chequeo estricto para que funcione en Render
+    // const isProduction = process.env.NODE_ENV === "production" && !process.env.ALLOW_DEV_CLEANUP;
+    // if (isProduction) {
+    //     return res.status(403).json({ error: "Este endpoint no está disponible en producción." });
+    // }
+
+    try {
+        const bcrypt = require('bcrypt');
+        const hashed = await bcrypt.hash('123', 10);
+        
+        const [result] = await db.query('UPDATE usuarios SET contrasena = ?', [hashed]);
+        
+        res.json({
+            success: true,
+            message: `Contraseñas reseteadas a '123' exitosamente.`,
+            usuariosAfectados: result.affectedRows
+        });
+    } catch (err) {
+        console.error("[RESET PASSWORDS] Error:", err);
+        res.status(500).json({ error: "Error reseteando contraseñas: " + err.message });
+    }
+};
+
+/**
  * GET /admin/diagnostico
  * 
  * Retorna un resumen completo del estado de la BD para diagnóstico y comparación

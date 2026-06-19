@@ -115,3 +115,134 @@ exports.cleanupDev = async (req, res) => {
         connection.release();
     }
 };
+
+/**
+ * GET /admin/diagnostico
+ * 
+ * Retorna un resumen completo del estado de la BD para diagnóstico y comparación
+ * entre entornos (local vs desarrollo).
+ */
+exports.diagnostico = async (req, res) => {
+    try {
+        const userId = req.usuario?.id;
+        const userRol = req.usuario?.permisos;
+        const result = {};
+
+        // 1. Total reuniones
+        const [totalReuniones] = await db.query('SELECT COUNT(*) as total FROM reuniones');
+        result.reuniones_total = totalReuniones[0].total;
+
+        // 2. Reuniones por estado
+        const [porEstado] = await db.query('SELECT estado_envio, COUNT(*) as total FROM reuniones GROUP BY estado_envio ORDER BY total DESC');
+        result.reuniones_por_estado = porEstado;
+
+        // 3. Reuniones Teams vs manuales
+        const [conEventId] = await db.query('SELECT COUNT(*) as total FROM reuniones WHERE event_id IS NOT NULL');
+        const [sinEventId] = await db.query('SELECT COUNT(*) as total FROM reuniones WHERE event_id IS NULL');
+        result.reuniones_con_event_id = conEventId[0].total;
+        result.reuniones_sin_event_id = sinEventId[0].total;
+
+        // 4. Huérfanas
+        const [totalHuerfanas] = await db.query('SELECT COUNT(*) as total FROM reuniones_huerfanas');
+        const [huerfanasPorEstado] = await db.query('SELECT estado, COUNT(*) as total FROM reuniones_huerfanas GROUP BY estado ORDER BY total DESC');
+        result.huerfanas_total = totalHuerfanas[0].total;
+        result.huerfanas_por_estado = huerfanasPorEstado;
+
+        // 5. Usuario actual
+        result.usuario = { id: userId, permisos: userRol };
+
+        // 6. Reuniones que retorna el endpoint para este usuario
+        if (userId && userRol === 'ejecutiva') {
+            const [reunionesUser] = await db.query(`
+                SELECT r.id, r.id_reunion, r.ejecutiva_id, r.empresa_id, r.tipo_reu,
+                       r.fecha_reu, r.estado_envio, r.event_id, r.asunto_teams,
+                       emp.nombre AS empresa_nombre
+                FROM reuniones r
+                LEFT JOIN usuarios e ON r.ejecutiva_id = e.id
+                LEFT JOIN empresas emp ON r.empresa_id = emp.id
+                LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+                WHERE (
+                    emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+                    OR emp.jefatura_id IN (
+                        SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+                    )
+                    OR r.ejecutiva_id = ?
+                )
+                ORDER BY r.fecha_reu DESC
+            `, [userId, userId, userId]);
+
+            result.reuniones_usuario = {
+                total: reunionesUser.length,
+                por_estado: {
+                    borrador: reunionesUser.filter(r => r.estado_envio === 'borrador').length,
+                    enviado: reunionesUser.filter(r => r.estado_envio === 'enviado').length,
+                    agendada: reunionesUser.filter(r => r.estado_envio === 'agendada').length,
+                    no_aplica: reunionesUser.filter(r => r.estado_envio === 'no_aplica').length,
+                },
+                primeras_15: reunionesUser.slice(0, 15).map(r => ({
+                    fecha: r.fecha_reu,
+                    estado: r.estado_envio,
+                    empresa_id: r.empresa_id,
+                    empresa: r.empresa_nombre || 'SIN EMPRESA',
+                    asunto: r.asunto_teams || r.tipo_reu || 'sin asunto',
+                    ejecutiva_id: r.ejecutiva_id
+                }))
+            };
+
+            // Huérfanas del usuario
+            const [huerfanasUser] = await db.query(`
+                SELECT h.id, h.asunto, h.fecha, h.estado
+                FROM reuniones_huerfanas h
+                JOIN usuarios u ON h.usuario_id = u.id
+                WHERE (
+                    u.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
+                    OR h.usuario_id = ?
+                )
+                AND h.estado IN ('pendiente', 'no_aplica')
+                ORDER BY h.fecha DESC
+            `, [userId, userId]);
+
+            result.huerfanas_usuario = {
+                total: huerfanasUser.length,
+                primeras_10: huerfanasUser.slice(0, 10).map(r => ({
+                    fecha: r.fecha,
+                    estado: r.estado,
+                    asunto: r.asunto
+                }))
+            };
+        }
+
+        // 7. Empresas
+        const [totalEmpresas] = await db.query('SELECT COUNT(*) as total FROM empresas');
+        result.empresas_total = totalEmpresas[0].total;
+
+        // 8. Jefaturas
+        const [totalJefaturas] = await db.query("SELECT COUNT(*) as total FROM usuarios WHERE permisos = 'jefatura'");
+        result.jefaturas_total = totalJefaturas[0].total;
+
+        // 9. Dominios y contactos
+        const [totalDominios] = await db.query('SELECT COUNT(*) as total FROM empresa_dominios');
+        const [totalContactos] = await db.query('SELECT COUNT(*) as total FROM empresa_contactos');
+        result.dominios_aprendidos = totalDominios[0].total;
+        result.contactos_aprendidos = totalContactos[0].total;
+
+        // 10. Encuestas
+        const [totalEncuestas] = await db.query('SELECT COUNT(*) as total FROM encuestas');
+        result.encuestas_total = totalEncuestas[0].total;
+
+        // 11. Logs de seguimiento
+        const [logsPorEstado] = await db.query('SELECT estado, COUNT(*) as total FROM empresa_seguimiento_log GROUP BY estado ORDER BY total DESC');
+        result.logs_seguimiento = logsPorEstado;
+
+        // 12. Verificar columnas existentes en reuniones y huerfanas (para validar migraciones)
+        const [colsReuniones] = await db.query("SHOW COLUMNS FROM reuniones");
+        result.columnas_reuniones = colsReuniones.map(c => c.Field);
+        const [colsHuerfanas] = await db.query("SHOW COLUMNS FROM reuniones_huerfanas");
+        result.columnas_huerfanas = colsHuerfanas.map(c => c.Field);
+
+        res.json(result);
+    } catch (err) {
+        console.error("[DIAGNOSTICO] Error:", err);
+        res.status(500).json({ error: "Error en diagnóstico: " + err.message });
+    }
+};

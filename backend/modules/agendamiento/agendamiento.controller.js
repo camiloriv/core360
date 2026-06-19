@@ -434,68 +434,82 @@ const syncEventosPasados = async (req, res) => {
     }
 };
 
+/**
+ * Función auxiliar para procesar la creación de una reunión (borrador)
+ * a partir de un registro de huerfana.
+ */
+const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
+    const year = new Date().getFullYear();
+    const [result] = await db.query("SELECT COUNT(*) AS total FROM reuniones WHERE YEAR(created_at) = ?", [year]);
+    const id_reunion = `REU-${year}-${String(result[0].total + 1).padStart(4, "0")}`;
+
+    // Parse asistentes
+    let attendeesList = [];
+    try {
+        attendeesList = JSON.parse(huerfana.asistentes || '[]');
+    } catch(e) {}
+
+    const names = [];
+    const externalEmails = [];
+
+    for (const item of attendeesList) {
+        let email = "";
+        let originalName = "";
+
+        if (typeof item === 'string') {
+            email = item.trim();
+        } else if (item && typeof item === 'object') {
+            email = (item.email || '').trim();
+            originalName = (item.name || '').trim();
+        }
+
+        if (email) {
+            const resolvedName = await resolveDisplayName(email, originalName);
+            names.push(resolvedName);
+            if (!email.toLowerCase().endsWith('@proforma.cl')) {
+                externalEmails.push(email);
+            }
+        }
+    }
+
+    const participantesNames = names.join(", ");
+    const enviadoAStr = JSON.stringify(externalEmails);
+
+    await db.query(
+        `INSERT INTO reuniones (
+            id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
+            lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
+        [
+            id_reunion, huerfana.usuario_id, empresa_id, 
+            '', 
+            huerfana.fecha, huerfana.hora, '',
+            enviadoAStr, huerfana.event_id,
+            participantesNames,
+            huerfana.asunto,
+            huerfana.asunto,
+            huerfana.ical_uid || null
+        ]
+    );
+
+    await db.query("UPDATE reuniones_huerfanas SET estado = 'vinculada' WHERE id = ?", [huerfana.id]);
+};
+
 const vincularHuerfana = async (req, res) => {
     try {
         const { id, empresa_id } = req.body;
         const [rows] = await db.query("SELECT * FROM reuniones_huerfanas WHERE id = ?", [id]);
         if (rows.length === 0) return res.status(404).json({ error: "No encontrada" });
-        const huerfana = rows[0];
+        const huerfanaPrincipal = rows[0];
 
-        const year = new Date().getFullYear();
-        const [result] = await db.query("SELECT COUNT(*) AS total FROM reuniones WHERE YEAR(created_at) = ?", [year]);
-        const id_reunion = `REU-${year}-${String(result[0].total + 1).padStart(4, "0")}`;
-
-        // Parse asistentes which can be string list (legacy) or name/email objects list (new)
+        // 1. Aprender dominios y contactos de la reunión seleccionada
         let attendeesList = [];
         try {
-            attendeesList = JSON.parse(huerfana.asistentes || '[]');
+            attendeesList = JSON.parse(huerfanaPrincipal.asistentes || '[]');
         } catch(e) {}
 
-        const names = [];
-        const externalEmails = [];
-
-        for (const item of attendeesList) {
-            let email = "";
-            let originalName = "";
-
-            if (typeof item === 'string') {
-                email = item.trim();
-            } else if (item && typeof item === 'object') {
-                email = (item.email || '').trim();
-                originalName = (item.name || '').trim();
-            }
-
-            if (email) {
-                const resolvedName = await resolveDisplayName(email, originalName);
-                names.push(resolvedName);
-                if (!email.toLowerCase().endsWith('@proforma.cl')) {
-                    externalEmails.push(email);
-                }
-            }
-        }
-
-        const participantesNames = names.join(", ");
-        const enviadoAStr = JSON.stringify(externalEmails);
-
-        await db.query(
-            `INSERT INTO reuniones (
-                id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
-                lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
-            [
-                id_reunion, huerfana.usuario_id, empresa_id, 
-                '', 
-                huerfana.fecha, huerfana.hora, '',
-                enviadoAStr, huerfana.event_id,
-                participantesNames,
-                huerfana.asunto,
-                huerfana.asunto,
-                huerfana.ical_uid || null
-            ]
-        );
-
-        // Auto-learning of domains and contacts
         const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+        
         for (const item of attendeesList) {
             let email = "";
             let name = null;
@@ -512,7 +526,6 @@ const vincularHuerfana = async (req, res) => {
                 if (!dominiosGenericos.includes(dom.substring(1))) {
                     await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
                     
-                    // Insert or update name in contacts
                     const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
                     if (existing.length === 0) {
                         await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
@@ -523,8 +536,52 @@ const vincularHuerfana = async (req, res) => {
             }
         }
 
-        await db.query("UPDATE reuniones_huerfanas SET estado = 'vinculada' WHERE id = ?", [id]);
-        res.json({ success: true });
+        // 2. Vincular la reunión principal
+        await crearBorradorDesdeHuerfana(huerfanaPrincipal, empresa_id);
+        let vinculadasExtras = 0;
+
+        // 3. Auto-Vincular otras huérfanas pendientes (Retro-match)
+        const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
+        const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
+        
+        const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
+        const knownEmails = new Set(contactosDocs.map(c => c.correo));
+
+        // Buscar todas las huérfanas pendientes restantes
+        const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente'");
+
+        for (const h of pendientes) {
+            let hAttendees = [];
+            try { hAttendees = JSON.parse(h.asistentes || '[]'); } catch(e) {}
+            
+            let matched = false;
+            for (const item of hAttendees) {
+                let email = "";
+                if (typeof item === 'string') email = item.trim().toLowerCase();
+                else if (item && typeof item === 'object') email = (item.email || '').trim().toLowerCase();
+
+                if (email) {
+                    if (knownEmails.has(email)) {
+                        matched = true;
+                        break;
+                    }
+                    if (email.includes('@')) {
+                        const dom = '@' + email.split('@')[1];
+                        if (knownDomains.has(dom)) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (matched) {
+                await crearBorradorDesdeHuerfana(h, empresa_id);
+                vinculadasExtras++;
+            }
+        }
+
+        res.json({ success: true, message: `Reunión vinculada. Adicionalmente se auto-vincularon ${vinculadasExtras} reuniones relacionadas.` });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Error al vincular." });

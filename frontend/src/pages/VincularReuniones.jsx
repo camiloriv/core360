@@ -59,13 +59,21 @@ export default function VincularReuniones() {
   const handleVincular = async (idHuerfana, empresaId) => {
     if (!empresaId) return;
     try {
-      await vincularHuerfana(idHuerfana, empresaId);
+      Swal.fire({
+        title: 'Vinculando y buscando coincidencias...',
+        text: 'Por favor espera, esto puede tomar unos segundos.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      const result = await vincularHuerfana(idHuerfana, empresaId);
+      
       Swal.fire({
         title: "Vinculada",
-        text: "La reunión ha sido vinculada correctamente y se creó el borrador.",
+        text: result?.data?.message || "La reunión ha sido vinculada correctamente y se creó el borrador.",
         icon: "success",
-        timer: 2000,
-        showConfirmButton: false
       });
       fetchHuerfanas();
     } catch (e) {

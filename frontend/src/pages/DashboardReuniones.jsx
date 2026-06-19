@@ -155,7 +155,8 @@ export default function DashboardReuniones() {
       return;
     }
     try {
-      await vincularHuerfana(selectedOrphanId, selectedEmpresaId);
+      const realId = selectedOrphan.id || (typeof selectedOrphanId === 'string' && selectedOrphanId.startsWith('huerfana-') ? selectedOrphanId.replace('huerfana-', '') : selectedOrphanId);
+      await vincularHuerfana(realId, selectedEmpresaId);
       Swal.fire("Éxito", "Empresa asignada correctamente. Borrador generado.", "success");
       setIsAssignModalOpen(false);
       setSelectedOrphanId(null);

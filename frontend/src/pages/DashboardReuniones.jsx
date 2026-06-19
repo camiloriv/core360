@@ -244,7 +244,12 @@ export default function DashboardReuniones() {
   const filteredReuniones = useMemo(() => {
     const result = reuniones.filter((r) => {
       const isHuerfana = Boolean(r.is_huerfana);
-      const pasaMacroYJef = isHuerfana || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      // Para roles ejecutiva/jefatura el backend ya filtra por usuario_id, así que las reuniones
+      // propias siempre deben mostrarse aunque la empresa no esté en empresasPorJefatura
+      // (puede ocurrir cuando hay datos de empresa incompletos en el entorno).
+      const esRolRestringido = userRol === 'ejecutiva' || userRol === 'jefatura';
+      const esReuionPropia = esRolRestringido && r.ejecutiva_id === user?.id;
+      const pasaMacroYJef = isHuerfana || esReuionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
       const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
 

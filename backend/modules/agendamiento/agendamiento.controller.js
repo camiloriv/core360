@@ -347,8 +347,13 @@ const syncEventosPasados = async (req, res) => {
         for (const event of pastEvents) {
             if (processedIds.has(event.id) || (event.iCalUId && processedICalUIds.has(event.iCalUId))) continue;
 
-            // Ignorar reuniones que no sean agendadas por Teams
-            if (!event.isOnlineMeeting && (!event.onlineMeeting || !event.onlineMeeting.joinUrl)) {
+            const subjectLower = (event.subject || '').toLowerCase();
+            const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
+            const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
+            const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
+
+            // Ignorar reuniones que no tengan un enlace de Teams y tampoco indiquen ser presenciales
+            if (!hasOnlineLink && !isPresencial) {
                 continue;
             }
 
@@ -398,6 +403,9 @@ const syncEventosPasados = async (req, res) => {
                     const externalEmails = emails.filter(email => !email.endsWith('@proforma.cl'));
                     const enviadoAStr = JSON.stringify(externalEmails);
 
+                    const linkTeams = event.onlineMeeting?.joinUrl || '';
+                    const lugarStr = isPresencial ? 'Presencial' : linkTeams;
+
                     await db.query(
                         `INSERT INTO reuniones (
                             id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
@@ -406,7 +414,7 @@ const syncEventosPasados = async (req, res) => {
                         [
                             id_reunion, usuarioId, matchedEmpresaId, 
                             '', 
-                            fecha, hora, event.onlineMeeting?.joinUrl || '',
+                            fecha, hora, lugarStr,
                             enviadoAStr, event.id, names.join(", "),
                             event.subject || 'Sin asunto',
                             event.subject || 'Sin asunto',
@@ -475,6 +483,10 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
     const participantesNames = names.join(", ");
     const enviadoAStr = JSON.stringify(externalEmails);
 
+    const subjectLower = (huerfana.asunto || '').toLowerCase();
+    const isPresencial = subjectLower.includes('presencial');
+    const lugarStr = isPresencial ? 'Presencial' : '';
+
     await db.query(
         `INSERT INTO reuniones (
             id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
@@ -483,7 +495,7 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
         [
             id_reunion, huerfana.usuario_id, empresa_id, 
             '', 
-            huerfana.fecha, huerfana.hora, '',
+            huerfana.fecha, huerfana.hora, lugarStr,
             enviadoAStr, huerfana.event_id,
             participantesNames,
             huerfana.asunto,

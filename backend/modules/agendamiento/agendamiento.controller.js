@@ -1,6 +1,28 @@
 require("dotenv").config();
 const db = require("../../database/connection");
 
+const generarIdReunion = async () => {
+    const year = new Date().getFullYear();
+    const sql = `
+        SELECT id_reunion 
+        FROM reuniones 
+        WHERE id_reunion LIKE ? 
+        ORDER BY CAST(SUBSTRING(id_reunion, 10) AS UNSIGNED) DESC 
+        LIMIT 1
+    `;
+    const [result] = await db.query(sql, [`REU-${year}-%`]);
+
+    let maxNum = 0;
+    if (result.length > 0 && result[0].id_reunion) {
+        const parts = result[0].id_reunion.split('-');
+        if (parts.length === 3) {
+            maxNum = parseInt(parts[2], 10) || 0;
+        }
+    }
+    const correlativo = String(maxNum + 1).padStart(4, "0");
+    return `REU-${year}-${correlativo}`;
+};
+
 let graphToken = null;
 let tokenExpiresAt = null;
 
@@ -363,17 +385,54 @@ const syncEventosPasados = async (req, res) => {
             return res.status(200).json({ success: true, procesados: 0 });
         }
 
-        const [reunionesDocs] = await db.query("SELECT event_id, ical_uid FROM reuniones WHERE event_id IS NOT NULL");
-        const [huerfanasDocs] = await db.query("SELECT event_id, ical_uid FROM reuniones_huerfanas");
-        const processedIds = new Set([...reunionesDocs, ...huerfanasDocs].map(r => r.event_id));
-        const processedICalUIds = new Set([...reunionesDocs, ...huerfanasDocs].map(r => r.ical_uid).filter(Boolean));
+        const [reunionesDocs] = await db.query("SELECT event_id, ical_uid, fecha_reu, hora, motivo_reu FROM reuniones");
+        const [huerfanasDocs] = await db.query("SELECT event_id, ical_uid, fecha, hora, asunto FROM reuniones_huerfanas");
+        
+        const processedIds = new Set();
+        const processedICalUIds = new Set();
+        const processedSignatures = new Set();
+
+        const formatDateStr = (val) => {
+            if (!val) return "";
+            if (typeof val === 'string') return val.split('T')[0];
+            return val.toISOString().split('T')[0];
+        };
+
+        reunionesDocs.forEach(r => {
+            if (r.event_id) processedIds.add(r.event_id);
+            if (r.ical_uid) processedICalUIds.add(r.ical_uid);
+            if (r.fecha_reu && r.hora && r.motivo_reu) {
+                const f = formatDateStr(r.fecha_reu);
+                const h = r.hora.substring(0, 5);
+                processedSignatures.add(`${f}|${h}|${r.motivo_reu.toLowerCase().trim()}`);
+            }
+        });
+
+        huerfanasDocs.forEach(r => {
+            if (r.event_id) processedIds.add(r.event_id);
+            if (r.ical_uid) processedICalUIds.add(r.ical_uid);
+            if (r.fecha && r.hora && r.asunto) {
+                const f = formatDateStr(r.fecha);
+                const h = r.hora.substring(0, 5);
+                processedSignatures.add(`${f}|${h}|${r.asunto.toLowerCase().trim()}`);
+            }
+        });
 
         const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
         
         let procesados = 0;
 
         for (const event of pastEvents) {
-            if (processedIds.has(event.id) || (event.iCalUId && processedICalUIds.has(event.iCalUId))) continue;
+            const fecha = event.start.dateTime.split('T')[0];
+            const hora = event.start.dateTime.split('T')[1].substring(0,5);
+            const rawSubject = event.subject || 'Sin asunto';
+            const signature = `${fecha}|${hora}|${rawSubject.toLowerCase().trim()}`;
+
+            if (processedIds.has(event.id) || 
+               (event.iCalUId && processedICalUIds.has(event.iCalUId)) ||
+               processedSignatures.has(signature)) {
+                continue;
+            }
 
             const subjectLower = (event.subject || '').toLowerCase();
             const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
@@ -418,14 +477,10 @@ const syncEventosPasados = async (req, res) => {
                     }
                 }
 
-                const fecha = event.start.dateTime.split('T')[0];
-                const hora = event.start.dateTime.split('T')[1].substring(0,5);
+                // La fecha y hora ya fueron extraídas arriba
 
                 if (matchedEmpresaId) {
-                    const year = new Date().getFullYear();
-                    const [result] = await db.query("SELECT COUNT(*) AS total FROM reuniones WHERE YEAR(created_at) = ?", [year]);
-                    const total = result[0].total + 1;
-                    const id_reunion = `REU-${year}-${String(total).padStart(4, "0")}`;
+                    const id_reunion = await generarIdReunion();
 
                     const names = filteredAttendees.map(a => a.name);
                     const externalEmails = emails.filter(email => !email.endsWith('@proforma.cl'));
@@ -435,7 +490,7 @@ const syncEventosPasados = async (req, res) => {
                     const lugarStr = isPresencial ? 'Presencial' : linkTeams;
 
                     await db.query(
-                        `INSERT INTO reuniones (
+                        `INSERT IGNORE INTO reuniones (
                             id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
                             lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
@@ -475,9 +530,7 @@ const syncEventosPasados = async (req, res) => {
  * a partir de un registro de huerfana.
  */
 const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
-    const year = new Date().getFullYear();
-    const [result] = await db.query("SELECT COUNT(*) AS total FROM reuniones WHERE YEAR(created_at) = ?", [year]);
-    const id_reunion = `REU-${year}-${String(result[0].total + 1).padStart(4, "0")}`;
+    const id_reunion = await generarIdReunion();
 
     // Parse asistentes
     let attendeesList = [];
@@ -516,7 +569,7 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
     const lugarStr = isPresencial ? 'Presencial' : '';
 
     await db.query(
-        `INSERT INTO reuniones (
+        `INSERT IGNORE INTO reuniones (
             id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
             lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
@@ -537,71 +590,73 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
 
 const vincularHuerfana = async (req, res) => {
     try {
-        const { id, empresa_id } = req.body;
+        const { id, empresa_id, dominios } = req.body;
         const [rows] = await db.query("SELECT * FROM reuniones_huerfanas WHERE id = ?", [id]);
         if (rows.length === 0) return res.status(404).json({ error: "No encontrada" });
         const huerfanaPrincipal = rows[0];
 
-        // 1. Aprender dominios y contactos de la reunión seleccionada
-        let attendeesList = [];
-        try {
-            attendeesList = JSON.parse(huerfanaPrincipal.asistentes || '[]');
-        } catch(e) {}
+        let vinculadasExtras = 0;
 
-        const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
-        
-        for (const item of attendeesList) {
-            let email = "";
-            let name = null;
+        if (empresa_id) {
+            // 1. Aprender dominios y contactos de la reunión seleccionada
+            let attendeesList = [];
+            try {
+                attendeesList = JSON.parse(huerfanaPrincipal.asistentes || '[]');
+            } catch(e) {}
 
-            if (typeof item === 'string') {
-                email = item.trim().toLowerCase();
-            } else if (item && typeof item === 'object') {
-                email = (item.email || '').trim().toLowerCase();
-                name = (item.name || '').trim() || null;
-            }
+            const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+            
+            for (const item of attendeesList) {
+                let email = "";
+                let name = null;
 
-            if (email && email.includes('@')) {
-                const dom = '@' + email.split('@')[1];
-                if (!dominiosGenericos.includes(dom.substring(1))) {
-                    await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
-                    
-                    const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                    if (existing.length === 0) {
-                        await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
-                    } else if (name && !existing[0].nombre) {
-                        await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                if (typeof item === 'string') {
+                    email = item.trim().toLowerCase();
+                } else if (item && typeof item === 'object') {
+                    email = (item.email || '').trim().toLowerCase();
+                    name = (item.name || '').trim() || null;
+                }
+
+                if (email && email.includes('@')) {
+                    const dom = '@' + email.split('@')[1];
+                    if (!dominiosGenericos.includes(dom.substring(1))) {
+                        const shouldSaveDomain = dominios === undefined || dominios.includes(dom);
+                        if (shouldSaveDomain) {
+                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                            
+                            const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
+                            if (existing.length === 0) {
+                                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
+                            } else if (name && !existing[0].nombre) {
+                                await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // 2. Vincular la reunión principal
-        await crearBorradorDesdeHuerfana(huerfanaPrincipal, empresa_id);
-        let vinculadasExtras = 0;
-
-        // 3. Auto-Vincular otras huérfanas pendientes (Retro-match)
-        const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
-        const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
-        
-        const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
-        const knownEmails = new Set(contactosDocs.map(c => c.correo));
-
-        // Buscar todas las huérfanas pendientes restantes
-        const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente'");
-
-        for (const h of pendientes) {
-            let hAttendees = [];
-            try { hAttendees = JSON.parse(h.asistentes || '[]'); } catch(e) {}
+            // 3. Auto-Vincular otras huérfanas pendientes (Retro-match)
+            const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
+            const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
             
-            let matched = false;
-            for (const item of hAttendees) {
-                let email = "";
-                if (typeof item === 'string') email = item.trim().toLowerCase();
-                else if (item && typeof item === 'object') email = (item.email || '').trim().toLowerCase();
+            const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
+            const knownEmails = new Set(contactosDocs.map(c => c.correo));
 
-                if (email) {
-                    if (knownEmails.has(email)) {
+            // Buscar todas las huérfanas pendientes restantes
+            const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente'");
+
+            for (const h of pendientes) {
+                let hAttendees = [];
+                try { hAttendees = JSON.parse(h.asistentes || '[]'); } catch(e) {}
+                
+                let matched = false;
+                for (const item of hAttendees) {
+                    let email = "";
+                    if (typeof item === 'string') email = item.trim().toLowerCase();
+                    else if (item && typeof item === 'object') email = (item.email || '').trim().toLowerCase();
+
+                    if (email) {
+                        if (knownEmails.has(email)) {
                         matched = true;
                         break;
                     }
@@ -620,8 +675,17 @@ const vincularHuerfana = async (req, res) => {
                 vinculadasExtras++;
             }
         }
+        }
 
-        res.json({ success: true, message: `Reunión vinculada. Adicionalmente se auto-vincularon ${vinculadasExtras} reuniones relacionadas.` });
+        // 2. Vincular la reunión principal
+        await crearBorradorDesdeHuerfana(huerfanaPrincipal, empresa_id || null);
+
+        let msj = "Reunión vinculada exitosamente.";
+        if (empresa_id && vinculadasExtras > 0) {
+            msj += ` Adicionalmente se auto-vincularon ${vinculadasExtras} reuniones relacionadas.`;
+        }
+
+        res.json({ success: true, message: msj });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Error al vincular." });
@@ -651,30 +715,67 @@ const getHuerfanas = async (req, res) => {
 
 const desvincularBorrador = async (req, res) => {
     try {
-        const { id_reunion } = req.body;
+        const { id_reunion, dominio, dominios } = req.body;
         
         // 1. Get the draft event_id
-        const [reuniones] = await db.query("SELECT event_id, estado_envio FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+        const [reuniones] = await db.query("SELECT event_id, estado_envio, empresa_id FROM reuniones WHERE id_reunion = ?", [id_reunion]);
         if (reuniones.length === 0) {
             return res.status(404).json({ error: "Reunión no encontrada." });
         }
-        
-        const reunion = reuniones[0];
-        if (reunion.estado_envio !== 'borrador') {
-            return res.status(400).json({ error: "Solo se pueden desvincular reuniones en estado borrador." });
-        }
-        
-        const eventId = reunion.event_id;
 
-        // 2. Delete the draft in reuniones
-        await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+        const { event_id, estado_envio, empresa_id } = reuniones[0];
 
-        // 3. If it has event_id, update reuniones_huerfanas state back to 'pendiente'
-        if (eventId) {
-            await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [eventId]);
+        if (estado_envio !== 'borrador') {
+            return res.status(400).json({ error: "Solo se pueden desvincular reuniones en borrador." });
         }
 
-        res.json({ success: true, message: "Reunión desvinculada y borrador eliminado correctamente." });
+        const targetDominios = Array.isArray(dominios)
+            ? dominios
+            : (dominio ? [dominio] : []);
+
+        if (targetDominios.length > 0 && empresa_id) {
+            let totalDesvinculadas = 0;
+            for (const dom of targetDominios) {
+                // Delete domain mapping if it was saved by mistake
+                await db.query("DELETE FROM empresa_dominios WHERE empresa_id = ? AND dominio = ?", [empresa_id, dom]);
+
+                // Find all borrador meetings of this company with this domain
+                const [relacionadas] = await db.query(
+                    "SELECT id_reunion, event_id FROM reuniones WHERE empresa_id = ? AND estado_envio = 'borrador' AND enviado_a LIKE ?", 
+                    [empresa_id, `%${dom}%`]
+                );
+
+                for (const rel of relacionadas) {
+                    if (rel.event_id) {
+                        await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [rel.event_id]);
+                    }
+                    await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [rel.id_reunion]);
+                }
+                totalDesvinculadas += relacionadas.length;
+            }
+
+            // Also make sure the current meeting itself is unlinked if it wasn't already in the loop
+            const [stillExists] = await db.query("SELECT id_reunion FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+            if (stillExists.length > 0) {
+                if (event_id) {
+                    await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
+                }
+                await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+                totalDesvinculadas++;
+            }
+
+            return res.json({ success: true, message: `Se desvincularon ${totalDesvinculadas} reuniones.` });
+        } else {
+            // Revert the orphan meeting back to pendiente
+            if (event_id) {
+                await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
+            }
+
+            // 3. Delete the draft from reuniones
+            await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+
+            res.json({ success: true });
+        }
     } catch (e) {
         console.error("Error al desvincular borrador:", e);
         res.status(500).json({ error: "Error interno al desvincular borrador." });

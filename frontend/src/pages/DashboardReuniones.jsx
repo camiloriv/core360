@@ -23,6 +23,7 @@ import SearchableFilter from "../components/form/fields/SearchableFilter";
 import KpiCard from "../components/dashboard/KpiCard";
 import { exportToExcel } from "../utils/exportExcel";
 import Swal from "sweetalert2";
+import api from "../services/api";
 import "../styles/core360-theme.css";
 
 const MESES = [
@@ -93,26 +94,77 @@ export default function DashboardReuniones() {
     runSync();
   }, []);
 
-  const handleDesvincular = async (idReunion) => {
-    const result = await Swal.fire({
-      title: "¿Desvincular reunión?",
-      text: "Se eliminará el borrador de la minuta y la reunión volverá a la bandeja de 'Reuniones Pasadas sin Clasificar' para que puedas volver a enlazarla.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#be123c",
-      cancelButtonColor: "#64748b",
-      confirmButtonText: "Sí, desvincular",
-      cancelButtonText: "Cancelar"
-    });
-
-    if (result.isConfirmed) {
-      try {
-        await desvincularBorrador(idReunion);
-        Swal.fire("Desvinculada", "La reunión ha sido desvinculada correctamente.", "success");
-        window.location.reload();
-      } catch (e) {
-        Swal.fire("Error", "No se pudo desvincular la reunión", "error");
+  const handleDesvincular = async (reunion) => {
+    let dominios = [];
+    try {
+      const invitadosStr = reunion.enviado_a || '[]';
+      const invitados = JSON.parse(invitadosStr);
+      if (Array.isArray(invitados)) {
+        dominios = [...new Set(invitados.filter(e => typeof e === 'string' && e.includes('@') && !e.toLowerCase().endsWith('@proforma.cl')).map(e => '@' + e.split('@')[1]))];
       }
+    } catch(e) {}
+
+    let desvincularDominios = [];
+
+    if (dominios.length > 0) {
+      const htmlContent = `
+        <div style="text-align: left; margin-top: 15px;">
+          <div style="font-size: 14px; color: #475569; margin-bottom: 16px; line-height: 1.5;">
+            Se desvinculará este borrador de minuta y la reunión volverá a la bandeja de reuniones sin clasificar.
+          </div>
+          <div style="font-weight: 700; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
+            Además, desvincular dominio(s) para auto-vinculación futura:
+          </div>
+          <div class="swal2-checkboxes-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            ${dominios.map(d => `
+              <label class="swal2-checkbox-label">
+                <input type="checkbox" class="swal2-desvincular-checkbox" value="${d}" />
+                <span>Eliminar dominio ${d} (desvincula todas las minutas en borrador asociadas)</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      const result = await Swal.fire({
+        title: '¿Desvincular Reunión?',
+        html: htmlContent,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Desvincular',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#be123c',
+        cancelButtonColor: '#64748b',
+        preConfirm: () => {
+          const checked = document.querySelectorAll('.swal2-desvincular-checkbox:checked');
+          return Array.from(checked).map(cb => cb.value);
+        }
+      });
+
+      if (!result.isConfirmed) return; // Cancelado
+      desvincularDominios = result.value || [];
+    } else {
+      const result = await Swal.fire({
+        title: "¿Desvincular reunión?",
+        text: "Se eliminará el borrador de la minuta y la reunión volverá a la bandeja de 'Reuniones Pasadas sin Clasificar' para que puedas volver a enlazarla.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#be123c",
+        cancelButtonColor: "#64748b",
+        confirmButtonText: "Sí, desvincular",
+        cancelButtonText: "Cancelar"
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    try {
+      const result = await desvincularBorrador(reunion.id_reunion, desvincularDominios);
+      const msj = result.data?.message || "La reunión ha sido desvinculada correctamente.";
+      Swal.fire("Desvinculada", msj, "success");
+      window.location.reload();
+    } catch (e) {
+      Swal.fire("Error", "No se pudo desvincular la reunión", "error");
     }
   };
 
@@ -122,6 +174,16 @@ export default function DashboardReuniones() {
   const [selectedEmpresaId, setSelectedEmpresaId] = useState("");
   const [searchEmpresa, setSearchEmpresa] = useState("");
   const [showEmpresaDropdown, setShowEmpresaDropdown] = useState(false);
+  const [noAplicaEmpresa, setNoAplicaEmpresa] = useState(false);
+  const [globalEmpresas, setGlobalEmpresas] = useState([]);
+
+  useEffect(() => {
+    // Para el modal de vinculación, cargar TODAS las empresas (no solo de la cartera actual),
+    // ya que reuniones antiguas pueden pertenecer a empresas que cambiaron de ejecutiva.
+    api.get("/empresas")
+      .then(res => setGlobalEmpresas(res.data))
+      .catch(err => console.error("Error cargando empresas globales:", err));
+  }, []);
 
   const externalAttendees = useMemo(() => {
     if (!selectedOrphan || !selectedOrphan.participantes) return [];
@@ -139,6 +201,26 @@ export default function DashboardReuniones() {
     return [];
   }, [selectedOrphan]);
 
+  const detectedDomains = useMemo(() => {
+    const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+    const list = externalAttendees
+      .map(p => {
+        const email = p.email || (p.name && p.name.includes('@') ? p.name : '');
+        if (email && email.includes('@')) {
+          return '@' + email.split('@')[1].trim().toLowerCase();
+        }
+        return null;
+      })
+      .filter(d => d && !dominiosGenericos.includes(d.substring(1)));
+    return [...new Set(list)];
+  }, [externalAttendees]);
+
+  const [selectedDomains, setSelectedDomains] = useState([]);
+
+  useEffect(() => {
+    setSelectedDomains(detectedDomains);
+  }, [detectedDomains]);
+
   const handleMarcarNoAplica = async (id, isHuerfana, isCurrentlyNoAplica) => {
     try {
       await marcarNoAplica(id, isHuerfana, !isCurrentlyNoAplica);
@@ -150,8 +232,8 @@ export default function DashboardReuniones() {
   };
 
   const handleAsignarEmpresa = async () => {
-    if (!selectedEmpresaId) {
-      Swal.fire("Atención", "Debes seleccionar una empresa", "warning");
+    if (!noAplicaEmpresa && !selectedEmpresaId) {
+      Swal.fire("Atención", "Debes seleccionar una empresa o marcar la opción 'No aplica'", "warning");
       return;
     }
     try {
@@ -165,13 +247,14 @@ export default function DashboardReuniones() {
       });
       
       const realId = selectedOrphan.id || (typeof selectedOrphanId === 'string' && selectedOrphanId.startsWith('huerfana-') ? selectedOrphanId.replace('huerfana-', '') : selectedOrphanId);
-      const result = await vincularHuerfana(realId, selectedEmpresaId);
+      const result = await vincularHuerfana(realId, noAplicaEmpresa ? null : selectedEmpresaId, noAplicaEmpresa ? [] : selectedDomains);
       
       Swal.fire("Éxito", result?.data?.message || "Empresa asignada correctamente. Borrador generado.", "success");
       setIsAssignModalOpen(false);
       setSelectedOrphanId(null);
       setSelectedOrphan(null);
       setSelectedEmpresaId("");
+      setNoAplicaEmpresa(false);
       refetch();
     } catch (e) {
       console.error(e);
@@ -183,6 +266,7 @@ export default function DashboardReuniones() {
   const [filtroJefatura, setFiltroJefatura] = useState("");
   const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
   const [filtroTipo, setFiltroTipo] = useState("Todas");
+  const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [filtroPeriodo, setFiltroPeriodo] = useState(`anio-${new Date().getFullYear()}`);
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
@@ -296,7 +380,14 @@ export default function DashboardReuniones() {
         }
       }
 
-      return pasaMacroYJef && pasaEmpresa && pasaTipo && pasaPeriodo;
+      let pasaEstado = true;
+      if (filtroEstado === "Pendientes de Vincular") {
+        pasaEstado = isHuerfana;
+      } else if (filtroEstado === "Vinculadas") {
+        pasaEstado = !isHuerfana;
+      }
+
+      return pasaMacroYJef && pasaEmpresa && pasaTipo && pasaPeriodo && pasaEstado;
     });
 
     return result.sort(
@@ -309,6 +400,7 @@ export default function DashboardReuniones() {
     filtroEmpresa,
     filtroTipo,
     filtroPeriodo,
+    filtroEstado,
     userRol,
     user,
     empresasPorJefatura
@@ -321,7 +413,7 @@ export default function DashboardReuniones() {
   // Reiniciar página a 1 cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo]);
+  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo, filtroEstado]);
 
   // 🔹 CÁLCULO DE DATOS DE REUNIONES ÚNICAS
   const realizedReuniones = useMemo(() => {
@@ -582,6 +674,17 @@ export default function DashboardReuniones() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Estado */}
+            <div style={{ minWidth: "200px", flex: "1 1 200px" }}>
+              <SearchableFilter 
+                label="Estado"
+                value={filtroEstado}
+                options={["Todos", "Pendientes de Vincular", "Vinculadas"]}
+                onChange={(val) => setFiltroEstado(val || "Todos")}
+                placeholder="Seleccionar..."
+              />
             </div>
 
             {/* Buscar Empresa */}
@@ -1050,7 +1153,7 @@ export default function DashboardReuniones() {
                               <div style={{ display: "flex", gap: "6px" }}>
                                 {r.event_id && (
                                   <span
-                                    onClick={(e) => { e.stopPropagation(); handleDesvincular(r.id_reunion); }}
+                                    onClick={(e) => { e.stopPropagation(); handleDesvincular(r); }}
                                     style={{
                                       fontSize: "10px", color: "#be123c", cursor: "pointer", textDecoration: "underline",
                                       fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#ffe4e6"
@@ -1407,14 +1510,61 @@ export default function DashboardReuniones() {
             <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
               Selecciona la empresa correspondiente. Una vez asignada, el dominio se guardará para auto-vincular futuras reuniones.
             </p>
-            <div style={{ marginBottom: "20px", position: "relative" }}>
+            
+            <div style={{ marginBottom: "16px", background: "#f8fafc", padding: "10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px", color: "#334155", margin: 0 }}>
+                <input 
+                  type="checkbox" 
+                  checked={noAplicaEmpresa} 
+                  onChange={(e) => {
+                    setNoAplicaEmpresa(e.target.checked);
+                    if (e.target.checked) {
+                      setSelectedEmpresaId("");
+                      setSearchEmpresa("");
+                    }
+                  }} 
+                  style={{ width: "16px", height: "16px", accentColor: "var(--primary-color)", cursor: "pointer" }}
+                />
+                <strong>No aplica empresa</strong> (Webinar, Reunión Interna, etc.)
+              </label>
+            </div>
+
+            {detectedDomains.length > 0 && !noAplicaEmpresa && (
+              <div style={{ marginBottom: "16px", background: "#f8fafc", padding: "12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
+                  Asociar Dominios para Auto-vincular:
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {detectedDomains.map((dom) => (
+                    <label key={dom} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", color: "#334155", margin: 0, textTransform: "none" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDomains.includes(dom)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDomains(prev => [...prev, dom]);
+                          } else {
+                            setSelectedDomains(prev => prev.filter(x => x !== dom));
+                          }
+                        }}
+                        style={{ width: "16px", height: "16px", accentColor: "var(--primary-color)", cursor: "pointer" }}
+                      />
+                      <span>{dom}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: "20px", position: "relative", opacity: noAplicaEmpresa ? 0.5 : 1 }}>
               <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "bold", color: "#334155" }}>
                 Empresa
               </label>
               <input
                 type="text"
-                placeholder="Escribe para buscar empresa..."
+                placeholder={noAplicaEmpresa ? "Deshabilitado" : "Escribe para buscar empresa..."}
                 value={searchEmpresa}
+                disabled={noAplicaEmpresa}
                 onChange={(e) => {
                   setSearchEmpresa(e.target.value);
                   setSelectedEmpresaId(""); // Resetea id si escribe algo distinto
@@ -1440,8 +1590,8 @@ export default function DashboardReuniones() {
                   zIndex: 10,
                   boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
                 }}>
-                  {empresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).length > 0 ? (
-                    empresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).map(emp => (
+                  {globalEmpresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).length > 0 ? (
+                    globalEmpresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).map(emp => (
                       <div
                         key={emp.id}
                         onClick={() => {
@@ -1472,14 +1622,14 @@ export default function DashboardReuniones() {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button
                 className="core360-btn secondary"
-                onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); }}
+                onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); setNoAplicaEmpresa(false); }}
               >
                 Cancelar
               </button>
               <button
                 className="core360-btn primary"
                 onClick={handleAsignarEmpresa}
-                disabled={!selectedEmpresaId}
+                disabled={!selectedEmpresaId && !noAplicaEmpresa}
               >
                 Asignar
               </button>

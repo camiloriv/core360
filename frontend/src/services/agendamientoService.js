@@ -20,15 +20,15 @@ export const obtenerHuerfanas = async () => {
   return api.get('/agendamiento/huerfanas');
 };
 
-export const vincularHuerfana = async (id, empresa_id) => {
-  return api.post('/agendamiento/huerfanas/vincular', { id, empresa_id });
+export const vincularHuerfana = async (id, empresa_id, dominios) => {
+  return api.post('/agendamiento/huerfanas/vincular', { id, empresa_id, dominios });
 };
 
 export const descartarHuerfana = async (id) => {
   return api.post('/agendamiento/huerfanas/descartar', { id });
 };
 
-export const desvincularBorrador = async (id_reunion) => {
-  return api.post('/agendamiento/huerfanas/desvincular', { id_reunion });
+export const desvincularBorrador = async (id_reunion, dominios) => {
+  return api.post('/agendamiento/huerfanas/desvincular', { id_reunion, dominios });
 };
 

@@ -356,16 +356,24 @@ const generarIdReunion = async () => {
     const year = new Date().getFullYear();
 
     const sql = `
-        SELECT COUNT(*) AS total 
+        SELECT id_reunion 
         FROM reuniones 
-        WHERE YEAR(created_at) = ?
+        WHERE id_reunion LIKE ? 
+        ORDER BY CAST(SUBSTRING(id_reunion, 10) AS UNSIGNED) DESC 
+        LIMIT 1
     `;
 
-    const [result] = await db.query(sql, [year]);
+    const [result] = await db.query(sql, [`REU-${year}-%`]);
 
-    const total = result[0].total + 1;
-    const correlativo = String(total).padStart(4, "0");
+    let maxNum = 0;
+    if (result.length > 0 && result[0].id_reunion) {
+        const parts = result[0].id_reunion.split('-');
+        if (parts.length === 3) {
+            maxNum = parseInt(parts[2], 10) || 0;
+        }
+    }
 
+    const correlativo = String(maxNum + 1).padStart(4, "0");
     return `REU-${year}-${correlativo}`;
 };
 

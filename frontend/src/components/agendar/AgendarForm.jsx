@@ -18,7 +18,9 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
     hora: "",
     duracion: "30",
     asunto: "",
-    detalle: ""
+    detalle: "",
+    modalidad: "Teams",
+    direccion: ""
   });
   
   const [loading, setLoading] = useState(false);
@@ -77,7 +79,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
         // Reset form
         setForm({
           empresa_id: "", destinatarios: "", asistentes_internos: "", 
-          fecha: "", hora: "", duracion: "30", asunto: "", detalle: ""
+          fecha: "", hora: "", duracion: "30", asunto: "", detalle: "", modalidad: "Teams", direccion: ""
         });
         if (onFormSubmitSuccess) onFormSubmitSuccess();
       }
@@ -94,7 +96,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
   return (
     <div className="form-container">
       <form onSubmit={handleSubmit}>
-        <FormSection title="DETALLES DEL EVENTO (TEAMS)">
+        <FormSection title={`DETALLES DEL EVENTO (${form.modalidad === "Presencial" ? "PRESENCIAL" : "TEAMS"})`}>
           <div className="form-group full-width" style={{ marginBottom: '15px' }}>
             <SelectEmpresa 
               value={form.empresa_id} 
@@ -102,6 +104,28 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
               empresas={empresas} 
             />
           </div>
+          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
+            <label>MODALIDAD *</label>
+            <select name="modalidad" value={form.modalidad} onChange={handleChange} required>
+              <option value="Teams">Reunión por Teams</option>
+              <option value="Presencial">Reunión Presencial</option>
+            </select>
+          </div>
+          
+          {form.modalidad === "Presencial" && (
+            <div className="form-group full-width" style={{ marginBottom: '15px' }}>
+              <label>DIRECCIÓN (UBICACIÓN) *</label>
+              <input 
+                type="text" 
+                name="direccion"
+                value={form.direccion} 
+                onChange={handleChange} 
+                placeholder="Ej. Av. Providencia 1234, Oficina 501" 
+                required={form.modalidad === "Presencial"} 
+              />
+            </div>
+          )}
+          
           <div className="form-group full-width" style={{ marginBottom: '15px' }}>
             <label>ASUNTO *</label>
             <input 
@@ -197,7 +221,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
-                Agendar en Teams
+                {form.modalidad === "Presencial" ? "Agendar Presencial" : "Agendar en Teams"}
               </>
             )}
           </button>

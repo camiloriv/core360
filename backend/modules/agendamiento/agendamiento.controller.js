@@ -38,7 +38,7 @@ const crearReunionTeams = async (req, res) => {
             return res.status(400).json({ error: "El usuario no tiene correo configurado en su perfil." });
         }
 
-        const { empresa_id, destinatarios, asistentes_internos, fecha, hora, duracion, asunto, detalle } = req.body;
+        const { empresa_id, destinatarios, asistentes_internos, fecha, hora, duracion, asunto, detalle, modalidad, direccion } = req.body;
 
         // Parse dateTime and calculate end time
         // fecha = YYYY-MM-DD, hora = HH:mm
@@ -78,8 +78,11 @@ const crearReunionTeams = async (req, res) => {
             });
         }
 
+        const isPresencial = modalidad === "Presencial";
+        const finalSubject = isPresencial ? `${asunto} [Presencial]` : asunto;
+
         const eventPayload = {
-            subject: asunto,
+            subject: finalSubject,
             body: {
                 contentType: "HTML",
                 content: detalle || "Reunión generada desde CORE 360"
@@ -92,10 +95,15 @@ const crearReunionTeams = async (req, res) => {
                 dateTime: endDateTimeStr,
                 timeZone: "America/Santiago"
             },
-            attendees: attendees,
-            isOnlineMeeting: true,
-            onlineMeetingProvider: "teamsForBusiness"
+            attendees: attendees
         };
+
+        if (isPresencial) {
+            eventPayload.location = { displayName: direccion ? `Presencial: ${direccion}` : "Presencial" };
+        } else {
+            eventPayload.isOnlineMeeting = true;
+            eventPayload.onlineMeetingProvider = "teamsForBusiness";
+        }
 
         const accessToken = await getGraphToken();
         const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/events`;
@@ -119,12 +127,32 @@ const crearReunionTeams = async (req, res) => {
         if (empresa_id) {
             const fechaVal = fecha;
             await db.query("UPDATE empresas SET estado_seguimiento = ?, fecha_concretada = ? WHERE id = ?", ['agendada', fechaVal, empresa_id]);
-            await db.query("INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, ?, ?, ?, ?, ?)", [empresa_id, 'agendada', fechaVal, req.usuario.id, data.id, asunto]);
+            await db.query("INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, ?, ?, ?, ?, ?)", [empresa_id, 'agendada', fechaVal, req.usuario.id, data.id, finalSubject]);
+
+            // Aprendizaje de dominios y contactos
+            if (destinatarios) {
+                const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+                const correos = destinatarios.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+                
+                for (const email of correos) {
+                    if (email.includes('@')) {
+                        const dom = '@' + email.split('@')[1];
+                        if (!dominiosGenericos.includes(dom.substring(1))) {
+                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                            
+                            const [existing] = await db.query("SELECT id FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
+                            if (existing.length === 0) {
+                                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, NULL)", [empresa_id, email]);
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         return res.status(200).json({ 
             success: true, 
-            message: "Reunión agendada en Teams",
+            message: isPresencial ? "Reunión agendada en tu calendario" : "Reunión agendada en Teams",
             joinUrl: data.onlineMeeting?.joinUrl || null,
             eventId: data.id
         });

@@ -239,14 +239,19 @@ const Sidebar = ({ isOpen, onClose }) => {
       if (item.path === "/vincular-reuniones") {
         return vistas.includes("/dashboard-reuniones");
       }
+      if (item.path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva")) {
+        return true;
+      }
       return vistas.includes(item.path);
     });
   } else {
     if (user.permisos !== "admin" && user.permisos !== "ADMIN") {
-      menuItems = menuItems.filter(
-        (item) =>
-          !["/gestion-usuarios", "/gestion-empresas"].includes(item.path),
-      );
+      menuItems = menuItems.filter((item) => {
+        if (item.path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva")) {
+          return true;
+        }
+        return !["/gestion-usuarios", "/gestion-empresas"].includes(item.path);
+      });
     }
 
     if (

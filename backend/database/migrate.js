@@ -158,7 +158,7 @@ async function runMigrations() {
     const [gestionadas] = await connection.query(`
       SELECT DISTINCT r.empresa_id, r.fecha_reu, r.id_reunion, r.ejecutiva_id
       FROM reuniones r
-      WHERE r.estado_envio != 'pendiente' AND r.fecha_reu IS NOT NULL
+      WHERE r.estado_envio != 'pendiente' AND r.fecha_reu IS NOT NULL AND r.empresa_id IS NOT NULL
     `);
     for (const reu of gestionadas) {
       const [exists] = await connection.query(
@@ -271,6 +271,14 @@ async function runMigrations() {
       const hashed = await bcrypt.hash('123', 10);
       const [pwdResult] = await connection.query('UPDATE usuarios SET contrasena = ?', [hashed]);
       console.log(`Migration: Successfully reset passwords for ${pwdResult.affectedRows} users.`);
+    }
+
+    // 14. Sembrar datos para inducción / demostración de plataforma
+    try {
+      const { seedInductionData } = require("./scripts/seed_induction");
+      await seedInductionData(connection);
+    } catch (e) {
+      console.error("Migration: Note: Seeding of induction data failed:", e.message);
     }
 
     console.log("Migration: All migrations verified and applied successfully!");

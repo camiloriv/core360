@@ -302,3 +302,147 @@ exports.obtenerUsuariosAsignados = async (req, res) => {
     res.status(500).json({ error: "Error en la BD" });
   }
 };
+
+exports.obtenerVinculaciones = async (req, res) => {
+  try {
+    const [empresas] = await db.query(`
+      SELECT e.id, e.nombre, e.jefatura_id, j.nombre as jefatura_nombre, e.zona_id, z.nombre as zona_nombre
+      FROM empresas e
+      LEFT JOIN usuarios j ON e.jefatura_id = j.id
+      LEFT JOIN zonas z ON e.zona_id = z.id
+      ORDER BY e.nombre ASC
+    `);
+
+    const [dominios] = await db.query(`
+      SELECT id, empresa_id, dominio FROM empresa_dominios
+    `);
+
+    const [contactos] = await db.query(`
+      SELECT id, empresa_id, correo, nombre FROM empresa_contactos
+    `);
+
+    // Group by company
+    const map = {};
+    empresas.forEach(emp => {
+      map[emp.id] = {
+        ...emp,
+        dominios: [],
+        contactos: []
+      };
+    });
+
+    dominios.forEach(dom => {
+      if (map[dom.empresa_id]) {
+        map[dom.empresa_id].dominios.push(dom.dominio);
+      }
+    });
+
+    contactos.forEach(cont => {
+      if (map[cont.empresa_id]) {
+        map[cont.empresa_id].contactos.push({
+          id: cont.id,
+          nombre: cont.nombre,
+          correo: cont.correo
+        });
+      }
+    });
+
+    res.json(Object.values(map));
+  } catch (err) {
+    console.error("Error obteniendo vinculaciones:", err);
+    res.status(500).json({ error: "Error al obtener vinculaciones de la BD" });
+  }
+};
+
+exports.actualizarVinculaciones = async (req, res) => {
+  const { id } = req.params; // empresa_id
+  const { jefatura_id, dominios, contactos, nombre, zona_id } = req.body;
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Update company basic info
+    const [empRows] = await connection.query("SELECT nombre, zona_id FROM empresas WHERE id = ?", [id]);
+    if (empRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Empresa no encontrada" });
+    }
+    const currentEmp = empRows[0];
+    const finalNombre = nombre || currentEmp.nombre;
+    const finalZonaId = zona_id !== undefined ? zona_id : currentEmp.zona_id;
+
+    await connection.query(
+      "UPDATE empresas SET nombre = ?, jefatura_id = ?, zona_id = ? WHERE id = ?",
+      [finalNombre, jefatura_id || null, finalZonaId || null, id]
+    );
+
+    // 2. Synchronize domains (empresa_dominios)
+    if (Array.isArray(dominios)) {
+      const cleanDominios = dominios
+        .map(d => d.trim().toLowerCase())
+        .filter(d => d.length > 0)
+        .map(d => d.startsWith('@') ? d : '@' + d);
+
+      const [existingDoms] = await connection.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [id]);
+      const existingDomSet = new Set(existingDoms.map(d => d.dominio));
+      const cleanDomSet = new Set(cleanDominios);
+
+      for (const dom of existingDomSet) {
+        if (!cleanDomSet.has(dom)) {
+          await connection.query("DELETE FROM empresa_dominios WHERE empresa_id = ? AND dominio = ?", [id, dom]);
+        }
+      }
+
+      for (const dom of cleanDomSet) {
+        if (!existingDomSet.has(dom)) {
+          await connection.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [id, dom]);
+        }
+      }
+    }
+
+    // 3. Synchronize contacts (empresa_contactos)
+    if (Array.isArray(contactos)) {
+      const cleanContactos = contactos
+        .map(c => ({
+          id: c.id,
+          nombre: c.nombre ? c.nombre.trim() : null,
+          correo: c.correo ? c.correo.trim().toLowerCase() : ''
+        }))
+        .filter(c => c.correo.includes('@'));
+
+      const [existingConts] = await connection.query("SELECT id, correo FROM empresa_contactos WHERE empresa_id = ?", [id]);
+      const existingContMap = new Map(existingConts.map(c => [c.id, c.correo]));
+      const newContIds = new Set(cleanContactos.map(c => c.id).filter(Boolean));
+
+      for (const [extId, extCorreo] of existingContMap.entries()) {
+        if (!newContIds.has(extId)) {
+          await connection.query("DELETE FROM empresa_contactos WHERE id = ?", [extId]);
+        }
+      }
+
+      for (const c of cleanContactos) {
+        if (c.id && existingContMap.has(c.id)) {
+          await connection.query(
+            "UPDATE empresa_contactos SET nombre = ?, correo = ? WHERE id = ?",
+            [c.nombre, c.correo, c.id]
+          );
+        } else {
+          await connection.query(
+            "INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre)",
+            [id, c.correo, c.nombre]
+          );
+        }
+      }
+    }
+
+    await connection.commit();
+    res.json({ success: true, message: "Vinculaciones actualizadas con éxito" });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error actualizando vinculaciones:", err);
+    res.status(500).json({ error: "Error interno al actualizar vinculaciones" });
+  } finally {
+    connection.release();
+  }
+};

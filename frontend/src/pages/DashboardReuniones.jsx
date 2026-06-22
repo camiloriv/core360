@@ -231,6 +231,24 @@ export default function DashboardReuniones() {
     }
   };
 
+  const handleVerMinuta = (reunion) => {
+    if (!reunion.minuta) {
+      Swal.fire("Sin minuta", "Esta reunión no tiene minuta disponible.", "info");
+      return;
+    }
+    Swal.fire({
+      title: reunion.asunto_teams || reunion.motivo_reu || 'Minuta de Reunión',
+      html: `
+        <div style="text-align: left; max-height: 65vh; overflow-y: auto; padding: 8px 4px; font-size: 13px; line-height: 1.6; color: #1e293b;">
+          ${reunion.minuta}
+        </div>
+      `,
+      width: '860px',
+      confirmButtonText: 'Cerrar',
+      confirmButtonColor: '#3b82f6',
+    });
+  };
+
   const handleAsignarEmpresa = async () => {
     if (!noAplicaEmpresa && !selectedEmpresaId) {
       Swal.fire("Atención", "Debes seleccionar una empresa o marcar la opción 'No aplica'", "warning");
@@ -514,7 +532,7 @@ export default function DashboardReuniones() {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
 
-  if (loading)
+  if (loading && reuniones.length === 0)
     return (
       <div style={{ padding: "40px", textAlign: "center" }}>
         Cargando dashboard profesional...
@@ -1194,17 +1212,25 @@ export default function DashboardReuniones() {
                           ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                               <div
-                                onClick={() => setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion)}
+                                onClick={() => handleVerMinuta(r)}
                                 style={{
-                                  color: "#166534", fontWeight: "bold", cursor: "pointer", textDecoration: "none",
+                                  color: "#166534", fontWeight: "bold", cursor: "pointer",
                                   fontSize: "12px", background: "#dcfce7", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                  display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", transition: "background 0.2s"
                                 }}
+                                title="Ver minuta"
                                 onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
                               >
-                                Enviado
+                                ✅ Minuta Enviada 📄
                               </div>
+                              <span
+                                onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
+                                style={{
+                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                }}
+                              >📧 Ver destinatarios</span>
                             </div>
                           )}
 

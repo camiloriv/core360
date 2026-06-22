@@ -56,7 +56,8 @@ const ProtectedRoute = ({ children, allowedRoles, path }) => {
 
   if (vistas && path && user.permisos !== "admin" && user.permisos !== "ADMIN") {
     const isVincularPermitted = path === "/vincular-reuniones" && vistas.includes("/dashboard-reuniones");
-    if (!vistas.includes(path) && !isVincularPermitted) {
+    const isGestionEmpresasPermitted = path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva");
+    if (!vistas.includes(path) && !isVincularPermitted && !isGestionEmpresasPermitted) {
       const fallback = vistas.includes("/registrar-reunion") 
         ? "/registrar-reunion" 
         : (vistas.length > 0 ? vistas[0] : "/login");
@@ -107,8 +108,8 @@ const MainLayout = () => {
             {/* Jefatura y Ejecutiva tienen los mismos permisos */}
             <Route path="/editor-encuestas" element={<ProtectedRoute allowedRoles={['jefatura', 'ejecutiva', 'admin']} path="/editor-encuestas"><EditorEncuestas /></ProtectedRoute>} />
             
-            {/* Solo Administradores */}
-            <Route path="/gestion-empresas" element={<ProtectedRoute allowedRoles={['admin']} path="/gestion-empresas"><GestionEmpresas /></ProtectedRoute>} />
+            {/* Solo Administradores y Jefatura/Ejecutiva (con restricciones en UI) */}
+            <Route path="/gestion-empresas" element={<ProtectedRoute allowedRoles={['admin', 'jefatura', 'ejecutiva']} path="/gestion-empresas"><GestionEmpresas /></ProtectedRoute>} />
             <Route path="/seguimiento-empresas" element={<ProtectedRoute allowedRoles={['jefatura', 'admin', 'ejecutiva', 'gerencia', 'gerencia_general']} path="/seguimiento-empresas"><SeguimientoEmpresas /></ProtectedRoute>} />
             
             {/* Solo Administradores */}

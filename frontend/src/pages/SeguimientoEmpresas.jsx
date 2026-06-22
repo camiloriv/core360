@@ -250,131 +250,390 @@ export default function SeguimientoEmpresas() {
     // 2. Obtener reuniones asociadas a esta empresa desde el dashboard
     const companyMeetings = (reuniones || []).filter((r) => r.empresa_id === emp.id);
 
-    // 3. Consolidar la línea de tiempo histórica
-    const timeline = [];
+    // 3. Agrupar logs por reunion_id / event_id
+    const logsByReunion = {};
+    const unlinkedLogs = []; // logs sin reunion_id (manuales)
 
-    // Agregar reuniones de la tabla reuniones (realizadas, con o sin minuta, y agendadas)
-    companyMeetings.forEach((r) => {
-      let tipoText = "Realizada (Con Minuta)";
-      let estadoVal = "gestionada";
-      if (r.estado_envio === "borrador") {
-        tipoText = "Realizada (Sin Minuta)";
-        estadoVal = "borrador";
-      } else if (r.estado_envio === "agendada") {
-        tipoText = "Agendada (Teams)";
-        estadoVal = "agendada";
-      }
-
-      timeline.push({
-        key: `meeting-${r.id_reunion || r.id}`,
-        fecha: r.fecha_reu,
-        hora: r.hora || "",
-        tipo: tipoText,
-        detalle: r.motivo_reu || "Reunión comercial",
-        responsable: r.ejecutiva_nombre || "",
-        estado: estadoVal,
-      });
-    });
-
-    // Agregar logs de agendamiento y solicitudes (filtrando gestionadas y agendadas duplicadas)
     logs.forEach((log) => {
-      if (log.estado === "gestionada") return; // ya representada por las reuniones con minuta
-
-      // Si ya hay un item en timeline con el mismo event_id (reunion_id), evitar duplicar!
-      if (log.estado === "agendada" && log.reunion_id) {
-        const existeEnTimeline = companyMeetings.some(r => r.event_id === log.reunion_id || r.id_reunion === log.reunion_id);
-        if (existeEnTimeline) return;
+      if (log.reunion_id) {
+        if (!logsByReunion[log.reunion_id]) {
+          logsByReunion[log.reunion_id] = [];
+        }
+        logsByReunion[log.reunion_id].push(log);
+      } else {
+        unlinkedLogs.push(log);
       }
+    });
 
-      let tipoText = "Solicitud de Reunión";
-      let detalleText = "Contacto iniciado / Solicitada";
-      if (log.estado === "agendada") {
-         tipoText = "Agendada (Teams)";
-         detalleText = log.asunto || "Reunión agendada en Teams";
-      } else if (log.estado === "cancelada") {
-         tipoText = "Cancelada (Teams)";
-         detalleText = log.asunto || "Reunión cancelada en Teams";
-      } else if (log.estado === "reagendada") {
-         tipoText = "Reagendada (Teams)";
-         detalleText = log.asunto || "Reunión reagendada en Teams";
-      }
+    // Construir flujos de reuniones
+    const flows = [];
 
-      timeline.push({
-        key: `log-${log.id}`,
-        fecha: log.fecha,
-        hora: "",
-        tipo: tipoText,
-        detalle: detalleText,
-        responsable: log.usuario_nombre || "",
-        estado: log.estado,
+    // Procesar reuniones registradas
+    companyMeetings.forEach((meeting) => {
+      const explicitLogs = [];
+      const refKeys = [meeting.id_reunion, meeting.event_id, meeting.id].filter(Boolean);
+
+      refKeys.forEach((key) => {
+        if (logsByReunion[key]) {
+          explicitLogs.push(...logsByReunion[key]);
+          delete logsByReunion[key]; // marcar como procesado
+        }
+      });
+
+      // Evitar duplicación de logs
+      const uniqueExplicitLogs = [];
+      const seenLogIds = new Set();
+      explicitLogs.forEach((l) => {
+        if (!seenLogIds.has(l.id)) {
+          seenLogIds.add(l.id);
+          uniqueExplicitLogs.push(l);
+        }
+      });
+
+      flows.push({
+        isMeeting: true,
+        meeting: meeting,
+        explicitLogs: uniqueExplicitLogs,
+        matchedLogs: [],
       });
     });
 
-    // Ordenar de más reciente a más antigua
-    timeline.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    // Logs restantes con reunion_id que no coinciden con reuniones registradas (ej. canceladas/Teams no vinculadas)
+    Object.keys(logsByReunion).forEach((reunionId) => {
+      flows.push({
+        isMeeting: false,
+        reunionId: reunionId,
+        explicitLogs: logsByReunion[reunionId],
+        matchedLogs: [],
+      });
+    });
+
+    // Helper para obtener fecha de ordenamiento/comparación de cada flujo
+    const getFlowDate = (flow) => {
+      if (flow.isMeeting) {
+        return new Date(flow.meeting.fecha_reu || flow.meeting.created_at);
+      }
+      const dates = flow.explicitLogs.map((l) => new Date(l.fecha || l.created_at));
+      return new Date(Math.min(...dates));
+    };
+
+    // Ordenar flujos cronológicamente para el emparejamiento manual
+    flows.sort((a, b) => getFlowDate(a) - getFlowDate(b));
+
+    // Ordenar logs no vinculados por fecha ascendente
+    unlinkedLogs.sort(
+      (a, b) => new Date(a.fecha || a.created_at) - new Date(b.fecha || b.created_at)
+    );
+
+    // Emparejar logs no vinculados (solicitada/agendada manual) al flujo correspondiente posterior
+    const manualFlows = [];
+    unlinkedLogs.forEach((log) => {
+      const logDate = new Date(log.fecha || log.created_at);
+      
+      // Buscar en los flujos pre-existentes (que tienen reunión o id de Teams)
+      const matchingFlow = flows.find((flow) => {
+        const flowDate = getFlowDate(flow);
+        return flowDate >= logDate;
+      });
+
+      if (matchingFlow) {
+        matchingFlow.matchedLogs.push(log);
+      } else {
+        // Buscar si ya existe un manualFlow posterior, o si no, crear uno
+        const existingManualFlow = manualFlows.find((mf) => {
+          const flowDate = getFlowDate(mf);
+          return flowDate >= logDate;
+        });
+
+        if (existingManualFlow) {
+          existingManualFlow.explicitLogs.push(log);
+        } else {
+          manualFlows.push({
+            isMeeting: false,
+            isManualLogOnly: true,
+            explicitLogs: [log],
+            matchedLogs: [],
+          });
+        }
+      }
+    });
+
+    // Añadir los flujos manuales a la lista general
+    flows.push(...manualFlows);
+
+    // Construir línea de tiempo final consolidada
+    const timeline = flows.map((flow) => {
+      const allLogs = [...flow.explicitLogs, ...flow.matchedLogs];
+      
+      // Ordenar logs cronológicamente para trazar el ciclo
+      allLogs.sort((a, b) => new Date(a.created_at || a.fecha) - new Date(b.created_at || b.fecha));
+
+      // Determinar estado actual del flujo para el badge
+      let estado = "solicitada";
+      if (flow.isMeeting) {
+        estado = flow.meeting.estado_envio; // 'borrador', 'enviado', 'agendada', 'no_aplica'
+      } else {
+        const latestLog = allLogs[allLogs.length - 1];
+        if (latestLog) {
+          estado = latestLog.estado;
+        }
+      }
+
+      let asunto = "Reunión Comercial";
+      let participantes = "-";
+      let ejecutiva = "";
+
+      if (flow.isMeeting) {
+        const motif = (flow.meeting.motivo_reu || "").trim();
+        const subject = (flow.meeting.asunto_teams || "").trim();
+        asunto = motif || subject || "Reunión Comercial";
+        participantes = flow.meeting.participantes || "-";
+        ejecutiva = flow.meeting.ejecutiva_nombre || "";
+      } else {
+        const logWithAsunto = allLogs.find((l) => l.asunto && l.asunto.trim());
+        const statusMap = {
+          solicitada: "Solicitud de Reunión",
+          agendada: "Reunión Agendada",
+          reagendada: "Reunión Reagendada",
+          cancelada: "Reunión Cancelada",
+          gestionada: "Reunión Concretada",
+          concretada: "Reunión Concretada",
+          no_aplica: "Reunión No Aplica",
+        };
+        const defaultAsunto = statusMap[estado] || "Seguimiento Comercial";
+        asunto = logWithAsunto ? logWithAsunto.asunto.trim() : defaultAsunto;
+        const logWithUser = allLogs.find((l) => l.usuario_nombre);
+        ejecutiva = logWithUser ? logWithUser.usuario_nombre : "";
+      }
+
+      let dateSolicitada = null;
+      let dateAgendadaAction = null;
+      let dateAgendadaTarget = null;
+      let dateRealizacion = null;
+      let dateEnvioMinuta = null;
+
+      const reschedules = [];
+      const cancellations = [];
+
+      allLogs.forEach((log) => {
+        if (log.estado === "solicitada") {
+          dateSolicitada = log.fecha;
+        } else if (log.estado === "agendada") {
+          if (!dateAgendadaAction) {
+            dateAgendadaAction = log.created_at || log.fecha;
+            dateAgendadaTarget = log.fecha;
+          } else if (log.fecha !== dateAgendadaTarget) {
+            reschedules.push({
+              fecha_cambio: log.created_at || log.fecha,
+              fecha_nueva: log.fecha,
+            });
+          }
+        } else if (log.estado === "reagendada") {
+          reschedules.push({
+            fecha_cambio: log.created_at || log.fecha,
+            fecha_nueva: log.fecha,
+          });
+        } else if (log.estado === "cancelada") {
+          cancellations.push({
+            fecha_cambio: log.created_at || log.fecha,
+          });
+        } else if (log.estado === "gestionada" || log.estado === "concretada") {
+          dateRealizacion = log.fecha;
+        }
+      });
+
+      if (flow.isMeeting) {
+        const m = flow.meeting;
+        if (m.estado_envio === "borrador" || m.estado_envio === "enviado") {
+          dateRealizacion = m.fecha_reu;
+        }
+        if (m.estado_envio === "agendada") {
+          dateAgendadaTarget = m.fecha_reu;
+          if (!dateAgendadaAction) {
+            dateAgendadaAction = m.created_at || m.fecha_reu;
+          }
+        }
+        if (m.estado_envio === "enviado") {
+          dateEnvioMinuta = m.created_at || m.fecha_reu;
+        }
+      }
+
+      // Ordenar reschedules y cancellations
+      reschedules.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio));
+      cancellations.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio));
+
+      const sortDate = dateEnvioMinuta || dateRealizacion || dateAgendadaTarget || dateSolicitada || new Date();
+
+      // Minuta: viene del objeto meeting si está disponible
+      const minuta = flow.isMeeting ? (flow.meeting.minuta || null) : null;
+      const reunionId = flow.isMeeting ? (flow.meeting.id || flow.meeting.id_reunion || null) : null;
+
+      return {
+        asunto,
+        participantes,
+        ejecutiva,
+        estado,
+        dateSolicitada,
+        dateAgendadaAction,
+        dateAgendadaTarget,
+        dateRealizacion,
+        dateEnvioMinuta,
+        reschedules,
+        cancellations,
+        sortDate,
+        minuta,
+        reunionId,
+      };
+    });
+
+    // Ordenar de más reciente a más antiguo
+    timeline.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
 
     const colorMap = {
-      gestionada: "#10b981", // verde
+      enviado: "#10b981",    // verde
       borrador: "#ca8a04",   // amarillo
       agendada: "#3b82f6",   // azul
       reagendada: "#6366f1", // indigo
       solicitada: "#f97316", // naranja
       cancelada: "#ef4444",  // rojo
+      no_aplica: "#64748b",  // gris
+      gestionada: "#10b981", // verde (compatibilidad)
     };
 
     const bgBadgeMap = {
-      gestionada: "#dcfce7",
+      enviado: "#dcfce7",
       borrador: "#fef08a",
       agendada: "#dbeafe",
       reagendada: "#e0e7ff",
       solicitada: "#ffedd5",
       cancelada: "#fee2e2",
+      no_aplica: "#f1f5f9",
+      gestionada: "#dcfce7",
     };
 
     const textBadgeMap = {
-      gestionada: "#166534",
+      enviado: "#166534",
       borrador: "#854d0e",
       agendada: "#1e40af",
       reagendada: "#3730a3",
       solicitada: "#c2410c",
       cancelada: "#991b1b",
+      no_aplica: "#475569",
+      gestionada: "#166534",
+    };
+
+    const statusTextMap = {
+      enviado: "Minuta Enviada",
+      borrador: "Realizada (Sin Minuta)",
+      agendada: "Agendada",
+      reagendada: "Reagendada",
+      solicitada: "Solicitada",
+      cancelada: "Cancelada",
+      no_aplica: "No Aplica",
+      gestionada: "Minuta Enviada",
     };
 
     const meetingsHtml = timeline.length > 0 
       ? `
-        <div style="margin-top: 25px; text-align: left;">
-          <h4 style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">
+        <div style="text-align: left; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin-top: 10px;">
+          <h4 style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; flex-shrink: 0;">
             📋 Historial de Reuniones y Eventos (${timeline.length})
           </h4>
-          <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+          <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+            <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; text-align: left;">
               <thead>
                 <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10;">
-                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Fecha</th>
-                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Tipo / Estado</th>
-                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Motivo / Detalle</th>
-                  <th style="padding: 10px; color: #64748b; font-weight: 600;">Responsable</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600; width: 30%;">Reunión / Motivo</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600; width: 44%;">Historial de Fechas</th>
+                  <th style="padding: 10px; color: #64748b; font-weight: 600; width: 26%;">Participantes</th>
                 </tr>
               </thead>
               <tbody>
                 ${timeline.map(item => {
-                  const dateStr = formatearFecha(item.fecha);
                   const bulletColor = colorMap[item.estado] || "#64748b";
                   const bgBadge = bgBadgeMap[item.estado] || "#f1f5f9";
                   const textBadge = textBadgeMap[item.estado] || "#475569";
-                  const respText = item.responsable ? `👤 ${item.responsable}` : "-";
+                  const statusText = statusTextMap[item.estado] || item.estado;
+                  const hasMinuta = (item.estado === 'enviado' || item.estado === 'gestionada') && item.minuta;
+                  const minutaAttr = hasMinuta ? `data-minuta-id="${item.reunionId}"` : '';
+                  const respText = item.ejecutiva ? `👤 ${item.ejecutiva}` : "";
 
                   return `
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                      <td style="padding: 10px; font-weight: 500; color: #334155; white-space: nowrap;">📅 ${dateStr}</td>
-                      <td style="padding: 10px; white-space: nowrap;">
-                        <span style="display: inline-flex; align-items: center; gap: 6px; background: ${bgBadge}; color: ${textBadge}; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">
-                          <span style="width: 6px; height: 6px; border-radius: 50%; background: ${bulletColor}; flex-shrink: 0;"></span>
-                          ${item.tipo}
-                        </span>
+                    <tr style="border-bottom: 1px solid #f1f5f9; vertical-align: top;">
+                      <td style="padding: 10px; word-break: break-word;">
+                        <div style="font-weight: 700; color: #1e293b; margin-bottom: 6px; font-size: 12px; line-height: 1.2;">${item.asunto}</div>
+                        <div style="margin-bottom: 4px;">
+                          ${hasMinuta
+                            ? `<span
+                                data-minuta-id="${item.reunionId}"
+                                style="display: inline-flex; align-items: center; gap: 4px; background: ${bgBadge}; color: ${textBadge}; padding: 2px 8px; border-radius: 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;"
+                                title="Ver minuta"
+                              >
+                                <span style="width: 4px; height: 4px; border-radius: 50%; background: ${bulletColor}; flex-shrink: 0;"></span>
+                                ${statusText} 📄
+                              </span>`
+                            : `<span style="display: inline-flex; align-items: center; gap: 4px; background: ${bgBadge}; color: ${textBadge}; padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; text-transform: uppercase;">
+                                <span style="width: 4px; height: 4px; border-radius: 50%; background: ${bulletColor}; flex-shrink: 0;"></span>
+                                ${statusText}
+                              </span>`
+                          }
+                        </div>
+                        ${respText ? `<div style="font-size: 10px; color: #64748b; margin-top: 4px;">${respText}</div>` : ""}
                       </td>
-                      <td style="padding: 10px; color: #475569; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.detalle}">${item.detalle}</td>
-                      <td style="padding: 10px; color: #475569; white-space: nowrap;">${respText}</td>
+                      <td style="padding: 10px; font-size: 11px;">
+                        <div style="display: flex; flex-direction: column; gap: 5px; line-height: 1.4;">
+                          ${item.dateSolicitada ? `
+                            <div style="display: flex; align-items: center; gap: 6px; color: #475569;">
+                              <span style="color: #f97316; font-size: 12px; line-height: 1;">●</span>
+                              <span><strong>Solicitada:</strong> ${formatearFecha(item.dateSolicitada)}</span>
+                            </div>
+                          ` : ""}
+                          
+                          ${item.dateAgendadaTarget ? `
+                            <div style="display: flex; align-items: flex-start; gap: 6px; color: #475569;">
+                              <span style="color: #3b82f6; font-size: 12px; line-height: 1; margin-top: 2px;">●</span>
+                              <span>
+                                <strong>Agendada:</strong> ${formatearFecha(item.dateAgendadaTarget)}
+                                ${item.dateAgendadaAction ? `<br/><span style="font-size: 9px; color: #94a3b8;">(creada: ${formatearFecha(item.dateAgendadaAction)})</span>` : ""}
+                              </span>
+                            </div>
+                          ` : ""}
+                          
+                          ${item.reschedules.map(r => `
+                            <div style="display: flex; align-items: flex-start; gap: 6px; color: #475569;">
+                              <span style="color: #6366f1; font-size: 11px; line-height: 1; margin-top: 2px;">↻</span>
+                              <span>
+                                <strong>Reagendada:</strong> ${formatearFecha(r.fecha_nueva)}
+                                <br/><span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFecha(r.fecha_cambio)})</span>
+                              </span>
+                            </div>
+                          `).join("")}
+                          
+                          ${item.cancellations.map(c => `
+                            <div style="display: flex; align-items: center; gap: 6px; color: #ef4444;">
+                              <span style="font-size: 11px; line-height: 1;">✕</span>
+                              <span><strong>Cancelada</strong> <span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFecha(c.fecha_cambio)})</span></span>
+                            </div>
+                          `).join("")}
+                          
+                          ${item.dateRealizacion ? `
+                            <div style="display: flex; align-items: center; gap: 6px; color: #475569;">
+                              <span style="color: #ca8a04; font-size: 12px; line-height: 1;">●</span>
+                              <span><strong>Realizada:</strong> ${formatearFecha(item.dateRealizacion)}</span>
+                            </div>
+                          ` : ""}
+                          
+                          ${item.dateEnvioMinuta ? `
+                            <div style="display: flex; align-items: center; gap: 6px; color: #166534;">
+                              <span style="color: #10b981; font-size: 11px; line-height: 1;">✓</span>
+                              <span><strong>Minuta Enviada:</strong> ${formatearFecha(item.dateEnvioMinuta)}</span>
+                            </div>
+                          ` : ""}
+                        </div>
+                      </td>
+                      <td style="padding: 10px; color: #475569; word-break: break-word; line-height: 1.3;">
+                        ${item.participantes}
+                      </td>
                     </tr>
                   `;
                 }).join('')}
@@ -402,47 +661,78 @@ export default function SeguimientoEmpresas() {
     const gradient = gradients[emp.id % gradients.length];
 
     const carnetHtml = `
-      <div style="background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 15px;">
-        <div style="background: ${gradient}; padding: 25px 20px; color: white; display: flex; align-items: center; gap: 20px; text-align: left; position: relative;">
-          <div style="width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); border: 2.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;">
+      <div style="background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 8px; flex-shrink: 0;">
+        <div style="background: ${gradient}; padding: 10px 16px; color: white; display: flex; align-items: center; gap: 12px; text-align: left;">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: white; flex-shrink: 0;">
             ${initial}
           </div>
-          <div>
-            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.8); display: block; margin-bottom: 2px;">
+          <div style="flex: 1; min-width: 0;">
+            <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.75); display: block;">
               Ficha de Empresa
             </span>
-            <h3 style="margin: 0; font-size: 20px; font-weight: 800; color: white; line-height: 1.2;">
+            <h3 style="margin: 1px 0 0 0; font-size: 15px; font-weight: 800; color: white; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${emp.nombre}
             </h3>
-          </div>
-        </div>
-        
-        <div style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left; background: #fafafa;">
-          <div>
-            <span style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 4px;">Macro-Zona</span>
-            <span style="font-size: 13px; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
-              🏢 ${emp.zona_nombre || 'Sin Zona'}
-            </span>
-          </div>
-          <div>
-            <span style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 4px;">Jefatura Asignada</span>
-            <span style="font-size: 13px; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
-              👤 ${emp.jefatura_nombre || 'Sin Jefatura'}
-            </span>
           </div>
         </div>
       </div>
     `;
 
-    Swal.fire({
-      html: `
+    const modalHtml = `
+      <div style="display: flex; flex-direction: column; height: 100%;">
         ${carnetHtml}
         ${meetingsHtml}
-      `,
+      </div>
+    `;
+
+    // Registrar función global para ver minuta desde el HTML estático
+    // Almacenamos las minutas indexadas por reunionId para acceso instantáneo
+    const minutaByReunionId = {};
+    timeline.forEach(item => {
+      if (item.reunionId && item.minuta) {
+        minutaByReunionId[String(item.reunionId)] = { minuta: item.minuta, asunto: item.asunto };
+      }
+    });
+
+    window.__core360_viewMinuta = (reunionId) => {
+      const data = minutaByReunionId[String(reunionId)];
+      if (!data) return;
+      Swal.fire({
+        title: data.asunto || 'Minuta de Reunión',
+        html: `
+          <div style="text-align: left; max-height: 65vh; overflow-y: auto; padding: 8px 4px; font-size: 13px; line-height: 1.6; color: #1e293b;">
+            ${data.minuta}
+          </div>
+        `,
+        width: '860px',
+        confirmButtonText: 'Cerrar',
+        confirmButtonColor: '#3b82f6',
+        showClass: { popup: 'animate__animated animate__fadeIn animate__faster' },
+      });
+    };
+
+    Swal.fire({
+      html: modalHtml,
       showConfirmButton: true,
       confirmButtonText: "Cerrar",
       confirmButtonColor: "#3b82f6",
-      width: "650px",
+      width: "1100px",
+      heightAuto: false,
+      customClass: {
+        popup: "swal-tracking-popup",
+        htmlContainer: "swal-tracking-container",
+      },
+      didOpen: (popup) => {
+        // Adjuntar listeners a los badges clickeables de minuta
+        popup.querySelectorAll('[data-minuta-id]').forEach(el => {
+          el.addEventListener('click', () => {
+            window.__core360_viewMinuta(el.getAttribute('data-minuta-id'));
+          });
+        });
+      },
+      didClose: () => {
+        delete window.__core360_viewMinuta;
+      }
     });
   };
 

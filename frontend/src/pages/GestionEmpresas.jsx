@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Swal from "sweetalert2";
 import api from "../services/api";
 import * as XLSX from "xlsx";
@@ -30,6 +30,18 @@ export default function GestionEmpresas() {
   const [excelRows, setExcelRows] = useState([]);
   const [procesandoExcel, setProcesandoExcel] = useState(false);
 
+  // Estados para Vinculaciones
+  const [vinculaciones, setVinculaciones] = useState([]);
+  const [filtroVincNombre, setFiltroVincNombre] = useState("");
+  const [currentPageVinc, setCurrentPageVinc] = useState(1);
+  const itemsPerPageVinc = 10;
+  const [showVinculaciones, setShowVinculaciones] = useState(true);
+
+  // Modal de edición de vinculaciones
+  const [isVincModalOpen, setIsVincModalOpen] = useState(false);
+  const [editingVinc, setEditingVinc] = useState(null);
+  const [dominiosText, setDominiosText] = useState("");
+
   const fetchDatos = async () => {
     setLoading(true);
     try {
@@ -37,11 +49,13 @@ export default function GestionEmpresas() {
       const resJ = await api.get("/jefaturas");
       const resEmp = await api.get("/empresas");
       const resZonas = await api.get("/zonas");
+      const resVinc = await api.get("/empresas/vinculaciones");
 
       setEjecutivas(resE.data || []);
       setJefaturas(resJ.data || []);
       setEmpresas(resEmp.data || []);
       setZonas(resZonas.data || []);
+      setVinculaciones(resVinc.data || []);
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "Error al cargar datos", "error");
@@ -330,6 +344,51 @@ export default function GestionEmpresas() {
           "error",
         );
       }
+    }
+  };
+
+  // --- Vinculaciones ---
+  const abrirEditarVinculacion = (vinc) => {
+    setEditingVinc({
+      ...vinc,
+      dominios: vinc.dominios ? [...vinc.dominios] : [],
+      contactos: vinc.contactos ? vinc.contactos.map(c => ({ ...c })) : []
+    });
+    setDominiosText(vinc.dominios ? vinc.dominios.join(", ") : "");
+    setIsVincModalOpen(true);
+  };
+
+  const guardarVinculaciones = async () => {
+    if (!editingVinc) return;
+    if (!editingVinc.nombre || !editingVinc.nombre.trim()) {
+      Swal.fire("Atención", "El nombre de la empresa es requerido", "warning");
+      return;
+    }
+
+    const parsedDominios = dominiosText
+      .split(",")
+      .map(d => d.trim())
+      .filter(Boolean);
+
+    try {
+      setLoading(true);
+      await api.put(`/empresas/${editingVinc.id}/vinculaciones`, {
+        nombre: editingVinc.nombre,
+        jefatura_id: editingVinc.jefatura_id,
+        zona_id: editingVinc.zona_id,
+        dominios: parsedDominios,
+        contactos: editingVinc.contactos
+      });
+
+      setIsVincModalOpen(false);
+      setEditingVinc(null);
+      Swal.fire("Éxito", "Vinculaciones actualizadas correctamente", "success");
+      await fetchDatos();
+    } catch (err) {
+      console.error("Error guardando vinculaciones:", err);
+      Swal.fire("Error", "No se pudieron actualizar las vinculaciones", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -644,6 +703,34 @@ export default function GestionEmpresas() {
     return result.isConfirmed;
   };
 
+  // Filtrar vinculaciones
+  const filteredVinculaciones = useMemo(() => {
+    const isAdmin = user?.permisos === "admin" || user?.permisos === "ADMIN";
+    const allowedVinc = isAdmin
+      ? vinculaciones
+      : vinculaciones.filter((v) => empresas.some((emp) => emp.id === v.id));
+
+    return allowedVinc.filter((v) => {
+      const term = filtroVincNombre.trim().toLowerCase();
+      if (!term) return true;
+
+      const matchNombre = v.nombre.toLowerCase().includes(term);
+      const matchJefatura = v.jefatura_nombre && v.jefatura_nombre.toLowerCase().includes(term);
+      const matchDominios = v.dominios && v.dominios.some(d => d.toLowerCase().includes(term));
+      const matchContactos = v.contactos && v.contactos.some(
+        c => (c.nombre && c.nombre.toLowerCase().includes(term)) || c.correo.toLowerCase().includes(term)
+      );
+
+      return matchNombre || matchJefatura || matchDominios || matchContactos;
+    });
+  }, [vinculaciones, filtroVincNombre, empresas, user]);
+
+  // Paginación vinculaciones
+  const indexOfLastItemVinc = currentPageVinc * itemsPerPageVinc;
+  const indexOfFirstItemVinc = indexOfLastItemVinc - itemsPerPageVinc;
+  const currentVincs = filteredVinculaciones.slice(indexOfFirstItemVinc, indexOfLastItemVinc);
+  const totalPagesVinc = Math.ceil(filteredVinculaciones.length / itemsPerPageVinc);
+
   if (loading) {
     return (
       <div
@@ -707,22 +794,25 @@ export default function GestionEmpresas() {
               ASIGNE O REASIGNE EMPRESAS POR EJECUTIVA.
             </p>
           </div>
-          <button onClick={crearEmpresa} className="btn-header-primary">
-            🏢 + Nueva Empresa
-          </button>
+          {(user?.permisos === "admin" || user?.permisos === "ADMIN") && (
+            <button onClick={crearEmpresa} className="btn-header-primary">
+              🏢 + Nueva Empresa
+            </button>
+          )}
         </header>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           {/* PANEL TRASPASO MASIVO (Sección premium con tabs para manual o Excel) */}
-          <div
-            style={{
-              background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-              borderRadius: "12px",
-              border: "1px solid #cbd5e1",
-              boxShadow: "0 6px 16px rgba(0,0,0,0.04)",
-              overflow: "hidden",
-            }}
-          >
+          {(user?.permisos === "admin" || user?.permisos === "ADMIN") && (
+            <div
+              style={{
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                borderRadius: "12px",
+                border: "1px solid #cbd5e1",
+                boxShadow: "0 6px 16px rgba(0,0,0,0.04)",
+                overflow: "hidden",
+              }}
+            >
             <div
               onClick={() => setShowTraspaso(!showTraspaso)}
               style={{
@@ -1568,8 +1658,555 @@ export default function GestionEmpresas() {
               </div>
             )}
           </div>
+          )}
+
+          {/* PANEL VINCULACIONES */}
+          <div
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              border: "1px solid #cbd5e1",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.04)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              onClick={() => setShowVinculaciones(!showVinculaciones)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "20px 24px",
+                cursor: "pointer",
+                borderBottom: showVinculaciones ? "1px solid #cbd5e1" : "none",
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  color: "#0f172a",
+                  fontSize: "1.15rem",
+                  fontWeight: "700",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <span style={{ fontSize: "0.8rem", color: "#475569" }}>
+                  {showVinculaciones ? "▼" : "▶"}
+                </span>{" "}
+                🔗 Vinculaciones de Empresas (Dominios y Contactos)
+              </h2>
+            </div>
+
+            {showVinculaciones && (
+              <div style={{ padding: "24px" }}>
+                {/* Filtro de Búsqueda */}
+                <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar por empresa, dominio o contacto..."
+                    value={filtroVincNombre}
+                    onChange={(e) => {
+                      setFiltroVincNombre(e.target.value);
+                      setCurrentPageVinc(1);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      outline: "none",
+                    }}
+                  />
+                  {filtroVincNombre && (
+                    <button
+                      onClick={() => setFiltroVincNombre("")}
+                      style={{
+                        padding: "10px 16px",
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "8px",
+                        color: "#475569",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        fontWeight: "600"
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Tabla de Vinculaciones */}
+                <div className="table-responsive">
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "13px",
+                      textAlign: "left",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          background: "#f8fafc",
+                          borderBottom: "2px solid #e2e8f0",
+                          color: "#475569",
+                          fontWeight: "600",
+                        }}
+                      >
+                        <th style={{ padding: "12px 16px" }}>EMPRESA</th>
+                        <th style={{ padding: "12px 16px" }}>EJECUTIVA / JEFATURA</th>
+                        <th style={{ padding: "12px 16px" }}>DOMINIOS</th>
+                        <th style={{ padding: "12px 16px" }}>CONTACTOS</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center" }}>ACCIONES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentVincs.length > 0 ? (
+                        currentVincs.map((vinc) => (
+                          <tr
+                            key={vinc.id}
+                            style={{
+                              borderBottom: "1px solid #e2e8f0",
+                              transition: "background 0.2s"
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ fontWeight: "700", color: "#0f172a" }}>{vinc.nombre}</div>
+                              {vinc.zona_nombre && (
+                                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>
+                                  📍 {vinc.zona_nombre}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "#334155", fontWeight: "500" }}>
+                              {vinc.jefatura_nombre ? `👤 ${vinc.jefatura_nombre}` : "⚠️ Sin asignación"}
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                {vinc.dominios && vinc.dominios.length > 0 ? (
+                                  vinc.dominios.map((dom, idx) => (
+                                    <span
+                                      key={idx}
+                                      style={{
+                                        background: "#e0f2fe",
+                                        color: "#0369a1",
+                                        padding: "3px 8px",
+                                        borderRadius: "6px",
+                                        fontSize: "11px",
+                                        fontWeight: "600",
+                                        border: "1px solid #bae6fd"
+                                      }}
+                                    >
+                                      {dom}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span style={{ fontStyle: "italic", color: "#94a3b8", fontSize: "11px" }}>Sin dominios</span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              {vinc.contactos && vinc.contactos.length > 0 ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  {vinc.contactos.map((cont) => (
+                                    <div key={cont.id} style={{ fontSize: "11px", color: "#334155" }}>
+                                      <strong>{cont.nombre || "S/N"}</strong> <span style={{ color: "#64748b" }}>({cont.correo})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span style={{ fontStyle: "italic", color: "#94a3b8", fontSize: "11px" }}>Sin contactos</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                              <button
+                                onClick={() => abrirEditarVinculacion(vinc)}
+                                style={{
+                                  background: "#f1f5f9",
+                                  border: "1px solid #cbd5e1",
+                                  color: "#1e293b",
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  cursor: "pointer",
+                                  fontWeight: "600",
+                                  fontSize: "12px",
+                                  transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#e2e8f0")}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f1f5f9")}
+                              >
+                                📝 Rectificar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5" style={{ padding: "30px", textAlign: "center", color: "#64748b" }}>
+                            No se encontraron empresas asociadas.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Controles de Paginación */}
+                {totalPagesVinc > 1 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "15px 0 0 0",
+                      borderTop: "1px solid #e2e8f0",
+                      marginTop: "15px"
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      Mostrando {indexOfFirstItemVinc + 1} a {Math.min(indexOfLastItemVinc, filteredVinculaciones.length)} de {filteredVinculaciones.length} registros
+                    </span>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => setCurrentPageVinc(currentPageVinc - 1)}
+                        disabled={currentPageVinc === 1}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          background: currentPageVinc === 1 ? "#f1f5f9" : "#fff",
+                          color: currentPageVinc === 1 ? "#94a3b8" : "#334155",
+                          cursor: currentPageVinc === 1 ? "not-allowed" : "pointer",
+                          fontSize: "12px",
+                          fontWeight: "bold"
+                        }}
+                      >
+                        Anterior
+                      </button>
+                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: "30px", fontSize: "12px", fontWeight: "bold", color: "var(--primary-color)" }}>
+                        {currentPageVinc} / {totalPagesVinc}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPageVinc(currentPageVinc + 1)}
+                        disabled={currentPageVinc === totalPagesVinc}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          background: currentPageVinc === totalPagesVinc ? "#f1f5f9" : "#fff",
+                          color: currentPageVinc === totalPagesVinc ? "#94a3b8" : "#334155",
+                          cursor: currentPageVinc === totalPagesVinc ? "not-allowed" : "pointer",
+                          fontSize: "12px",
+                          fontWeight: "bold"
+                        }}
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* MODAL REACT DE EDICIÓN DE VINCULACIONES */}
+      {isVincModalOpen && editingVinc && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "28px",
+              borderRadius: "16px",
+              width: "560px",
+              maxWidth: "100%",
+              boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px"
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "700", color: "#0f172a" }}>
+                Rectificar Vinculación
+              </h3>
+              <button
+                onClick={() => { setIsVincModalOpen(false); setEditingVinc(null); }}
+                style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#94a3b8" }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Nombre de la Empresa */}
+              <div>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                  Nombre de Empresa
+                </label>
+                <input
+                  type="text"
+                  value={editingVinc.nombre}
+                  onChange={(e) => setEditingVinc({ ...editingVinc, nombre: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              {/* Jefatura / Ejecutiva Asignada */}
+              <div>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                  Jefatura / Ejecutiva Asignada
+                </label>
+                <select
+                  value={editingVinc.jefatura_id || ""}
+                  onChange={(e) => setEditingVinc({ ...editingVinc, jefatura_id: e.target.value ? Number(e.target.value) : null })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    background: "white",
+                    boxSizing: "border-box"
+                  }}
+                >
+                  <option value="">Sin jefatura asignada</option>
+                  {jefaturas.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Zona Comercial */}
+              <div>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                  Zona Comercial
+                </label>
+                <select
+                  value={editingVinc.zona_id || ""}
+                  onChange={(e) => setEditingVinc({ ...editingVinc, zona_id: e.target.value ? Number(e.target.value) : null })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    background: "white",
+                    boxSizing: "border-box"
+                  }}
+                >
+                  <option value="">Seleccione Zona...</option>
+                  {zonas.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dominios de Auto-enlace */}
+              <div>
+                <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                  Dominios de Auto-enlace (separados por comas)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: @empresa.com, @corp.empresa.com"
+                  value={dominiosText}
+                  onChange={(e) => setDominiosText(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    outline: "none",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <span style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>
+                  Las reuniones de Teams con invitados de estos dominios se auto-asignarán a esta empresa.
+                </span>
+              </div>
+
+              {/* Contactos Asociados */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: "600", color: "#334155", margin: 0 }}>
+                    Contactos Asociados ({editingVinc.contactos.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingVinc({
+                        ...editingVinc,
+                        contactos: [...editingVinc.contactos, { id: null, nombre: "", correo: "" }]
+                      });
+                    }}
+                    style={{
+                      background: "rgba(59, 130, 246, 0.08)",
+                      border: "1px solid rgba(59, 130, 246, 0.2)",
+                      color: "var(--secondary-color)",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ➕ Agregar Contacto
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "180px", overflowY: "auto", paddingRight: "4px" }}>
+                  {editingVinc.contactos.map((c, index) => (
+                    <div key={index} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <input
+                        type="text"
+                        placeholder="Nombre"
+                        value={c.nombre || ""}
+                        onChange={(e) => {
+                          const updated = [...editingVinc.contactos];
+                          updated[index].nombre = e.target.value;
+                          setEditingVinc({ ...editingVinc, contactos: updated });
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          fontSize: "12px",
+                          outline: "none"
+                        }}
+                      />
+                      <input
+                        type="email"
+                        placeholder="correo@empresa.com"
+                        value={c.correo || ""}
+                        onChange={(e) => {
+                          const updated = [...editingVinc.contactos];
+                          updated[index].correo = e.target.value;
+                          setEditingVinc({ ...editingVinc, contactos: updated });
+                        }}
+                        style={{
+                          flex: 1.2,
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          fontSize: "12px",
+                          outline: "none"
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = editingVinc.contactos.filter((_, idx) => idx !== index);
+                          setEditingVinc({ ...editingVinc, contactos: updated });
+                        }}
+                        style={{
+                          background: "#fee2e2",
+                          border: "1px solid #fecaca",
+                          color: "#dc2626",
+                          padding: "8px",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                        title="Eliminar contacto"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+
+                  {editingVinc.contactos.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "15px", border: "1px dashed #cbd5e1", borderRadius: "8px", color: "#64748b", fontSize: "12px" }}>
+                      No hay contactos configurados para esta empresa.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "16px", marginTop: "8px" }}>
+              <button
+                onClick={() => { setIsVincModalOpen(false); setEditingVinc(null); }}
+                style={{
+                  background: "white",
+                  border: "1px solid #cbd5e1",
+                  color: "#334155",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarVinculaciones}
+                style={{
+                  background: "var(--secondary-color)",
+                  border: "none",
+                  color: "white",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 10px rgba(59, 130, 246, 0.2)"
+                }}
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

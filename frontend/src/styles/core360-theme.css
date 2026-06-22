@@ -459,9 +459,48 @@ button:disabled {
 .swal2-popup {
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   border-radius: 16px !important;
-  padding: 24px !important;
+  padding: 16px 20px !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   border: 1px solid #f1f5f9 !important;
+}
+
+/* Custom class for tracking modal to fit height and scroll internally */
+.swal-tracking-popup {
+  height: 90vh !important;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+.swal-tracking-popup .swal2-html-container.swal-tracking-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Inner wrapper div must stretch to fill container height */
+.swal-tracking-popup .swal2-html-container.swal-tracking-container > div {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.swal-tracking-popup .swal2-actions {
+  flex-shrink: 0 !important;
+  margin-top: 8px !important;
+}
+
+/* Prevent body scroll when tracking modal is open */
+body.swal2-shown {
+  overflow: hidden !important;
 }
 
 .swal2-title {

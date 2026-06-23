@@ -642,8 +642,8 @@ const vincularHuerfana = async (req, res) => {
             const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
             const knownEmails = new Set(contactosDocs.map(c => c.correo));
 
-            // Buscar todas las huérfanas pendientes restantes
-            const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente'");
+            // Buscar todas las huérfanas pendientes restantes (excluyendo la que estamos vinculando)
+            const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente' AND id != ?", [id]);
 
             for (const h of pendientes) {
                 let hAttendees = [];

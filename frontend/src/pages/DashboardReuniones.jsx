@@ -162,7 +162,7 @@ export default function DashboardReuniones() {
       const result = await desvincularBorrador(reunion.id_reunion, desvincularDominios);
       const msj = result.data?.message || "La reunión ha sido desvinculada correctamente.";
       Swal.fire("Desvinculada", msj, "success");
-      window.location.reload();
+      refetch();
     } catch (e) {
       Swal.fire("Error", "No se pudo desvincular la reunión", "error");
     }

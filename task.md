@@ -11,13 +11,14 @@
   - [x] Eliminar el archivo antiguo `GestionEjecutivas.jsx`.
   - [x] Actualizar el sidebar en `Sidebar.jsx` (cambiar ruta `/gestion-ejecutivas` a `/gestion-empresas`, etiqueta a "Empresas", título y el icono SVG).
   - [x] Actualizar el enrutamiento en `App.jsx` (reemplazar la importación y la ruta `/gestion-ejecutivas` por `/gestion-empresas`).
-- [x] **Verificación y Pruebas**
-  - [x] Validar que al eliminar un template no se eliminen sus encuestas generadas ni sus respuestas (soft delete exitoso).
-  - [x] Validar que los campos de los modales calcen con proporciones perfectas.
-  - [x] Ejecutar el build de producción para validar la compilación sin errores.
-  - [x] Verificar creación, edición y eliminación de empresas.
-  - [x] Verificar el traspaso masivo de carteras de empresas.
-  - [x] Validar que todas las vistas administrativas luzcan idénticas en estructura.
+- [x] **1. Modificación de `handleEstadoClick` en `SeguimientoEmpresas.jsx`**
+  - [x] Agrupar logs (`empresa_seguimiento_log`) y reuniones por identificador de reunión (`id_reunion` / `event_id`)
+  - [x] Asignar cronológicamente los logs huérfanos sin `reunion_id` (como solicitudes manuales) a sus flujos correspondientes
+  - [x] Extraer y mapear hitos: Solicitada, Agendada (acción y programada para), Realización, Minuta Enviada, Reagendada y Cancelada
+- [x] **2. Rediseño del Modal en `SeguimientoEmpresas.jsx`**
+  - [x] Ajustar estilos CSS de la tabla para `table-layout: fixed; width: 100%; overflow-x: hidden;`
+  - [x] Eliminar `white-space: nowrap` en columnas extensas y añadir `word-break: break-word;`
+  - [x] Diseñar las 3 columnas: "Reunión / Motivo", "Historial de Fechas", y "Participantes"
 - [x] **Ajustes de Proporciones y Estandarización de Botones**
   - [x] Eliminar botones "editar/borrar" que causaban desproporción en las tarjetas de templates en la barra lateral.
   - [x] Implementar manejador de menú SweetAlert2 (`handleTemplateOptions`) interactivo para el template seleccionado con opciones premium para Cargar, Editar o Eliminar.

@@ -113,13 +113,13 @@ export default function DashboardReuniones() {
             Se desvinculará este borrador de minuta y la reunión volverá a la bandeja de reuniones sin clasificar.
           </div>
           <div style="font-weight: 700; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
-            Además, desvincular dominio(s) para auto-vinculación futura:
+            Además, puedes eliminar el dominio asociado para evitar vinculaciones futuras erróneas:
           </div>
           <div class="swal2-checkboxes-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
             ${dominios.map(d => `
               <label class="swal2-checkbox-label">
                 <input type="checkbox" class="swal2-desvincular-checkbox" value="${d}" />
-                <span>Eliminar dominio ${d} (desvincula todas las minutas en borrador asociadas)</span>
+                <span>Eliminar dominio ${d} (evita que futuras reuniones de este dominio se autovinculen a esta empresa)</span>
               </label>
             `).join('')}
           </div>
@@ -285,6 +285,7 @@ export default function DashboardReuniones() {
   const [filtroEmpresa, setFiltroEmpresa] = useState(() => sessionStorage.getItem('reuniones_empresa') || "Todas");
   const [filtroTipo, setFiltroTipo] = useState(() => sessionStorage.getItem('reuniones_tipo') || "Todas");
   const [filtroEstado, setFiltroEstado] = useState(() => sessionStorage.getItem('reuniones_estado') || "Todos");
+  const [activeTab, setActiveTab] = useState("clientes");
   const [filtroPeriodo, setFiltroPeriodo] = useState(() => sessionStorage.getItem('reuniones_periodo') || `anio-${new Date().getFullYear()}`);
 
   useEffect(() => {
@@ -391,6 +392,13 @@ export default function DashboardReuniones() {
       const esRolRestringido = userRol === 'ejecutiva' || userRol === 'jefatura';
       // Usar Number() para evitar type mismatch: la BD devuelve número pero localStorage puede devolver string
       const esReunionPropia = esRolRestringido && Number(r.ejecutiva_id) === Number(user?.id);
+      
+      const isInterna = r.empresa_nombre === "PROFORMA INTERNA" || r.tipo_reu === "Reunión Interna Proforma";
+      if (activeTab === "internas" && !isInterna) return false;
+      if (activeTab === "clientes" && isInterna) return false;
+      if (activeTab === "proximas" && r.estado_envio !== "agendada") return false;
+      if (activeTab !== "proximas" && (r.estado_envio === "agendada" || r.estado_envio === "cancelada")) return false;
+
       const pasaMacroYJef = isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
       const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
@@ -432,6 +440,7 @@ export default function DashboardReuniones() {
     filtroTipo,
     filtroPeriodo,
     filtroEstado,
+    activeTab,
     userRol,
     user,
     empresasPorJefatura
@@ -523,12 +532,11 @@ export default function DashboardReuniones() {
       Tipo: r.tipo_reu,
       Motivo: r.motivo_reu,
       Empresa: r.empresa_nombre,
-      Ejecutiva: r.ejecutiva_nombre,
-      Jefatura: r.jefatura_nombre,
-      Lugar: r.lugar,
+      "Usuario Creador": r.ejecutiva_nombre,
+      "Jefatura Responsable": r.jefatura_nombre,
+      Modalidad: r.lugar,
       Participantes: r.participantes,
-      Destinatario: r.enviado_a,
-      Estado: r.estado_envio,
+      "Estado Minuta": r.estado_envio,
     }));
     exportToExcel(
       dataToExport,
@@ -690,6 +698,7 @@ export default function DashboardReuniones() {
                     else if (val === "REGIONES") setFiltroMacroZona("Regiones");
                   }}
                   placeholder="Escribe para buscar..."
+                  isHighlighted={filtroMacroZona !== "Todas"}
                 />
               </div>
             )}
@@ -715,6 +724,7 @@ export default function DashboardReuniones() {
                     }
                   }}
                   placeholder="Escribe para buscar..."
+                  isHighlighted={filtroJefatura !== ""}
                 />
               </div>
             )}
@@ -727,6 +737,7 @@ export default function DashboardReuniones() {
                 options={optionsTipos}
                 onChange={(val) => setFiltroTipo(val)}
                 placeholder="Escribe para buscar..."
+                isHighlighted={filtroTipo !== "Todas"}
               />
             </div>
 
@@ -749,14 +760,16 @@ export default function DashboardReuniones() {
                   width: "100%",
                   height: "41.5px",
                   borderRadius: "8px",
-                  border: "1.5px solid #e2e8f0",
                   padding: "10px 12px",
                   fontSize: "13px",
-                  backgroundColor: "var(--bg-container)",
-                  color: "#334155",
                   outline: "none",
                   cursor: "pointer",
-                  boxSizing: "border-box"
+                  boxSizing: "border-box",
+                  color: filtroPeriodo !== `anio-${new Date().getFullYear()}` ? "var(--primary-color)" : "#334155",
+                  fontWeight: filtroPeriodo !== `anio-${new Date().getFullYear()}` ? "bold" : "normal",
+                  background: filtroPeriodo !== `anio-${new Date().getFullYear()}` ? "#eff6ff" : "var(--bg-container)",
+                  border: filtroPeriodo !== `anio-${new Date().getFullYear()}` ? "1.5px solid #60a5fa" : "1.5px solid #e2e8f0",
+                  transition: "border-color 0.2s, background 0.2s"
                 }}
               >
                 {periodoOptions.map((opt) => (
@@ -775,6 +788,7 @@ export default function DashboardReuniones() {
                 options={["Todos", "Pendientes de Vincular", "Vinculadas"]}
                 onChange={(val) => setFiltroEstado(val || "Todos")}
                 placeholder="Seleccionar..."
+                isHighlighted={filtroEstado !== "Todos"}
               />
             </div>
 
@@ -786,6 +800,7 @@ export default function DashboardReuniones() {
                 options={optionsEmpresas}
                 onChange={(val) => setFiltroEmpresa(val)}
                 placeholder="Escribe para buscar..."
+                isHighlighted={filtroEmpresa !== "Todas"}
               />
             </div>
           </div>
@@ -1078,9 +1093,83 @@ export default function DashboardReuniones() {
               alignItems: "center",
             }}
           >
-            <h3 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
-              Historial de Reuniones
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <h3 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+                Historial de Reuniones
+              </h3>
+              
+              {/* Opciones de filtro de pestaña integradas al lado del título */}
+              <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '6px' }}>
+                <button
+                  onClick={() => { setActiveTab('todas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'todas' ? 'white' : 'transparent',
+                    color: activeTab === 'todas' ? '#334155' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'todas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'todas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => { setActiveTab('clientes'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'clientes' ? 'var(--secondary-color)' : 'transparent',
+                    color: activeTab === 'clientes' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'clientes' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'clientes' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🏢 Clientes
+                </button>
+                <button
+                  onClick={() => { setActiveTab('internas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'internas' ? '#1e293b' : 'transparent',
+                    color: activeTab === 'internas' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'internas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'internas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  👥 Proforma
+                </button>
+                <button
+                  onClick={() => { setActiveTab('proximas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'proximas' ? '#0284c7' : 'transparent',
+                    color: activeTab === 'proximas' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'proximas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'proximas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  📅 Próximas
+                </button>
+              </div>
+            </div>
             <button
               onClick={handleExport}
               style={{

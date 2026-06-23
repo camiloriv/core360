@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
  * Componente genérico para filtros con búsqueda (Autocompletado)
  * Ideal para Dashboards donde hay muchas opciones.
  */
-function SearchableFilter({ label, value, options = [], onChange, placeholder = "Buscar..." }) {
+function SearchableFilter({ label, value, options = [], onChange, placeholder = "Buscar...", isHighlighted = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
@@ -69,10 +69,12 @@ function SearchableFilter({ label, value, options = [], onChange, placeholder = 
             borderRadius: "8px",
             border: "1.5px solid #e2e8f0",
             fontSize: "13px",
-            color: "#334155",
+            color: isHighlighted ? "var(--primary-color)" : "#334155",
+            fontWeight: isHighlighted ? "bold" : "normal",
             outline: "none",
-            background: "var(--bg-container)",
-            transition: "border-color 0.2s",
+            background: isHighlighted ? "#eff6ff" : "var(--bg-container)",
+            border: isHighlighted ? "1.5px solid #60a5fa" : "1.5px solid #e2e8f0",
+            transition: "border-color 0.2s, background 0.2s",
             cursor: "pointer"
           }}
         />

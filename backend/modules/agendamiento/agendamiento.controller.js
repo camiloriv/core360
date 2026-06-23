@@ -204,7 +204,7 @@ const obtenerEventosCalendario = async (req, res) => {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${accessToken}`,
-                "Prefer": "outlook.timezone=\"UTC\""
+                "Prefer": "outlook.timezone=\"America/Santiago\""
             }
         });
 
@@ -338,8 +338,8 @@ const syncEventosPasados = async (req, res) => {
         }
 
         const now = new Date();
-        const start = "2026-01-01T00:00:00Z";
-        const end = now.toISOString();
+        const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString(); // 3 meses atras
+        const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();   // 3 meses a futuro
 
         const accessToken = await getGraphToken();
         const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=999`;
@@ -348,7 +348,7 @@ const syncEventosPasados = async (req, res) => {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${accessToken}`,
-                "Prefer": "outlook.timezone=\"UTC\""
+                "Prefer": "outlook.timezone=\"America/Santiago\""
             }
         });
 
@@ -358,91 +358,98 @@ const syncEventosPasados = async (req, res) => {
 
         const data = await response.json();
         const rawEvents = data.value || [];
-        const currentEventIds = new Set(rawEvents.map(e => e.id));
+        const currentEventMap = new Map();
+        rawEvents.forEach(e => currentEventMap.set(e.id, e));
 
-        // Cleanup: eliminar reuniones huérfanas que fueron eliminadas de Outlook
-        try {
-            const [dbHuerfanas] = await db.query(
-                "SELECT event_id FROM reuniones_huerfanas WHERE usuario_id = ? AND estado IN ('pendiente', 'ignorado') AND fecha >= '2026-01-01'",
-                [usuarioId]
-            );
-            for (const row of dbHuerfanas) {
-                if (row.event_id && !currentEventIds.has(row.event_id)) {
-                    console.log(`Sync Cleanup: Deleting deleted Outlook event ${row.event_id} from huerfanas`);
-                    await db.query(
-                        "DELETE FROM reuniones_huerfanas WHERE usuario_id = ? AND event_id = ? AND estado IN ('pendiente', 'ignorado')",
-                        [usuarioId, row.event_id]
-                    );
-                }
-            }
-        } catch (cleanupError) {
-            console.error("Error during sync huerfanas cleanup:", cleanupError);
-        }
-
-        const pastEvents = rawEvents.filter(e => new Date(e.end.dateTime + "Z") < now);
-
-        if (pastEvents.length === 0) {
-            return res.status(200).json({ success: true, procesados: 0 });
-        }
-
-        const [reunionesDocs] = await db.query("SELECT event_id, ical_uid, fecha_reu, hora, motivo_reu FROM reuniones");
-        const [huerfanasDocs] = await db.query("SELECT event_id, ical_uid, fecha, hora, asunto FROM reuniones_huerfanas");
+        const [reunionesDocs] = await db.query("SELECT id_reunion, event_id, ical_uid, fecha_reu, hora, motivo_reu, estado_envio, empresa_id, tipo_reu FROM reuniones");
+        const [huerfanasDocs] = await db.query("SELECT id, event_id, ical_uid, fecha, hora, asunto, estado FROM reuniones_huerfanas WHERE usuario_id = ?", [usuarioId]);
         
-        const processedIds = new Set();
-        const processedICalUIds = new Set();
-        const processedSignatures = new Set();
+        const reunionesByEventId = new Map();
+        reunionesDocs.forEach(r => {
+            if (r.event_id) reunionesByEventId.set(r.event_id, r);
+            if (!r.event_id && r.ical_uid) reunionesByEventId.set(r.ical_uid, r);
+        });
 
+        const huerfanasByEventId = new Map();
+        huerfanasDocs.forEach(r => {
+            if (r.event_id) huerfanasByEventId.set(r.event_id, r);
+            if (!r.event_id && r.ical_uid) huerfanasByEventId.set(r.ical_uid, r);
+        });
+
+        const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
+        
         const formatDateStr = (val) => {
             if (!val) return "";
             if (typeof val === 'string') return val.split('T')[0];
             return val.toISOString().split('T')[0];
         };
 
-        reunionesDocs.forEach(r => {
-            if (r.event_id) processedIds.add(r.event_id);
-            if (r.ical_uid) processedICalUIds.add(r.ical_uid);
-            if (r.fecha_reu && r.hora && r.motivo_reu) {
-                const f = formatDateStr(r.fecha_reu);
-                const h = r.hora.substring(0, 5);
-                processedSignatures.add(`${f}|${h}|${r.motivo_reu.toLowerCase().trim()}`);
-            }
-        });
-
-        huerfanasDocs.forEach(r => {
-            if (r.event_id) processedIds.add(r.event_id);
-            if (r.ical_uid) processedICalUIds.add(r.ical_uid);
-            if (r.fecha && r.hora && r.asunto) {
-                const f = formatDateStr(r.fecha);
-                const h = r.hora.substring(0, 5);
-                processedSignatures.add(`${f}|${h}|${r.asunto.toLowerCase().trim()}`);
-            }
-        });
-
-        const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
-        
+        const todayStr = formatDateStr(now);
         let procesados = 0;
 
-        for (const event of pastEvents) {
+        for (const event of rawEvents) {
             const fecha = event.start.dateTime.split('T')[0];
             const hora = event.start.dateTime.split('T')[1].substring(0,5);
-            const rawSubject = event.subject || 'Sin asunto';
-            const signature = `${fecha}|${hora}|${rawSubject.toLowerCase().trim()}`;
+            const isEventPast = new Date(event.end.dateTime + "Z") < now;
+            const isCancelled = event.isCancelled || false;
+            
+            const existingReunion = reunionesByEventId.get(event.id) || (event.iCalUId && reunionesByEventId.get(event.iCalUId));
+            const existingHuerfana = huerfanasByEventId.get(event.id) || (event.iCalUId && huerfanasByEventId.get(event.iCalUId));
 
-            if (processedIds.has(event.id) || 
-               (event.iCalUId && processedICalUIds.has(event.iCalUId)) ||
-               processedSignatures.has(signature)) {
+            if (existingReunion) {
+                const fDb = formatDateStr(existingReunion.fecha_reu);
+                const hDb = existingReunion.hora ? existingReunion.hora.substring(0, 5) : "";
+                
+                if (isCancelled && existingReunion.estado_envio !== 'cancelada') {
+                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
+                    if (existingReunion.empresa_id) {
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
+                            [existingReunion.empresa_id, todayStr, usuarioId, event.id, "Cancelada desde Outlook"]
+                        );
+                    }
+                    procesados++;
+                } else if (!isCancelled && (fDb !== fecha || hDb !== hora)) {
+                    await db.query("UPDATE reuniones SET fecha_reu = ?, hora = ? WHERE id_reunion = ?", [fecha, hora, existingReunion.id_reunion]);
+                    if (existingReunion.empresa_id) {
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
+                            [existingReunion.empresa_id, fecha, usuarioId, event.id, "Reagendada desde Outlook"]
+                        );
+                    }
+                    procesados++;
+                }
+                
+                if (!isCancelled && isEventPast && existingReunion.estado_envio === 'agendada') {
+                    const nuevoEstado = existingReunion.tipo_reu === 'Reunión Interna Proforma' ? 'no_aplica' : 'borrador';
+                    await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [nuevoEstado, existingReunion.id_reunion]);
+                    procesados++;
+                }
                 continue;
             }
+
+            if (existingHuerfana) {
+                const fDb = formatDateStr(existingHuerfana.fecha);
+                const hDb = existingHuerfana.hora ? existingHuerfana.hora.substring(0, 5) : "";
+                
+                if (isCancelled && existingHuerfana.estado !== 'cancelada') {
+                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [existingHuerfana.id]);
+                    procesados++;
+                } else if (!isCancelled && (fDb !== fecha || hDb !== hora)) {
+                    await db.query("UPDATE reuniones_huerfanas SET fecha = ?, hora = ? WHERE id = ?", [fecha, hora, existingHuerfana.id]);
+                    procesados++;
+                }
+                continue;
+            }
+
+            if (isCancelled) continue;
 
             const subjectLower = (event.subject || '').toLowerCase();
             const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
             const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
             const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
 
-            // Ignorar reuniones que no tengan un enlace de Teams y tampoco indiquen ser presenciales
-            if (!hasOnlineLink && !isPresencial) {
-                continue;
-            }
+            if (!hasOnlineLink && !isPresencial) continue;
 
             try {
                 const attendees = event.attendees || [];
@@ -458,63 +465,142 @@ const syncEventosPasados = async (req, res) => {
                 const allInternal = emails.every(e => e.endsWith('@proforma.cl'));
                 const asstStr = JSON.stringify(filteredAttendees);
 
-                if (emails.length === 0 || allInternal) {
+                if (emails.length === 0) {
                     await db.query(
                         "INSERT INTO reuniones_huerfanas (usuario_id, event_id, asunto, fecha, hora, asistentes, estado, ical_uid) VALUES (?, ?, ?, ?, ?, ?, 'ignorado', ?)",
-                        [usuarioId, event.id, event.subject || 'Sin asunto', event.start.dateTime.split('T')[0], event.start.dateTime.split('T')[1].substring(0,5), asstStr, event.iCalUId || null]
+                        [usuarioId, event.id, event.subject || 'Sin asunto', fecha, hora, asstStr, event.iCalUId || null]
                     );
-                    if (event.iCalUId) processedICalUIds.add(event.iCalUId);
                     continue;
                 }
 
-                let matchedEmpresaId = null;
+                if (allInternal) {
+                    const id_reunion = await generarIdReunion();
+                    const names = filteredAttendees.map(a => a.name);
+                    const linkTeams = event.onlineMeeting?.joinUrl || '';
+                    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
+                    
+                    const [empRows] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
+                    const idProforma = empRows.length > 0 ? empRows[0].id : null;
+
+                    if (idProforma) {
+                        const estadoNuevo = isEventPast ? 'no_aplica' : 'agendada';
+                        await db.query(
+                            `INSERT IGNORE INTO reuniones (
+                                id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
+                                lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                id_reunion, usuarioId, idProforma, 
+                                'Reunión Interna Proforma', 
+                                fecha, hora, lugarStr,
+                                estadoNuevo, '[]', event.id, names.join(", "),
+                                event.subject || 'Sin asunto',
+                                event.subject || 'Sin asunto',
+                                event.iCalUId || null
+                            ]
+                        );
+                        if (estadoNuevo === 'agendada') {
+                            await db.query(
+                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
+                                [idProforma, fecha, usuarioId, event.id, event.subject || 'Reunión Interna']
+                            );
+                        }
+                    }
+                    procesados++;
+                    continue;
+                }
+
+                const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+                const externalDomains = new Set();
+                
                 for (const email of emails) {
-                    const domain = '@' + email.split('@')[1];
-                    const match = dominiosDocs.find(d => d.dominio === domain);
-                    if (match) {
-                        matchedEmpresaId = match.empresa_id;
-                        break;
+                    if (email.includes('@')) {
+                        const dom = email.split('@')[1].toLowerCase();
+                        if (!dominiosGenericos.includes(dom)) {
+                            externalDomains.add('@' + dom);
+                        }
                     }
                 }
 
-                // La fecha y hora ya fueron extraídas arriba
+                let matchedEmpresaId = null;
+                if (externalDomains.size === 1) {
+                    const domain = [...externalDomains][0];
+                    const match = dominiosDocs.find(d => d.dominio === domain);
+                    if (match) matchedEmpresaId = match.empresa_id;
+                }
 
                 if (matchedEmpresaId) {
                     const id_reunion = await generarIdReunion();
-
                     const names = filteredAttendees.map(a => a.name);
                     const externalEmails = emails.filter(email => !email.endsWith('@proforma.cl'));
                     const enviadoAStr = JSON.stringify(externalEmails);
 
                     const linkTeams = event.onlineMeeting?.joinUrl || '';
-                    const lugarStr = isPresencial ? 'Presencial' : linkTeams;
+                    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
+                    const estadoNuevo = isEventPast ? 'borrador' : 'agendada';
 
                     await db.query(
                         `INSERT IGNORE INTO reuniones (
                             id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
                             lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                         [
                             id_reunion, usuarioId, matchedEmpresaId, 
                             '', 
                             fecha, hora, lugarStr,
-                            enviadoAStr, event.id, names.join(", "),
+                            estadoNuevo, enviadoAStr, event.id, names.join(", "),
                             event.subject || 'Sin asunto',
                             event.subject || 'Sin asunto',
                             event.iCalUId || null
                         ]
                     );
-                    if (event.iCalUId) processedICalUIds.add(event.iCalUId);
+
+                    if (estadoNuevo === 'agendada' || estadoNuevo === 'borrador') {
+                        const estadoLog = estadoNuevo === 'agendada' ? 'agendada' : 'gestionada';
+                        const fechaLog = estadoNuevo === 'agendada' ? fecha : todayStr;
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, ?, ?, ?, ?, ?)",
+                            [matchedEmpresaId, estadoLog, fechaLog, usuarioId, event.id, event.subject || 'Sin asunto']
+                        );
+                    }
+
                 } else {
                     await db.query(
                         "INSERT INTO reuniones_huerfanas (usuario_id, event_id, asunto, fecha, hora, asistentes, estado, ical_uid) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)",
                         [usuarioId, event.id, event.subject || 'Sin asunto', fecha, hora, asstStr, event.iCalUId || null]
                     );
-                    if (event.iCalUId) processedICalUIds.add(event.iCalUId);
                 }
                 procesados++;
             } catch (eventError) {
                 console.error(`Error procesando evento individual ${event.id}:`, eventError);
+            }
+        }
+
+        for (const [eventId, r] of reunionesByEventId.entries()) {
+            if (!r.event_id) continue;
+            const fDb = r.fecha_reu ? formatDateStr(r.fecha_reu) : "";
+            if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
+                if (!currentEventMap.has(eventId) && r.estado_envio !== 'cancelada' && r.estado_envio !== 'enviado') {
+                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [r.id_reunion]);
+                    if (r.empresa_id) {
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
+                            [r.empresa_id, todayStr, usuarioId, eventId, "Eliminada desde Outlook"]
+                        );
+                    }
+                    procesados++;
+                }
+            }
+        }
+
+        for (const [eventId, r] of huerfanasByEventId.entries()) {
+            if (!r.event_id) continue;
+            const fDb = r.fecha ? formatDateStr(r.fecha) : "";
+            if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
+                if (!currentEventMap.has(eventId) && r.estado !== 'cancelada') {
+                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [r.id]);
+                    procesados++;
+                }
             }
         }
 
@@ -566,7 +652,7 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
 
     const subjectLower = (huerfana.asunto || '').toLowerCase();
     const isPresencial = subjectLower.includes('presencial');
-    const lugarStr = isPresencial ? 'Presencial' : '';
+    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
 
     await db.query(
         `INSERT IGNORE INTO reuniones (
@@ -649,7 +735,10 @@ const vincularHuerfana = async (req, res) => {
                 let hAttendees = [];
                 try { hAttendees = JSON.parse(h.asistentes || '[]'); } catch(e) {}
                 
-                let matched = false;
+                const externalDomains = new Set();
+                let matchedByEmail = false;
+                let matchedByDomain = false;
+
                 for (const item of hAttendees) {
                     let email = "";
                     if (typeof item === 'string') email = item.trim().toLowerCase();
@@ -657,24 +746,29 @@ const vincularHuerfana = async (req, res) => {
 
                     if (email) {
                         if (knownEmails.has(email)) {
-                        matched = true;
-                        break;
-                    }
-                    if (email.includes('@')) {
-                        const dom = '@' + email.split('@')[1];
-                        if (knownDomains.has(dom)) {
-                            matched = true;
-                            break;
+                            matchedByEmail = true;
+                        }
+                        if (email.includes('@')) {
+                            const dom = email.split('@')[1];
+                            const domWithAt = '@' + dom;
+                            if (!dominiosGenericos.includes(dom)) {
+                                externalDomains.add(domWithAt);
+                                if (knownDomains.has(domWithAt)) {
+                                    matchedByDomain = true;
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            if (matched) {
-                await crearBorradorDesdeHuerfana(h, empresa_id);
-                vinculadasExtras++;
+                // Vinculamos solo si:
+                // 1. Hay un match explícito por correo, O
+                // 2. Hay match por dominio Y la reunión tiene exactamente UN dominio corporativo (no es transversal)
+                if (matchedByEmail || (matchedByDomain && externalDomains.size === 1)) {
+                    await crearBorradorDesdeHuerfana(h, empresa_id);
+                    vinculadasExtras++;
+                }
             }
-        }
         }
 
         // 2. Vincular la reunión principal
@@ -734,48 +828,21 @@ const desvincularBorrador = async (req, res) => {
             : (dominio ? [dominio] : []);
 
         if (targetDominios.length > 0 && empresa_id) {
-            let totalDesvinculadas = 0;
             for (const dom of targetDominios) {
-                // Delete domain mapping if it was saved by mistake
+                // Delete domain mapping if it was saved by mistake so it doesn't auto-link in the future
                 await db.query("DELETE FROM empresa_dominios WHERE empresa_id = ? AND dominio = ?", [empresa_id, dom]);
-
-                // Find all borrador meetings of this company with this domain
-                const [relacionadas] = await db.query(
-                    "SELECT id_reunion, event_id FROM reuniones WHERE empresa_id = ? AND estado_envio = 'borrador' AND enviado_a LIKE ?", 
-                    [empresa_id, `%${dom}%`]
-                );
-
-                for (const rel of relacionadas) {
-                    if (rel.event_id) {
-                        await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [rel.event_id]);
-                    }
-                    await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [rel.id_reunion]);
-                }
-                totalDesvinculadas += relacionadas.length;
             }
-
-            // Also make sure the current meeting itself is unlinked if it wasn't already in the loop
-            const [stillExists] = await db.query("SELECT id_reunion FROM reuniones WHERE id_reunion = ?", [id_reunion]);
-            if (stillExists.length > 0) {
-                if (event_id) {
-                    await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
-                }
-                await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
-                totalDesvinculadas++;
-            }
-
-            return res.json({ success: true, message: `Se desvincularon ${totalDesvinculadas} reuniones.` });
-        } else {
-            // Revert the orphan meeting back to pendiente
-            if (event_id) {
-                await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
-            }
-
-            // 3. Delete the draft from reuniones
-            await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
-
-            res.json({ success: true });
         }
+
+        // Revert the orphan meeting back to pendiente
+        if (event_id) {
+            await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
+        }
+
+        // Delete the draft from reuniones (only the selected one)
+        await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+
+        res.json({ success: true, message: "Reunión desvinculada." });
     } catch (e) {
         console.error("Error al desvincular borrador:", e);
         res.status(500).json({ error: "Error interno al desvincular borrador." });

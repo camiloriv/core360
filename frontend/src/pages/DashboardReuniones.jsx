@@ -280,19 +280,32 @@ export default function DashboardReuniones() {
     }
   };
 
-  const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
-  const [filtroJefatura, setFiltroJefatura] = useState("");
-  const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
-  const [filtroTipo, setFiltroTipo] = useState("Todas");
-  const [filtroEstado, setFiltroEstado] = useState("Todos");
-  const [filtroPeriodo, setFiltroPeriodo] = useState(`anio-${new Date().getFullYear()}`);
+  const [filtroMacroZona, setFiltroMacroZona] = useState(() => sessionStorage.getItem('reuniones_macro') || "Todas");
+  const [filtroJefatura, setFiltroJefatura] = useState(() => sessionStorage.getItem('reuniones_jefatura') || "");
+  const [filtroEmpresa, setFiltroEmpresa] = useState(() => sessionStorage.getItem('reuniones_empresa') || "Todas");
+  const [filtroTipo, setFiltroTipo] = useState(() => sessionStorage.getItem('reuniones_tipo') || "Todas");
+  const [filtroEstado, setFiltroEstado] = useState(() => sessionStorage.getItem('reuniones_estado') || "Todos");
+  const [filtroPeriodo, setFiltroPeriodo] = useState(() => sessionStorage.getItem('reuniones_periodo') || `anio-${new Date().getFullYear()}`);
+
+  useEffect(() => {
+    sessionStorage.setItem('reuniones_macro', filtroMacroZona);
+    sessionStorage.setItem('reuniones_jefatura', filtroJefatura);
+    sessionStorage.setItem('reuniones_empresa', filtroEmpresa);
+    sessionStorage.setItem('reuniones_tipo', filtroTipo);
+    sessionStorage.setItem('reuniones_estado', filtroEstado);
+    sessionStorage.setItem('reuniones_periodo', filtroPeriodo);
+  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroEstado, filtroPeriodo]);
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
   const periodoOptions = useMemo(() => buildPeriodoOptions(), []);
 
   // Paginación
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [currentPage, setCurrentPage] = useState(() => Number(sessionStorage.getItem('reuniones_page')) || 1);
+
+  useEffect(() => {
+    sessionStorage.setItem('reuniones_page', currentPage);
+  }, [currentPage]);
+  const itemsPerPage = 6;
 
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
@@ -385,8 +398,8 @@ export default function DashboardReuniones() {
       let pasaPeriodo = true;
       if (r.fecha_reu) {
         const d = new Date(r.fecha_reu);
-        const rYear = d.getFullYear();
-        const rMonth = String(d.getMonth() + 1).padStart(2, "0");
+        const rYear = d.getUTCFullYear();
+        const rMonth = String(d.getUTCMonth() + 1).padStart(2, "0");
         
         if (filtroPeriodo.startsWith("anio-")) {
           const anioSeleccionado = Number(filtroPeriodo.replace("anio-", ""));
@@ -429,7 +442,12 @@ export default function DashboardReuniones() {
   }, [reuniones]);
 
   // Reiniciar página a 1 cuando cambien los filtros
+  const isFirstRender = React.useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo, filtroEstado]);
 
@@ -443,8 +461,8 @@ export default function DashboardReuniones() {
       const d = new Date(r.fecha_reu);
       const now = new Date();
       return (
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
+        d.getUTCMonth() === now.getMonth() &&
+        d.getUTCFullYear() === now.getFullYear()
       );
     });
   }, [realizedReuniones]);
@@ -500,7 +518,7 @@ export default function DashboardReuniones() {
   const handleExport = () => {
     const dataToExport = filteredReuniones.map((r) => ({
       ID: r.id_reunion,
-      Fecha: new Date(r.fecha_reu),
+      Fecha: new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" }),
       Hora: r.hora,
       Tipo: r.tipo_reu,
       Motivo: r.motivo_reu,
@@ -525,11 +543,15 @@ export default function DashboardReuniones() {
   const totalPages = Math.ceil(filteredReuniones.length / itemsPerPage);
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
   };
 
   if (loading && reuniones.length === 0)
@@ -597,6 +619,57 @@ export default function DashboardReuniones() {
           marginBottom: "30px",
           gap: "20px"
         }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0, fontSize: "14px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Filtros
+            </h3>
+            {/* Botón Limpiar Filtros */}
+            <button 
+              onClick={() => {
+                setFiltroMacroZona("Todas");
+                setFiltroJefatura("");
+                setFiltroEmpresa("Todas");
+                setFiltroTipo("Todas");
+                setFiltroEstado("Todos");
+                setFiltroPeriodo(`anio-${new Date().getFullYear()}`);
+                setCurrentPage(1);
+                sessionStorage.removeItem('reuniones_macro');
+                sessionStorage.removeItem('reuniones_jefatura');
+                sessionStorage.removeItem('reuniones_empresa');
+                sessionStorage.removeItem('reuniones_tipo');
+                sessionStorage.removeItem('reuniones_estado');
+                sessionStorage.removeItem('reuniones_periodo');
+                sessionStorage.removeItem('reuniones_page');
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#64748b",
+                fontSize: "13px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                transition: "all 0.2s",
+                fontWeight: "500"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = "#f1f5f9";
+                e.currentTarget.style.color = "#334155";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#64748b";
+              }}
+              title="Limpiar todos los filtros"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              Limpiar filtros
+            </button>
+          </div>
           <div style={{ 
             display: "flex", 
             flexWrap: "wrap", 
@@ -1052,7 +1125,7 @@ export default function DashboardReuniones() {
                     <tr key={r.id_reunion} style={styles.tr}>
                       <td style={styles.tdCell}>
                         <div style={styles.companyName}>
-                          {new Date(r.fecha_reu).toLocaleDateString()}
+                          {new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })}
                         </div>
                         <div style={{ ...styles.meetingIdText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={r.id_reunion}>
                           {r.id_reunion.length > 25 ? "En Teams" : r.id_reunion}
@@ -1512,7 +1585,7 @@ export default function DashboardReuniones() {
                   <strong>Reunión:</strong> {selectedOrphan.asunto_teams || selectedOrphan.motivo_reu || 'Sin asunto'}
                 </div>
                 <div style={{ marginBottom: "8px" }}>
-                  <strong>Fecha:</strong> {new Date(selectedOrphan.fecha_reu).toLocaleDateString()} {selectedOrphan.hora}
+                  <strong>Fecha:</strong> {new Date(selectedOrphan.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })} {selectedOrphan.hora}
                 </div>
                 {externalAttendees.length > 0 ? (
                   <div>

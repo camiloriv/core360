@@ -81,17 +81,7 @@ export default function DashboardReuniones() {
   const [loadingSync, setLoadingSync] = useState(true);
 
   useEffect(() => {
-    const runSync = async () => {
-      try {
-        await syncEventosPasados();
-        refetch();
-      } catch (e) {
-        console.error("Error sincronizando calendario", e);
-      } finally {
-        setLoadingSync(false);
-      }
-    };
-    runSync();
+    setLoadingSync(false);
   }, []);
 
   const handleDesvincular = async (reunion) => {

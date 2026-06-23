@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDashboardData } from "../hooks/useDashboardData";
-import { syncEventosPasados, obtenerHuerfanas, vincularHuerfana, descartarHuerfana } from "../services/agendamientoService";
+import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, descartarHuerfana } from "../services/agendamientoService";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
 import "../styles/core360-theme.css";
@@ -11,6 +11,7 @@ export default function VincularReuniones() {
   const [huerfanasSeleccionadas, setHuerfanasSeleccionadas] = useState({});
   const [loadingSync, setLoadingSync] = useState(true);
   const [syncingNow, setSyncingNow] = useState(false);
+  const [ultimaSincronizacion, setUltimaSincronizacion] = useState(null);
 
   const fetchHuerfanas = async () => {
     try {
@@ -21,33 +22,43 @@ export default function VincularReuniones() {
     }
   };
 
+  const fetchSyncStatus = async () => {
+    try {
+      const res = await getSyncStatus();
+      setUltimaSincronizacion(res.data?.ultima_sincronizacion || null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const runSync = async (manual = false) => {
     if (manual) {
       setSyncingNow(true);
       Swal.fire({
         title: "Sincronizando...",
-        text: "Consultando tu calendario de Microsoft Outlook / Teams",
+        text: "Consultando tu calendario de Microsoft Outlook / Teams mediante Consultas Delta",
         allowOutsideClick: false,
         didOpen: () => {
           Swal.showLoading();
         }
       });
-    }
-
-    try {
-      await syncEventosPasados();
-      if (manual) {
+      
+      try {
+        await syncEventosPasados();
         Swal.fire("Sincronizado", "Tu calendario ha sido sincronizado con éxito", "success");
-      }
-    } catch (e) {
-      console.error("Error sincronizando calendario", e);
-      if (manual) {
+        await fetchSyncStatus();
+      } catch (e) {
+        console.error("Error sincronizando calendario", e);
         Swal.fire("Error", "No se pudo sincronizar el calendario", "error");
+      } finally {
+        await fetchHuerfanas();
+        setLoadingSync(false);
+        setSyncingNow(false);
       }
-    } finally {
-      await fetchHuerfanas();
+    } else {
+      // On load
+      await Promise.all([fetchHuerfanas(), fetchSyncStatus()]);
       setLoadingSync(false);
-      setSyncingNow(false);
     }
   };
 
@@ -106,29 +117,38 @@ export default function VincularReuniones() {
           </h1>
           <p className="page-subtitle">CLASIFICACIÓN DE REUNIONES COMERCIALES PASADAS</p>
         </div>
-        <button
-          onClick={() => runSync(true)}
-          disabled={syncingNow}
-          style={{
-            background: "var(--success-color)",
-            color: "white",
-            height: "42px",
-            padding: "0 20px",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
-            transition: "all 0.2s ease"
-          }}
-          onMouseOver={(e) => { e.currentTarget.style.filter = "brightness(1.05)"; }}
-          onMouseOut={(e) => { e.currentTarget.style.filter = "none"; }}
-        >
-          🔄 {syncingNow ? "Sincronizando..." : "Sincronizar Calendario"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          {ultimaSincronizacion && (
+            <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: "500", background: "white", padding: "8px 12px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+              Última sincronización: <span style={{ fontWeight: "bold", color: "var(--primary-color)" }}>
+                {new Date(ultimaSincronizacion).toLocaleString("es-CL", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={() => runSync(true)}
+            disabled={syncingNow}
+            style={{
+              background: "var(--success-color)",
+              color: "white",
+              height: "42px",
+              padding: "0 20px",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.2)",
+              transition: "all 0.2s ease"
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.filter = "brightness(1.05)"; }}
+            onMouseOut={(e) => { e.currentTarget.style.filter = "none"; }}
+          >
+            🔄 {syncingNow ? "Sincronizando..." : "Sincronizar Calendario"}
+          </button>
+        </div>
       </div>
 
       {loadingSync ? (

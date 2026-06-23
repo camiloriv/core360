@@ -338,11 +338,23 @@ const syncEventosPasados = async (req, res) => {
         }
 
         const now = new Date();
-        const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString(); // 3 meses atras
-        const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();   // 3 meses a futuro
+        const start = new Date(now.getFullYear(), 0, 1).toISOString(); // 1 Enero
+        const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();   // 1 año futuro
 
         const accessToken = await getGraphToken();
-        const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=999`;
+
+        const [usuarioRows] = await db.query("SELECT sync_delta_token, ultima_sincronizacion FROM usuarios WHERE id = ?", [usuarioId]);
+        const deltaToken = usuarioRows[0]?.sync_delta_token;
+
+        let endpoint = "";
+        let isDeltaRequest = false;
+
+        if (deltaToken) {
+            endpoint = deltaToken;
+            isDeltaRequest = true;
+        } else {
+            endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=${start}&endDateTime=${end}&$top=999`;
+        }
 
         const response = await fetch(endpoint, {
             method: "GET",
@@ -353,10 +365,22 @@ const syncEventosPasados = async (req, res) => {
         });
 
         if (!response.ok) {
-            return res.status(200).json({ success: true, message: "No se pudo sincronizar", events: [] });
+            if (response.status === 410) {
+                // Token expirado o inválido, forzar sincronización completa próxima vez
+                await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
+            }
+            return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró", events: [] });
         }
 
         const data = await response.json();
+        
+        const newDeltaToken = data['@odata.deltaLink'] || null;
+        if (newDeltaToken) {
+            await db.query("UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?", [newDeltaToken, usuarioId]);
+        } else {
+            await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
+        }
+
         const rawEvents = data.value || [];
         const currentEventMap = new Map();
         rawEvents.forEach(e => currentEventMap.set(e.id, e));
@@ -388,13 +412,31 @@ const syncEventosPasados = async (req, res) => {
         let procesados = 0;
 
         for (const event of rawEvents) {
+            const existingReunion = reunionesByEventId.get(event.id) || (event.iCalUId && reunionesByEventId.get(event.iCalUId));
+            const existingHuerfana = huerfanasByEventId.get(event.id) || (event.iCalUId && huerfanasByEventId.get(event.iCalUId));
+
+            if (event['@removed']) {
+                if (existingReunion && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado') {
+                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
+                    if (existingReunion.empresa_id) {
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
+                            [existingReunion.empresa_id, todayStr, usuarioId, event.id, "Eliminada desde Outlook (Delta)"]
+                        );
+                    }
+                    procesados++;
+                }
+                if (existingHuerfana && existingHuerfana.estado !== 'cancelada') {
+                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [existingHuerfana.id]);
+                    procesados++;
+                }
+                continue;
+            }
+
             const fecha = event.start.dateTime.split('T')[0];
             const hora = event.start.dateTime.split('T')[1].substring(0,5);
             const isEventPast = new Date(event.end.dateTime + "Z") < now;
             const isCancelled = event.isCancelled || false;
-            
-            const existingReunion = reunionesByEventId.get(event.id) || (event.iCalUId && reunionesByEventId.get(event.iCalUId));
-            const existingHuerfana = huerfanasByEventId.get(event.id) || (event.iCalUId && huerfanasByEventId.get(event.iCalUId));
 
             if (existingReunion) {
                 const fDb = formatDateStr(existingReunion.fecha_reu);
@@ -576,30 +618,32 @@ const syncEventosPasados = async (req, res) => {
             }
         }
 
-        for (const [eventId, r] of reunionesByEventId.entries()) {
-            if (!r.event_id) continue;
-            const fDb = r.fecha_reu ? formatDateStr(r.fecha_reu) : "";
-            if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
-                if (!currentEventMap.has(eventId) && r.estado_envio !== 'cancelada' && r.estado_envio !== 'enviado') {
-                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [r.id_reunion]);
-                    if (r.empresa_id) {
-                        await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
-                            [r.empresa_id, todayStr, usuarioId, eventId, "Eliminada desde Outlook"]
-                        );
+        if (!isDeltaRequest) {
+            for (const [eventId, r] of reunionesByEventId.entries()) {
+                if (!r.event_id) continue;
+                const fDb = r.fecha_reu ? formatDateStr(r.fecha_reu) : "";
+                if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
+                    if (!currentEventMap.has(eventId) && r.estado_envio !== 'cancelada' && r.estado_envio !== 'enviado') {
+                        await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [r.id_reunion]);
+                        if (r.empresa_id) {
+                            await db.query(
+                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
+                                [r.empresa_id, todayStr, usuarioId, eventId, "Eliminada desde Outlook"]
+                            );
+                        }
+                        procesados++;
                     }
-                    procesados++;
                 }
             }
-        }
 
-        for (const [eventId, r] of huerfanasByEventId.entries()) {
-            if (!r.event_id) continue;
-            const fDb = r.fecha ? formatDateStr(r.fecha) : "";
-            if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
-                if (!currentEventMap.has(eventId) && r.estado !== 'cancelada') {
-                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [r.id]);
-                    procesados++;
+            for (const [eventId, r] of huerfanasByEventId.entries()) {
+                if (!r.event_id) continue;
+                const fDb = r.fecha ? formatDateStr(r.fecha) : "";
+                if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
+                    if (!currentEventMap.has(eventId) && r.estado !== 'cancelada') {
+                        await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [r.id]);
+                        procesados++;
+                    }
                 }
             }
         }
@@ -608,6 +652,17 @@ const syncEventosPasados = async (req, res) => {
     } catch (error) {
         console.error("Error en syncEventosPasados:", error);
         res.status(500).json({ error: "Error interno en sincronización." });
+    }
+};
+
+const getSyncStatus = async (req, res) => {
+    try {
+        const usuarioId = req.usuario.id;
+        const [rows] = await db.query("SELECT ultima_sincronizacion FROM usuarios WHERE id = ?", [usuarioId]);
+        res.status(200).json({ ultima_sincronizacion: rows[0]?.ultima_sincronizacion || null });
+    } catch (error) {
+        console.error("Error en getSyncStatus:", error);
+        res.status(500).json({ error: "Error interno." });
     }
 };
 
@@ -672,6 +727,13 @@ const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
     );
 
     await db.query("UPDATE reuniones_huerfanas SET estado = 'vinculada' WHERE id = ?", [huerfana.id]);
+
+    if (empresa_id) {
+        await db.query(
+            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
+            [empresa_id, huerfana.fecha, huerfana.usuario_id, huerfana.event_id, huerfana.asunto || 'Sin asunto']
+        );
+    }
 };
 
 const vincularHuerfana = async (req, res) => {
@@ -854,6 +916,7 @@ module.exports = {
     obtenerEventosCalendario,
     anularReunionTeams,
     syncEventosPasados,
+    getSyncStatus,
     vincularHuerfana,
     descartarHuerfana,
     getHuerfanas,

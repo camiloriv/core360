@@ -9,6 +9,7 @@ router.post('/anular', verificarToken, agendamientoController.anularReunionTeams
 router.get('/calendario', verificarToken, agendamientoController.obtenerEventosCalendario);
 
 // Sincronización híbrida
+router.get('/sync-status', verificarToken, agendamientoController.getSyncStatus);
 router.post('/sync-past', verificarToken, agendamientoController.syncEventosPasados);
 router.get('/huerfanas', verificarToken, agendamientoController.getHuerfanas);
 router.post('/huerfanas/vincular', verificarToken, agendamientoController.vincularHuerfana);

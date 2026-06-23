@@ -16,6 +16,10 @@ export const syncEventosPasados = async () => {
   return api.post('/agendamiento/sync-past');
 };
 
+export const getSyncStatus = async () => {
+  return api.get('/agendamiento/sync-status');
+};
+
 export const obtenerHuerfanas = async () => {
   return api.get('/agendamiento/huerfanas');
 };

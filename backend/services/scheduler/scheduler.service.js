@@ -1,6 +1,7 @@
 const db = require("../../database/connection");
 const { enviarCorreo, enviarCorreoEncuesta } = require("../email/email.service");
 const encuestaService = require("../../modules/encuestas/encuestas.service");
+const agendamientoController = require("../../modules/agendamiento/agendamiento.controller");
 
 const checkAndSendScheduledEmails = async () => {
     try {
@@ -68,8 +69,34 @@ const checkAndSendScheduledEmails = async () => {
 
 // Iniciar el scheduler cada 1 minuto
 const startScheduler = () => {
-    console.log("🚀 Scheduler de encuestas iniciado (1 min)");
-    setInterval(checkAndSendScheduledEmails, 60 * 1000);
+    console.log("🚀 Scheduler de encuestas y sincronización iniciado (1 min)");
+    setInterval(() => {
+        checkAndSendScheduledEmails();
+        checkAndRunDailySync();
+    }, 60 * 1000);
+};
+
+const checkAndRunDailySync = async () => {
+    try {
+        const now = new Date();
+        // Ejecutar a las 3 AM y 0 minutos (madrugada). El setInterval de 1 minuto asegura que pase una vez
+        if (now.getHours() === 3 && now.getMinutes() === 0) {
+            console.log("⏳ Iniciando sincronización masiva diaria de eventos de Microsoft Graph...");
+            const [usuarios] = await db.query("SELECT id, correo FROM usuarios WHERE correo IS NOT NULL");
+            for (const u of usuarios) {
+                try {
+                    const req = { usuario: { id: u.id, correo: u.correo } };
+                    const res = { status: () => res, json: () => {} };
+                    await agendamientoController.syncEventosPasados(req, res);
+                } catch (e) {
+                    console.error("❌ Error sincronizando a", u.correo, e);
+                }
+            }
+            console.log("✅ Sincronización masiva diaria completada.");
+        }
+    } catch (e) {
+        console.error("🔥 Error en checkAndRunDailySync", e);
+    }
 };
 
 module.exports = { startScheduler };

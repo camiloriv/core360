@@ -61,6 +61,15 @@ async function runMigrations() {
       await connection.query('ALTER TABLE usuarios ADD COLUMN ultima_sincronizacion DATETIME NULL');
     }
 
+    // Insertar PROFORMA INTERNA si no existe
+    const [empProforma] = await connection.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
+    if (empProforma.length === 0) {
+      console.log("Migration: Inserting 'PROFORMA INTERNA' company...");
+      await connection.query(
+        "INSERT INTO empresas (nombre, rut, jefatura_id, holding, tamanio) VALUES ('PROFORMA INTERNA', '0-0', NULL, 'Proforma', 'Interna')"
+      );
+    }
+
     // 4. Columns in empresas table (zona_id)
     const [empZonaCol] = await connection.query("SHOW COLUMNS FROM empresas LIKE 'zona_id'");
     if (empZonaCol.length === 0) {

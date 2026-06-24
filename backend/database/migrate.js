@@ -49,6 +49,18 @@ async function runMigrations() {
       await connection.query('ALTER TABLE usuarios ADD COLUMN requiere_cambio_clave TINYINT(1) DEFAULT 0');
     }
 
+    const [userSyncDeltaCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'sync_delta_token'");
+    if (userSyncDeltaCol.length === 0) {
+      console.log("Migration: Adding 'sync_delta_token' column to 'usuarios'...");
+      await connection.query('ALTER TABLE usuarios ADD COLUMN sync_delta_token TEXT NULL');
+    }
+
+    const [userUltimaSyncCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'ultima_sincronizacion'");
+    if (userUltimaSyncCol.length === 0) {
+      console.log("Migration: Adding 'ultima_sincronizacion' column to 'usuarios'...");
+      await connection.query('ALTER TABLE usuarios ADD COLUMN ultima_sincronizacion DATETIME NULL');
+    }
+
     // 4. Columns in empresas table (zona_id)
     const [empZonaCol] = await connection.query("SHOW COLUMNS FROM empresas LIKE 'zona_id'");
     if (empZonaCol.length === 0) {

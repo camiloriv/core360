@@ -66,7 +66,7 @@ async function runMigrations() {
     if (empProforma.length === 0) {
       console.log("Migration: Inserting 'PROFORMA INTERNA' company...");
       await connection.query(
-        "INSERT INTO empresas (nombre, rut, jefatura_id, holding, tamanio) VALUES ('PROFORMA INTERNA', '0-0', NULL, 'Proforma', 'Interna')"
+        "INSERT INTO empresas (nombre, jefatura_id) VALUES ('PROFORMA INTERNA', NULL)"
       );
     }
 

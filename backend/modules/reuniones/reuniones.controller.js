@@ -41,11 +41,8 @@ const buildHuerfanasRoleWhereClause = (usuario_id, rol) => {
     let params = [];
 
     if (rol === 'ejecutiva') {
-        whereClause += ` AND (
-            u.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
-            OR h.usuario_id = ?
-        )`;
-        params.push(usuario_id, usuario_id);
+        whereClause += ` AND h.usuario_id = ?`;
+        params.push(usuario_id);
     } else if (rol === 'jefatura') {
         whereClause += ` AND (u.jefatura_id = ? OR h.usuario_id = ?)`;
         params.push(usuario_id, usuario_id);

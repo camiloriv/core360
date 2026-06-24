@@ -70,6 +70,10 @@ async function runMigrations() {
       );
     }
 
+    // Forzar resincronización completa para que se guarden las reuniones internas que fueron ignoradas por falta de la empresa
+    console.log("Migration: Resetting sync_delta_token to force full sync...");
+    await connection.query("UPDATE usuarios SET sync_delta_token = NULL WHERE ultima_sincronizacion < '2026-06-25'");
+
     // 4. Columns in empresas table (zona_id)
     const [empZonaCol] = await connection.query("SHOW COLUMNS FROM empresas LIKE 'zona_id'");
     if (empZonaCol.length === 0) {

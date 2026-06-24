@@ -911,6 +911,23 @@ const desvincularBorrador = async (req, res) => {
     }
 };
 
+const debugProforma = async (req, res) => {
+    try {
+        const [emp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
+        const [users] = await db.query("SELECT id, correo, sync_delta_token, ultima_sincronizacion FROM usuarios LIMIT 5");
+        const [reus] = await db.query("SELECT id_reunion, ejecutiva_id, tipo_reu, fecha_reu, estado_envio FROM reuniones WHERE empresa_id = ? OR estado_envio = 'agendada' ORDER BY id DESC LIMIT 50", [emp.length > 0 ? emp[0].id : null]);
+        const [agendadas] = await db.query("SELECT id, reunion_id, estado, fecha FROM empresa_seguimiento_log WHERE estado = 'agendada' ORDER BY id DESC LIMIT 20");
+        res.json({
+            proforma_interna: emp,
+            users: users,
+            reuniones_agendadas_y_proforma: reus,
+            logs_agendadas: agendadas
+        });
+    } catch (e) {
+        res.json({ error: e.message });
+    }
+};
+
 module.exports = {
     crearReunionTeams,
     obtenerEventosCalendario,
@@ -920,5 +937,6 @@ module.exports = {
     vincularHuerfana,
     descartarHuerfana,
     getHuerfanas,
-    desvincularBorrador
+    desvincularBorrador,
+    debugProforma
 };

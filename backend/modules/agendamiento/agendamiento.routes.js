@@ -16,4 +16,7 @@ router.post('/huerfanas/vincular', verificarToken, agendamientoController.vincul
 router.post('/huerfanas/descartar', verificarToken, agendamientoController.descartarHuerfana);
 router.post('/huerfanas/desvincular', verificarToken, agendamientoController.desvincularBorrador);
 
+// Endpoint de debug temporal (BORRAR DESPUES)
+router.get('/debug', agendamientoController.debugProforma);
+
 module.exports = router;

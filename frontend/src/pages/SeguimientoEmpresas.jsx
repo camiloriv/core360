@@ -458,9 +458,28 @@ export default function SeguimientoEmpresas() {
         }
       }
 
-      // Ordenar reschedules y cancellations
-      reschedules.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio));
-      cancellations.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio));
+      // Deduplicar y ordenar reschedules y cancellations
+      const uniqueReschedules = [];
+      const seenResch = new Set();
+      reschedules.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio)).forEach(r => {
+        const d = new Date(r.fecha_cambio);
+        const key = !isNaN(d) ? d.toISOString().split('T')[0] + "_" + r.fecha_nueva : r.fecha_cambio;
+        if (!seenResch.has(key)) {
+          seenResch.add(key);
+          uniqueReschedules.push(r);
+        }
+      });
+
+      const uniqueCancellations = [];
+      const seenCancel = new Set();
+      cancellations.sort((a, b) => new Date(a.fecha_cambio) - new Date(b.fecha_cambio)).forEach(c => {
+        const d = new Date(c.fecha_cambio);
+        const key = !isNaN(d) ? d.toISOString().split('T')[0] : c.fecha_cambio;
+        if (!seenCancel.has(key)) {
+          seenCancel.add(key);
+          uniqueCancellations.push(c);
+        }
+      });
 
       const sortDate = dateEnvioMinuta || dateRealizacion || dateAgendadaTarget || dateSolicitada || new Date();
 
@@ -478,8 +497,8 @@ export default function SeguimientoEmpresas() {
         dateAgendadaTarget,
         dateRealizacion,
         dateEnvioMinuta,
-        reschedules,
-        cancellations,
+        reschedules: uniqueReschedules,
+        cancellations: uniqueCancellations,
         sortDate,
         minuta,
         reunionId,

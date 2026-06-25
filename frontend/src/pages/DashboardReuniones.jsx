@@ -1646,11 +1646,13 @@ export default function DashboardReuniones() {
         }}>
           <div style={{
             background: "white", padding: "24px", borderRadius: "8px",
-            width: "420px", maxWidth: "95%", boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+            width: "600px", maxWidth: "95%", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            maxHeight: "90vh", display: "flex", flexDirection: "column"
           }}>
-            <h3 style={{ marginTop: 0, marginBottom: "16px", color: "var(--primary-color)" }}>Asignar Empresa</h3>
+            <h3 style={{ marginTop: 0, marginBottom: "16px", color: "var(--primary-color)", flexShrink: 0 }}>Asignar Empresa</h3>
             
-            {selectedOrphan && (
+            <div style={{ overflowY: "auto", flex: 1, paddingRight: "4px" }}>
+              {selectedOrphan && (
               <div style={{
                 background: "#f8fafc",
                 border: "1px solid #e2e8f0",
@@ -1797,7 +1799,8 @@ export default function DashboardReuniones() {
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", flexShrink: 0, marginTop: "16px" }}>
               <button
                 className="core360-btn secondary"
                 onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); setNoAplicaEmpresa(false); }}

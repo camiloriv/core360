@@ -204,7 +204,7 @@ const obtenerEventosCalendario = async (req, res) => {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${accessToken}`,
-                "Prefer": "outlook.timezone=\"America/Santiago\""
+                "Prefer": "outlook.timezone=\"UTC\""
             }
         });
 
@@ -416,7 +416,7 @@ const syncEventosPasados = async (req, res) => {
             const existingHuerfana = huerfanasByEventId.get(event.id) || (event.iCalUId && huerfanasByEventId.get(event.iCalUId));
 
             if (event['@removed']) {
-                if (existingReunion && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado') {
+                if (existingReunion && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado' && existingReunion.estado_envio !== 'borrador') {
                     await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
                     if (existingReunion.empresa_id) {
                         await db.query(
@@ -442,7 +442,7 @@ const syncEventosPasados = async (req, res) => {
                 const fDb = formatDateStr(existingReunion.fecha_reu);
                 const hDb = existingReunion.hora ? existingReunion.hora.substring(0, 5) : "";
                 
-                if (isCancelled && existingReunion.estado_envio !== 'cancelada') {
+                if (isCancelled && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado' && existingReunion.estado_envio !== 'borrador') {
                     await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
                     if (existingReunion.empresa_id) {
                         await db.query(
@@ -824,9 +824,9 @@ const vincularHuerfana = async (req, res) => {
                 }
 
                 // Vinculamos solo si:
-                // 1. Hay un match explícito por correo, O
-                // 2. Hay match por dominio Y la reunión tiene exactamente UN dominio corporativo (no es transversal)
-                if (matchedByEmail || (matchedByDomain && externalDomains.size === 1)) {
+                // 1. Hay un match explícito por correo o por dominio
+                // 2. Y la reunión tiene MÁXIMO UN dominio corporativo externo (si hay más de 1, requiere revisión manual)
+                if ((matchedByEmail || matchedByDomain) && externalDomains.size <= 1) {
                     await crearBorradorDesdeHuerfana(h, empresa_id);
                     vinculadasExtras++;
                 }

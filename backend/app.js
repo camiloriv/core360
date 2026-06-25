@@ -89,6 +89,41 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "API funcionando 🚀", timestamp: new Date() });
 });
 
+// 🔹 Endpoint Temporal para arreglar reuniones canceladas
+app.get("/fix-canceladas", async (req, res) => {
+  const db = require("./database/connection");
+  try {
+      const [rows] = await db.query(`
+          SELECT r.id_reunion, r.estado_envio, r.fecha_reu, r.minuta,
+                 (SELECT COUNT(*) FROM empresa_seguimiento_log l WHERE l.reunion_id = r.event_id AND l.estado IN ('gestionada', 'concretada', 'enviado')) as valid_logs,
+                 (SELECT COUNT(*) FROM empresa_seguimiento_log l WHERE l.reunion_id = r.event_id AND l.estado = 'cancelada') as cancel_logs
+          FROM reuniones r
+          WHERE r.estado_envio = 'cancelada'
+      `);
+      
+      const affected = rows.filter(r => r.valid_logs > 0 && r.cancel_logs > 0);
+      const toFix = affected.map(r => ({ id_reunion: r.id_reunion, revert_to: 'borrador' }));
+      
+      let logs = [];
+      for (const f of toFix) {
+          await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [f.revert_to, f.id_reunion]);
+          logs.push(`Reverted reunion ${f.id_reunion} to ${f.revert_to}`);
+          
+          await db.query(`
+              DELETE FROM empresa_seguimiento_log 
+              WHERE reunion_id = (SELECT event_id FROM reuniones WHERE id_reunion = ?) 
+              AND estado = 'cancelada'
+          `, [f.id_reunion]);
+          logs.push(`Deleted cancelada logs for reunion ${f.id_reunion}`);
+      }
+      
+      res.json({ status: "ok", fixedCount: toFix.length, logs });
+  } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error ejecutando fix" });
+  }
+});
+
 // ❌ Manejador Global de Errores (Error Catch-all)
 app.use((err, req, res, next) => {
   console.error("Internal Error:", err.stack);

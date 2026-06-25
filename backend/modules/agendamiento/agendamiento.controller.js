@@ -356,32 +356,50 @@ const syncEventosPasados = async (req, res) => {
             endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=${start}&endDateTime=${end}&$top=999`;
         }
 
-        const response = await fetch(endpoint, {
-            method: "GET",
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Prefer": "outlook.timezone=\"America/Santiago\""
-            }
-        });
+        let allRawEvents = [];
+        let currentEndpoint = endpoint;
+        let finalDeltaToken = null;
 
-        if (!response.ok) {
-            if (response.status === 410) {
-                // Token expirado o inválido, forzar sincronización completa próxima vez
-                await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
+        while (currentEndpoint) {
+            const response = await fetch(currentEndpoint, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                    "Prefer": "outlook.timezone=\"America/Santiago\""
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 410) {
+                    // Token expirado o inválido, forzar sincronización completa próxima vez
+                    await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
+                }
+                return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró", events: [] });
             }
-            return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró", events: [] });
+
+            const data = await response.json();
+            
+            if (data.value && data.value.length > 0) {
+                allRawEvents.push(...data.value);
+            }
+
+            if (data['@odata.nextLink']) {
+                currentEndpoint = data['@odata.nextLink'];
+            } else if (data['@odata.deltaLink']) {
+                finalDeltaToken = data['@odata.deltaLink'];
+                currentEndpoint = null;
+            } else {
+                currentEndpoint = null;
+            }
         }
 
-        const data = await response.json();
-        
-        const newDeltaToken = data['@odata.deltaLink'] || null;
-        if (newDeltaToken) {
-            await db.query("UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?", [newDeltaToken, usuarioId]);
+        if (finalDeltaToken) {
+            await db.query("UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?", [finalDeltaToken, usuarioId]);
         } else {
             await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
         }
 
-        const rawEvents = data.value || [];
+        const rawEvents = allRawEvents;
         const currentEventMap = new Map();
         rawEvents.forEach(e => currentEventMap.set(e.id, e));
 

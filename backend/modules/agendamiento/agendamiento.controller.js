@@ -353,7 +353,7 @@ const syncEventosPasados = async (req, res) => {
             endpoint = deltaToken;
             isDeltaRequest = true;
         } else {
-            endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=${start}&endDateTime=${end}&$top=999`;
+            endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=${start}&endDateTime=${end}`;
         }
 
         let allRawEvents = [];

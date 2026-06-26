@@ -814,7 +814,7 @@ export default function DashboardReuniones() {
         </div>
 
         {/* --- KPI CARDS --- */}
-        <div className="responsive-grid-4" style={{ marginBottom: "30px" }}>
+        <div className="responsive-grid-8" style={{ marginBottom: "30px" }}>
           <KpiCard
             title="Total Histórico"
             value={realizedReuniones.length}

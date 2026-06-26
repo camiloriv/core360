@@ -200,7 +200,7 @@ export default function VincularReuniones() {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-            {huerfanas.map(h => (
+            {[...huerfanas].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).map(h => (
               <div key={h.id} style={{
                 background: "white",
                 padding: "20px",
@@ -314,7 +314,7 @@ export default function VincularReuniones() {
                       e.currentTarget.style.borderColor = "#cbd5e1";
                     }}
                   >
-                    No requiere minuta
+                    No aplica empresa
                   </button>
                 </div>
               </div>

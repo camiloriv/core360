@@ -499,8 +499,14 @@ button:disabled {
 }
 
 /* Prevent body scroll when tracking modal is open */
+html.swal2-shown,
 body.swal2-shown {
   overflow: hidden !important;
+  height: 100% !important;
+}
+
+html.swal2-height-auto {
+  height: 100% !important;
 }
 
 .swal2-title {
@@ -788,11 +794,15 @@ body.swal2-shown {
 
 .main-content {
   flex: 1;
-  margin-left: 220px;
-  min-height: 100vh;
+  margin-left: 80px;
+  min-height: calc(100vh - 60px);
   background: var(--bg-body);
   transition: margin-left 0.3s ease;
-  width: calc(100% - 220px);
+  width: calc(100% - 80px);
+}
+
+.main-content .encuesta-page {
+  min-height: calc(100vh - 60px) !important;
 }
 
 /* Mobile Header (Hidden on Desktop) */

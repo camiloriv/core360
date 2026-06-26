@@ -1357,7 +1357,7 @@ export default function DashboardReuniones() {
                           ) : r.estado_envio === "borrador" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                               <div
-                                onClick={() => navigate("/registrar-reunion", { state: { draft: r } })}
+                                onClick={() => navigate("/home", { state: { draft: r } })}
                                 style={{
                                   color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
                                   background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
@@ -1390,7 +1390,7 @@ export default function DashboardReuniones() {
                           ) : r.estado_envio === "agendada" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                               <div
-                                onClick={() => navigate("/registrar-reunion", { state: { draft: r } })}
+                                onClick={() => navigate("/home", { state: { draft: r } })}
                                 style={{
                                   color: "#1e40af", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
                                   background: "#dbeafe", padding: "4px 8px", borderRadius: "4px",

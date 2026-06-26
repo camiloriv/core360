@@ -7,6 +7,7 @@ import "./styles/core360-theme.css";
 import "./styles/components.css";
 
 import Sidebar from "./components/Sidebar";
+import Topbar from "./components/Topbar";
 import { useInactivityLogout } from "./hooks/useInactivityLogout";
 
 // Lazy Loaded Pages para Code Splitting
@@ -57,14 +58,17 @@ const ProtectedRoute = ({ children, allowedRoles, path }) => {
   if (vistas && path && user.permisos !== "admin" && user.permisos !== "ADMIN") {
     const isVincularPermitted = path === "/vincular-reuniones" && vistas.includes("/dashboard-reuniones");
     const isGestionEmpresasPermitted = path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva");
-    if (!vistas.includes(path) && !isVincularPermitted && !isGestionEmpresasPermitted) {
-      const fallback = vistas.includes("/registrar-reunion") 
-        ? "/registrar-reunion" 
+    const isPermitted = vistas.includes(path) 
+      || (path === "/home" && (vistas.includes("/registrar-reunion") || vistas.includes("/home")))
+      || (path === "/registrar-reunion" && (vistas.includes("/registrar-reunion") || vistas.includes("/home")));
+    if (!isPermitted && !isVincularPermitted && !isGestionEmpresasPermitted) {
+      const fallback = (vistas.includes("/home") || vistas.includes("/registrar-reunion"))
+        ? "/home"
         : (vistas.length > 0 ? vistas[0] : "/login");
       return <Navigate to={fallback} replace />;
     }
   } else if (allowedRoles && !allowedRoles.includes(user.permisos) && user.permisos !== "admin" && user.permisos !== "ADMIN") {
-    return <Navigate to="/registrar-reunion" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return children;
@@ -75,10 +79,13 @@ const MainLayout = () => {
   useInactivityLogout();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+
   return (
     <div className="app-layout">
+      <Topbar user={user} />
       <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-      <div className="main-content">
+      <div className="main-content" style={{ marginTop: "60px" }}>
         {/* Mobile Header with Hamburger */}
         <div className="mobile-header">
           <button className="hamburger-btn" onClick={() => setIsMobileMenuOpen(true)}>
@@ -97,7 +104,8 @@ const MainLayout = () => {
 
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
-            <Route path="/" element={<Navigate to="/registrar-reunion" replace />} />
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<ProtectedRoute path="/home"><Home /></ProtectedRoute>} />
             <Route path="/registrar-reunion" element={<ProtectedRoute path="/registrar-reunion"><Home /></ProtectedRoute>} />
             <Route path="/crear-encuesta" element={<ProtectedRoute path="/crear-encuesta"><CrearEncuesta /></ProtectedRoute>} />
             <Route path="/agendar" element={<ProtectedRoute path="/agendar"><AgendarReunion /></ProtectedRoute>} />

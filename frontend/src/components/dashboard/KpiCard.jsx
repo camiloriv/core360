@@ -3,133 +3,113 @@ import React from "react";
 export default function KpiCard({ title, value, sub, color, trend, icon }) {
   const cardColor = color || "var(--primary-color)";
 
+  // If the icon is an SVG element and we want it to be a bit larger/standardized, we can clone it.
+  // But for safety if it's just a node, we'll render it as is, inside a styled wrapper.
+  const renderIcon = () => {
+    if (React.isValidElement(icon)) {
+      // Intenta inyectar un tamaño estándar si es posible, o déjalo como está.
+      return React.cloneElement(icon, { width: 28, height: 28, strokeWidth: 1.5 });
+    }
+    return icon;
+  };
+
   return (
     <div
       className="kpi-card"
       style={{
         background: "#fff",
-        padding: "20px",
-        borderRadius: "12px",
+        padding: "12px 14px",
+        borderRadius: "10px",
         border: "1px solid #e2e8f0",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "14px",
         boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
         cursor: "default",
-        position: "relative",
         overflow: "hidden",
-        height: "100%",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-4px)";
-        e.currentTarget.style.boxShadow =
-          "0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 8px 12px -3px rgba(0,0,0,0.08)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
       }}
     >
-      {/* Decorative colored left border */}
-      <div
-        className="kpi-card-border"
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "4px",
-          backgroundColor: cardColor,
-        }}
-      ></div>
+      {icon && (
+        <div
+          className="kpi-card-icon"
+          style={{
+            color: cardColor,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {renderIcon()}
+        </div>
+      )}
 
-      <div
-        className="kpi-card-header"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "15px",
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1 }}>
+        <span
+          className="kpi-card-value"
+          style={{
+            fontSize: "18px",
+            fontWeight: "800",
+            color: "#1e293b",
+            lineHeight: "1.1",
+            whiteSpace: "nowrap",
+            textOverflow: "ellipsis",
+            overflow: "hidden"
+          }}
+        >
+          {value}
+        </span>
         <span
           className="kpi-card-title"
+          title={title}
           style={{
-            fontSize: "11px",
+            fontSize: "12px",
             color: "#64748b",
-            fontWeight: "bold",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            paddingLeft: "4px",
+            lineHeight: "1.2",
+            marginTop: "3px",
+            whiteSpace: "nowrap",
+            textOverflow: "ellipsis",
+            overflow: "hidden",
           }}
         >
           {title}
         </span>
-        {icon && (
-          <div
-            className="kpi-card-icon"
-            style={{
-              background: `${cardColor}15`,
-              padding: "6px",
-              borderRadius: "8px",
-              color: cardColor,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {icon}
-          </div>
-        )}
-      </div>
-
-      <div className="kpi-card-body" style={{ paddingLeft: "4px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+        {trend ? (
           <span
-            className="kpi-card-value"
             style={{
-              fontSize: "32px",
-              fontWeight: "800",
-              color: "#1e293b",
-              lineHeight: "1",
+              fontSize: "11px",
+              fontWeight: "bold",
+              color: trend.startsWith("+") || trend.startsWith("↑") ? "#059669" : "#dc2626",
+              marginTop: "4px"
             }}
           >
-            {value}
+            {trend}
           </span>
-          {trend && (
-            <span
-              className="kpi-card-trend"
-              style={{
-                fontSize: "11px",
-                fontWeight: "bold",
-                color:
-                  trend.startsWith("+") || trend.startsWith("↑")
-                    ? "#059669"
-                    : "#dc2626",
-                background:
-                  trend.startsWith("+") || trend.startsWith("↑")
-                    ? "#dcfce7"
-                    : "#fee2e2",
-                padding: "2px 6px",
-                borderRadius: "4px",
-              }}
-            >
-              {trend}
-            </span>
-          )}
-        </div>
-        <span
-          className="kpi-card-sub"
-          style={{
-            fontSize: "11px",
-            color: "#94a3b8",
-            display: "block",
-            marginTop: "8px",
-          }}
-        >
-          {sub}
-        </span>
+        ) : sub ? (
+          <span
+            title={sub}
+            style={{
+              fontSize: "10px",
+              fontWeight: "600",
+              color: cardColor,
+              marginTop: "4px",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden"
+            }}
+          >
+            {sub}
+          </span>
+        ) : null}
       </div>
     </div>
   );

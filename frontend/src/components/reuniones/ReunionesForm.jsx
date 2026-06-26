@@ -25,6 +25,7 @@ function ReunionesForm({ onSuccess }) {
 
   const { form, setField, setFiles, resetForm } = useReunionesForm();
   const [isCcEditable, setIsCcEditable] = useState(false);
+  const [forceShowForm, setForceShowForm] = useState(false);
 
   const { empresas, setEmpresas, fetchEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);
@@ -179,15 +180,17 @@ function ReunionesForm({ onSuccess }) {
     }
   };
 
-  if (!location.state || !location.state.draft) {
+  const isDirectRegistrarRoute = location.pathname === "/registrar-reunion";
+
+  if (!isDirectRegistrarRoute && !forceShowForm && (!location.state || !location.state.draft)) {
     return (
       <div 
         className="container" 
         style={{ 
           position: "relative", 
           maxWidth: "600px", 
-          margin: "50px auto", 
-          padding: "40px 30px", 
+          margin: "20px auto", 
+          padding: "24px 24px", 
           borderRadius: "16px", 
           background: "white", 
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.05)", 
@@ -195,21 +198,21 @@ function ReunionesForm({ onSuccess }) {
           border: "1px solid #f1f5f9"
         }}
       >
-        <div style={{ marginBottom: "24px" }}>
+        <div>
           <div 
             style={{ 
               display: "inline-flex", 
               justifyContent: "center", 
               alignItems: "center", 
-              width: "72px", 
-              height: "72px", 
+              width: "60px", 
+              height: "60px", 
               borderRadius: "50%", 
               background: "rgba(99, 102, 241, 0.08)", 
               color: "rgb(99, 102, 241)", 
-              marginBottom: "24px" 
+              marginBottom: "16px" 
             }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 2v4" />
               <path d="M8 2v4" />
               <rect width="18" height="18" x="3" y="4" rx="2" />
@@ -217,23 +220,23 @@ function ReunionesForm({ onSuccess }) {
               <path d="m9 16 2 2 4-4" />
             </svg>
           </div>
-          <h2 style={{ fontSize: "22px", fontWeight: "700", color: "#0f172a", marginBottom: "12px", fontFamily: "Outfit, sans-serif" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a", marginBottom: "8px", fontFamily: "Outfit, sans-serif" }}>
             Registro de Minutas Exclusivo para Teams
           </h2>
-          <p style={{ fontSize: "14.5px", color: "#64748b", lineHeight: "1.6", marginBottom: "30px", fontFamily: "Inter, sans-serif" }}>
+          <p style={{ fontSize: "13.5px", color: "#64748b", lineHeight: "1.5", marginBottom: "20px", fontFamily: "Inter, sans-serif" }}>
             Para garantizar la limpieza e integridad del proyecto, todas las minutas registradas deben estar vinculadas a una reunión comercial agendada a través de <b>Microsoft Teams</b>.
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <button 
               onClick={() => navigate("/vincular-reuniones")}
               style={{
                 width: "100%",
-                padding: "13px 20px",
+                padding: "10px 16px",
                 borderRadius: "8px",
                 border: "none",
                 background: "var(--secondary-color)",
                 color: "white",
-                fontSize: "14.5px",
+                fontSize: "14px",
                 fontWeight: "600",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
@@ -248,12 +251,12 @@ function ReunionesForm({ onSuccess }) {
               onClick={() => navigate("/agendar")}
               style={{
                 width: "100%",
-                padding: "13px 20px",
+                padding: "10px 16px",
                 borderRadius: "8px",
                 border: "1px solid #cbd5e1",
                 background: "white",
                 color: "#475569",
-                fontSize: "14.5px",
+                fontSize: "14px",
                 fontWeight: "600",
                 cursor: "pointer",
                 transition: "all 0.2s ease"
@@ -268,6 +271,31 @@ function ReunionesForm({ onSuccess }) {
               }}
             >
               Agendar Nueva Reunión en Teams
+            </button>
+            <button 
+              onClick={() => navigate("/registrar-reunion")}
+              style={{
+                width: "100%",
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                background: "white",
+                color: "#475569",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#f8fafc";
+                e.currentTarget.style.borderColor = "#94a3b8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "white";
+                e.currentTarget.style.borderColor = "#cbd5e1";
+              }}
+            >
+              Crear Minuta Desde Cero
             </button>
           </div>
         </div>

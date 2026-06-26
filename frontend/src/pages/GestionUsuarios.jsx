@@ -5,7 +5,7 @@ import "../styles/core360-theme.css";
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const ALL_VIEWS = [
-  { path: "/registrar-reunion", label: "Registrar Reunión" },
+  { path: "/home", label: "Home" },
   { path: "/crear-encuesta", label: "Crear Encuesta" },
   { path: "/agendar", label: "Agendar" },
   { path: "/dashboard-reuniones", label: "Mis reuniones" },
@@ -20,7 +20,7 @@ const getDefaultViewsForRole = (role) => {
   switch (role) {
     case "admin":
       return [
-        "/registrar-reunion",
+        "/home",
         "/crear-encuesta",
         "/agendar",
         "/dashboard-reuniones",
@@ -32,7 +32,7 @@ const getDefaultViewsForRole = (role) => {
       ];
     case "gerencia":
       return [
-        "/registrar-reunion",
+        "/home",
         "/crear-encuesta",
         "/agendar",
         "/dashboard-reuniones",
@@ -42,7 +42,7 @@ const getDefaultViewsForRole = (role) => {
     case "jefatura":
     case "ejecutiva":
       return [
-        "/registrar-reunion",
+        "/home",
         "/crear-encuesta",
         "/agendar",
         "/dashboard-reuniones",
@@ -52,7 +52,7 @@ const getDefaultViewsForRole = (role) => {
       ];
     default:
       return [
-        "/registrar-reunion",
+        "/home",
         "/crear-encuesta",
         "/agendar",
         "/dashboard-reuniones",

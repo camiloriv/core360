@@ -9,9 +9,9 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   let menuItems = [
     {
-      path: "/registrar-reunion",
-      label: "Registrar Reunión",
-      title: "Registrar Reunión",
+      path: "/home",
+      label: "Home",
+      title: "Home",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -23,13 +23,9 @@ const Sidebar = ({ isOpen, onClose }) => {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="lucide lucide-calendar-check-icon lucide-calendar-check"
         >
-          <path d="M8 2v4" />
-          <path d="M16 2v4" />
-          <rect width="18" height="18" x="3" y="4" rx="2" />
-          <path d="M3 10h18" />
-          <path d="m9 16 2 2 4-4" />
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
       ),
     },
@@ -50,7 +46,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       path: "/crear-encuesta",
-      label: "Crear Encuesta",
+      label: "Evaluación",
       title: "Crear Encuesta",
       icon: (
         <svg
@@ -74,7 +70,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       path: "/dashboard-reuniones",
-      label: "Mis reuniones",
+      label: "Reuniones",
       title: "Minutas",
       icon: (
         <svg
@@ -99,7 +95,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       path: "/vincular-reuniones",
-      label: "Vincular reuniones",
+      label: "Vincular",
       title: "Vincular reuniones",
       icon: (
         <svg
@@ -120,7 +116,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       path: "/dashboard-encuestas",
-      label: "Mis encuestas",
+      label: "Informes",
       title: "Informes",
       icon: (
         <svg
@@ -143,7 +139,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     {
       path: "/editor-encuestas",
-      label: "Editar encuestas",
+      label: "Ajustes",
       title: "Ajustes",
       icon: (
         <svg
@@ -242,7 +238,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       if (item.path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva")) {
         return true;
       }
-      return vistas.includes(item.path);
+      return vistas.includes(item.path) || (item.path === "/home" && (vistas.includes("/registrar-reunion") || vistas.includes("/home")));
     });
   } else {
     if (user.permisos !== "admin" && user.permisos !== "ADMIN") {
@@ -273,187 +269,16 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
   }, [location.pathname]);
 
-  const handleOpenPasswordModal = () => {
-    Swal.fire({
-      title: "Actualizar Contraseña",
-      html: `
-        <div style="text-align: left; font-family: 'Outfit', 'Inter', sans-serif;">
-          <div style="margin-bottom: 12px;">
-            <label style="font-weight: 600; font-size: 13px; color: #475569;">Contraseña Actual</label>
-            <input type="password" id="swal-current-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Ingresa tu contraseña actual" required />
-          </div>
-
-          <div style="margin-bottom: 8px;">
-            <label style="font-weight: 600; font-size: 13px; color: #475569;">Nueva Contraseña</label>
-            <input type="password" id="swal-new-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Mínimo 8 caracteres" required />
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <div style="height: 6px; width: 100%; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 6px;">
-              <div id="swal-strength-bar" style="height: 100%; width: 0%; transition: all 0.3s ease; background: #cbd5e1;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-              <span id="swal-strength-text" style="font-size: 11px; font-weight: 600; color: #94a3b8;">Fuerza: Sin contraseña</span>
-            </div>
-          </div>
-
-          <div style="margin-bottom: 8px;">
-            <label style="font-weight: 600; font-size: 13px; color: #475569;">Confirmar Nueva Contraseña</label>
-            <input type="password" id="swal-confirm-password" class="swal2-input" style="margin: 5px 0 0 0; width: 100%; box-sizing: border-box; height: 42px; font-size: 14px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 10px;" placeholder="Repite la nueva contraseña" required />
-          </div>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: "Actualizar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "var(--secondary-color, #e05e2b)",
-      cancelButtonColor: "#94a3b8",
-      focusConfirm: false,
-      didOpen: () => {
-        const newPasswordInput = document.getElementById("swal-new-password");
-        const strengthBar = document.getElementById("swal-strength-bar");
-        const strengthText = document.getElementById("swal-strength-text");
-
-        newPasswordInput.addEventListener("input", (e) => {
-          const password = e.target.value;
-          if (!password) {
-            strengthBar.style.width = "0%";
-            strengthBar.style.background = "#e2e8f0";
-            strengthText.textContent = "Fuerza: Sin contraseña";
-            strengthText.style.color = "#94a3b8";
-            return;
-          }
-
-          // Analizar fuerza
-          let score = 0;
-          if (password.length >= 8) score++;
-          if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
-          if (/[0-9]/.test(password)) score++;
-          if (/[^A-Za-z0-9]/.test(password)) score++;
-
-          let strength = "Débil";
-          let color = "#ef4444"; // Rojo
-          let width = "33%";
-
-          if (password.length < 8) {
-            strength = "Débil (muy corta)";
-            color = "#ef4444";
-            width = "20%";
-          } else if (score >= 4) {
-            strength = "Fuerte 💪";
-            color = "#22c55e"; // Verde
-            width = "100%";
-          } else if (score >= 2) {
-            strength = "Medio ⚠️";
-            color = "#eab308"; // Amarillo
-            width = "66%";
-          } else {
-            strength = "Débil";
-            color = "#ef4444";
-            width = "33%";
-          }
-
-          strengthBar.style.width = width;
-          strengthBar.style.background = color;
-          strengthText.textContent = `Fuerza: ${strength}`;
-          strengthText.style.color = color;
-        });
-      },
-      preConfirm: () => {
-        const currentPassword = document.getElementById(
-          "swal-current-password",
-        ).value;
-        const newPassword = document.getElementById("swal-new-password").value;
-        const confirmPassword = document.getElementById(
-          "swal-confirm-password",
-        ).value;
-
-        if (!currentPassword || !newPassword || !confirmPassword) {
-          Swal.showValidationMessage("Todos los campos son obligatorios");
-          return false;
-        }
-
-        if (newPassword.length < 8) {
-          Swal.showValidationMessage(
-            "La nueva contraseña debe tener al menos 8 caracteres",
-          );
-          return false;
-        }
-
-        if (newPassword === currentPassword) {
-          Swal.showValidationMessage(
-            "La nueva contraseña debe ser distinta a la actual",
-          );
-          return false;
-        }
-
-        if (newPassword !== confirmPassword) {
-          Swal.showValidationMessage("Las nuevas contraseñas no coinciden");
-          return false;
-        }
-
-        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
-        return axios
-          .post(`${API_URL}/usuarios/cambiar-contrasena`, {
-            usuario_id: user.id,
-            contrasena_actual: currentPassword,
-            nueva_contrasena: newPassword,
-          })
-          .then((response) => {
-            return response.data;
-          })
-          .catch((err) => {
-            Swal.showValidationMessage(
-              err.response?.data?.error || "Error al cambiar la contraseña",
-            );
-            return false;
-          });
-      },
-    }).then((result) => {
-      if (result.isConfirmed) {
-        Swal.fire({
-          title: "¡Contraseña Actualizada!",
-          text: "Tu contraseña ha sido modificada con éxito.",
-          icon: "success",
-          confirmButtonColor: "var(--secondary-color, #e05e2b)",
-        }).then(() => {
-          window.location.reload();
-        });
-      }
-    });
-  };
-
   return (
     <div className={`sidebar ${isOpen ? "open" : ""}`} style={styles.sidebar}>
-      <div style={styles.logoContainer}>
-        {/* Replace image with styled text to match CloudSync vibe until an SVG is provided */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            width: "100%",
-            color: "white",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <img
-              src="/logo_texto.PNG"
-              alt="CORE 360 Logo"
-              style={{
-                maxWidth: "100%",
-                maxHeight: "45px",
-                objectFit: "contain",
-              }}
-            />
-          </div>
-          <button className="close-sidebar-btn" onClick={onClose}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
+      {/* Mobile close button (solo visible si la clase 'open' está activa en móvil) */}
+      <div style={{ display: "flex", justifyContent: "center", padding: "10px 0" }}>
+        <button className="close-sidebar-btn" onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
 
       <nav style={styles.nav} className="sidebar-nav">
@@ -464,9 +289,10 @@ const Sidebar = ({ isOpen, onClose }) => {
             style={({ isActive }) => ({
               ...styles.navLink,
               backgroundColor: isActive
-                ? "var(--secondary-color)"
+                ? "rgba(255, 255, 255, 0.1)"
                 : "transparent",
-              color: isActive ? "white" : "rgba(255, 255, 255, 0.7)",
+              color: isActive ? "white" : "rgba(255, 255, 255, 0.6)",
+              borderLeft: isActive ? "3px solid var(--secondary-color)" : "3px solid transparent",
             })}
           >
             <span style={styles.icon}>{item.icon}</span>
@@ -474,118 +300,55 @@ const Sidebar = ({ isOpen, onClose }) => {
           </NavLink>
         ))}
       </nav>
-
-      <div style={styles.footer}>
-        {(user.nombre || user.correo) && (
-          <div
-            onClick={handleOpenPasswordModal}
-            style={{
-              color: "rgba(255, 255, 255, 0.7)",
-              fontSize: "12px",
-              marginBottom: "8px",
-              fontWeight: "500",
-              textAlign: "center",
-              lineHeight: "1.2",
-              cursor: "pointer",
-              transition: "color 0.2s ease",
-            }}
-            onMouseEnter={(e) => (e.target.style.color = "white")}
-            onMouseLeave={(e) =>
-              (e.target.style.color = "rgba(255, 255, 255, 0.7)")
-            }
-            title="Seguridad / Cambiar Contraseña"
-          >
-            {user.nombre || user.correo || "Administrador"}
-          </div>
-        )}
-        <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("usuario");
-            localStorage.removeItem("ultimoAcceso");
-            window.location.href = "/login";
-          }}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#fca5a5",
-            cursor: "pointer",
-            fontSize: "11px",
-            fontWeight: "600",
-            textTransform: "uppercase",
-            marginBottom: "0px",
-            width: "100%",
-            transition: "color 0.2s ease",
-          }}
-          onMouseEnter={(e) => (e.target.style.color = "#ef4444")}
-          onMouseLeave={(e) => (e.target.style.color = "#fca5a5")}
-        >
-          Cerrar Sesión
-        </button>
-      </div>
     </div>
   );
 };
 
 const styles = {
   sidebar: {
-    width: "220px" /* Increased width for horizontal text */,
-    height: "100dvh",
+    width: "80px",
+    height: "calc(100dvh - 60px)",
     background: "var(--primary-color)",
     display: "flex",
     flexDirection: "column",
     position: "fixed",
     left: 0,
-    top: 0,
+    top: "60px", // Below Topbar
     bottom: 0,
     zIndex: 1000,
     boxShadow: "4px 0 10px rgba(0,0,0,0.05)",
     fontFamily: "var(--font-main)",
   },
-  logoContainer: {
-    padding: "16px 20px",
-    display: "flex",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    marginBottom: "5px",
-  },
   nav: {
-    padding: "8px 12px",
+    padding: "10px 0",
     flex: 1,
     display: "flex",
     flexDirection: "column",
-    gap: "2px",
+    gap: "5px",
     overflowY: "auto",
     overflowX: "hidden",
   },
   navLink: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    padding: "8px 14px",
+    justifyContent: "center",
+    padding: "12px 4px",
     textDecoration: "none",
     transition: "all 0.2s",
-    borderRadius: "8px",
   },
   icon: {
-    fontSize: "18px",
-    marginRight: "12px",
+    fontSize: "20px",
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: "4px",
   },
   label: {
-    fontSize: "13px",
-    fontWeight: "500",
-    letterSpacing: "0.2px",
-  },
-  footer: {
-    padding: "12px 15px",
+    fontSize: "11px",
+    fontWeight: "600",
     textAlign: "center",
-    borderTop: "1px solid rgba(255,255,255,0.1)",
-  },
-  version: {
-    fontSize: "10px",
-    color: "rgba(255, 255, 255, 0.4)",
-    fontWeight: "500",
+    lineHeight: "1.2",
   },
 };
 

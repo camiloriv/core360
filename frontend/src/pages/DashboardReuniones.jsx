@@ -1329,7 +1329,7 @@ export default function DashboardReuniones() {
               <thead>
                 <tr style={styles.th}>
                   <th style={styles.thCell}>FECHA / ID</th>
-                  <th style={styles.thCell}>EMPRESA / EJECUTIVA</th>
+                  <th style={styles.thCell}>EMPRESA</th>
                   <th style={styles.thCell}>TIPO / MOTIVO</th>
                   <th style={styles.thCell}>MINUTA</th>
                   <th style={styles.thCell}>FECHA DE ENVÍO</th>
@@ -1370,9 +1370,6 @@ export default function DashboardReuniones() {
                         ) : (
                           <div style={styles.companyName}>{r.empresa_nombre}</div>
                         )}
-                        <div style={styles.ejecutivaName}>
-                          {r.ejecutiva_nombre}
-                        </div>
                       </td>
                       <td style={styles.tdCell}>
                         <div 

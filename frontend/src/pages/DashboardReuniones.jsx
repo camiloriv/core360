@@ -406,6 +406,9 @@ export default function DashboardReuniones() {
       const isProforma = r.empresa_nombre === "PROFORMA INTERNA"
         || r.tipo_reu === "Reunión Interna Proforma"
         || (allEmails.length > 0 && allEmails.every(email => email.toLowerCase().endsWith("@proforma.cl")));
+
+      r._isProforma = isProforma;
+
       
       // Helper to get local date to avoid timezone shift
       const getLocalDate = (val) => {
@@ -1405,7 +1408,7 @@ export default function DashboardReuniones() {
                                 }}
                               >🚫 No aplica</span>
                             </div>
-                          ) : r.estado_envio === "no_aplica" ? (
+                          ) : (r.estado_envio === "no_aplica" || (r._isProforma && r.estado_envio !== "enviado" && r.estado_envio !== "borrador" && r.estado_envio !== "agendada")) ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                               <div style={{
                                 color: "#475569", fontWeight: "bold", fontSize: "12px",
@@ -1414,14 +1417,33 @@ export default function DashboardReuniones() {
                               }}>
                                 🚫 No aplica
                               </div>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true); }}
-                                style={{
-                                  fontSize: "10px", color: "#2563eb", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
-                                }}
-                              >↩️ Revertir</span>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                <span
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (r.estado_envio === "no_aplica") {
+                                      handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true);
+                                    } else {
+                                      // If it was implicitly no_aplica, clicking revert might mean we want to change it to borrador
+                                      // Actually, the user can just upload a minuta or we leave it as explicitly no aplica if they click No aplica
+                                      handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true);
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: "10px", color: "#2563eb", cursor: "pointer", textDecoration: "underline",
+                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
+                                  }}
+                                >↩️ Revertir</span>
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
+                                  style={{
+                                    fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
+                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                  }}
+                                >👥 Ver participantes</span>
+                              </div>
                             </div>
+
                           ) : r.estado_envio === "borrador" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                               <div

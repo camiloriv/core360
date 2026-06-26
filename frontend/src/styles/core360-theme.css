@@ -849,9 +849,19 @@ body.swal2-shown {
 }
 
 /* Responsive Grids */
+.responsive-grid-8 {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 15px;
+}
 .responsive-grid-6 {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
+  gap: 15px;
+}
+.responsive-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 15px;
 }
 .responsive-grid-2 {
@@ -878,7 +888,9 @@ body.swal2-shown {
 
 /* Tablet Breakpoint */
 @media (max-width: 1024px) {
-  .responsive-grid-6 {
+  .responsive-grid-8,
+  .responsive-grid-6,
+  .responsive-grid-4 {
     grid-template-columns: repeat(3, 1fr);
   }
   .responsive-editor-layout {
@@ -888,7 +900,9 @@ body.swal2-shown {
 
 /* Mobile Breakpoint */
 @media (max-width: 768px) {
-  .responsive-grid-6 {
+  .responsive-grid-8,
+  .responsive-grid-6,
+  .responsive-grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
   .responsive-grid-2,

@@ -477,6 +477,13 @@ Implementamos el flujo para desvincular borradores mal asignados y devolverlos a
    - Este botón solo se muestra para aquellos borradores que contienen un `event_id` válido (sincronizados de Teams/Outlook).
    - Al hacer clic, se dispara un cuadro de diálogo SweetAlert2 de confirmación. Si el usuario confirma, elimina el borrador y recarga la vista, haciendo que la reunión vuelva a figurar en el panel de reuniones sin clasificar para permitir asociarla a la empresa correcta.
 
+---
 
+## 📅 Clasificación de Reuniones Próximas y Clientes (Dashboard)
 
+Corregimos la visualización de reuniones futuras (por ejemplo, agendadas para diciembre de 2026 u otros meses posteriores) para que aparezcan correctamente en la pestaña **"Próximas"** en lugar de la pestaña **"Clientes"** en el Historial de Reuniones:
 
+1. **Filtro de Clientes Actualizado**: Modificamos el filtro de la pestaña **"Clientes"** para descartar reuniones cuya fecha sea hoy o posterior y cuyo estado de envío no sea `'enviado'` (finalizado).
+2. **Filtro de Próximas Actualizado**: Modificamos el filtro de la pestaña **"Próximas"** para incluir reuniones futuras que no han sido finalizadas (estado distinto a `'enviado'`) o que estén explícitamente en estado `'agendada'`.
+3. **Filtro de Todas Actualizado**: Modificamos la pestaña **"Todas"** para ocultar las reuniones futuras pendientes (upcoming) de la lista de reuniones realizadas.
+4. **Despliegue Exitoso**: Compilamos y verificamos la aplicación mediante `npm run build` y empujamos los cambios a la rama remota `develop` en GitHub.

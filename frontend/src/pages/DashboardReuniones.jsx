@@ -407,6 +407,34 @@ export default function DashboardReuniones() {
         || r.tipo_reu === "Reunión Interna Proforma"
         || (allEmails.length > 0 && allEmails.every(email => email.toLowerCase().endsWith("@proforma.cl")));
       
+      // Helper to get local date to avoid timezone shift
+      const getLocalDate = (val) => {
+        if (!val) return new Date();
+        let dateObj;
+        if (val instanceof Date) {
+          dateObj = val;
+        } else if (typeof val === 'string') {
+          const cleanStr = val.substring(0, 10);
+          const parts = cleanStr.split('-');
+          if (parts.length === 3) {
+            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          }
+          dateObj = new Date(val);
+        } else {
+          dateObj = new Date(val);
+        }
+        if (isNaN(dateObj.getTime())) return new Date();
+        return new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+      };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const meetingDate = getLocalDate(r.fecha_reu);
+      meetingDate.setHours(0, 0, 0, 0);
+
+      const isFuture = meetingDate >= today;
+
       // Excluidas Check
       if (activeTab === "excluidas" && r.estado_envio !== "no_aplica") return false;
       if (activeTab !== "excluidas" && r.estado_envio === "no_aplica") return false;
@@ -417,14 +445,20 @@ export default function DashboardReuniones() {
       }
       if (activeTab === "clientes") {
         if (isProforma) return false;
-        if (r.estado_envio === "agendada" || r.estado_envio === "cancelada") return false;
+        // Exclude upcoming meetings (future and not finalized)
+        const isUpcoming = isFuture && r.estado_envio !== "enviado";
+        if (isUpcoming || r.estado_envio === "cancelada") return false;
       }
       if (activeTab === "proximas") {
         if (isProforma) return false;
-        if (r.estado_envio !== "agendada") return false;
+        // Only show upcoming meetings (future and not finalized, or explicitly 'agendada')
+        const isUpcoming = (isFuture && r.estado_envio !== "enviado") || r.estado_envio === "agendada";
+        if (!isUpcoming) return false;
       }
       if (activeTab === "todas") {
-        if (r.estado_envio === "agendada" || r.estado_envio === "cancelada") return false;
+        // Under 'todas' (realized list), hide upcoming meetings
+        const isUpcoming = isFuture && r.estado_envio !== "enviado";
+        if (isUpcoming || r.estado_envio === "cancelada") return false;
       }
 
       const pasaMacroYJef = isProforma || isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);

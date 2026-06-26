@@ -6,31 +6,27 @@ const buildRoleWhereClause = (usuario_id, rol) => {
     let whereClause = "WHERE 1=1";
     let params = [];
 
-    if (rol === 'ejecutiva') {
+    if (rol === 'admin' || rol === 'gerencia_general') {
+        // Admin ve TODO.
+    } else if (rol === 'gerencia') {
         whereClause += ` AND (
-            emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?) 
-            OR emp.jefatura_id IN (
-                SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)
-            )
-            OR r.ejecutiva_id = ?
+            r.ejecutiva_id = ?
+            OR r.ejecutiva_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
+            OR r.ejecutiva_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
         )`;
         params.push(usuario_id, usuario_id, usuario_id);
     } else if (rol === 'jefatura') {
-        whereClause += ` AND (emp.jefatura_id = ? OR emp.jefatura_id IN (
-            SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = ?
-        ))`;
+        whereClause += ` AND (
+            r.ejecutiva_id = ?
+            OR r.ejecutiva_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)
+        )`;
         params.push(usuario_id, usuario_id);
-    } else if (rol === 'gerencia') {
-        whereClause += ` AND (j.id IN (
-            SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
-            UNION
-            SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
-                SELECT ug.usuario_id FROM usuario_gerencias ug 
-                JOIN usuarios u ON ug.usuario_id = u.id 
-                WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
-            )
-        ) OR emp.jefatura_id = ?)`;
-        params.push(usuario_id, usuario_id, usuario_id);
+    } else if (rol === 'ejecutiva') {
+        whereClause += ` AND (
+            r.ejecutiva_id = ?
+            OR r.ejecutiva_id = (SELECT COALESCE(jefatura_id, 0) FROM usuarios WHERE id = ?)
+        )`;
+        params.push(usuario_id, usuario_id);
     }
     
     return { whereClause, params };
@@ -40,25 +36,27 @@ const buildHuerfanasRoleWhereClause = (usuario_id, rol) => {
     let whereClause = "WHERE 1=1";
     let params = [];
 
-    if (rol === 'ejecutiva') {
-        whereClause += ` AND h.usuario_id = ?`;
-        params.push(usuario_id);
-    } else if (rol === 'jefatura') {
-        whereClause += ` AND (u.jefatura_id = ? OR h.usuario_id = ?)`;
-        params.push(usuario_id, usuario_id);
+    if (rol === 'admin' || rol === 'gerencia_general') {
+        // Admin ve TODO.
     } else if (rol === 'gerencia') {
         whereClause += ` AND (
-            u.id IN (
-                SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
-                UNION
-                SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
-                    SELECT ug.usuario_id FROM usuario_gerencias ug 
-                    JOIN usuarios u ON ug.usuario_id = u.id 
-                    WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
-                )
-            ) OR u.jefatura_id = ? OR h.usuario_id = ?
+            h.usuario_id = ?
+            OR h.usuario_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
+            OR h.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
         )`;
-        params.push(usuario_id, usuario_id, usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id);
+    } else if (rol === 'jefatura') {
+        whereClause += ` AND (
+            h.usuario_id = ?
+            OR h.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)
+        )`;
+        params.push(usuario_id, usuario_id);
+    } else if (rol === 'ejecutiva') {
+        whereClause += ` AND (
+            h.usuario_id = ?
+            OR h.usuario_id = (SELECT COALESCE(jefatura_id, 0) FROM usuarios WHERE id = ?)
+        )`;
+        params.push(usuario_id, usuario_id);
     }
     
     return { whereClause, params };

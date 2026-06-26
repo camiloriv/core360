@@ -58,8 +58,8 @@ export default function SeguimientoEmpresas() {
 
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === "admin" || userRol === "gerencia_general";
-  // Solo admin, gerencia_general y gerencia pueden ver y cambiar el filtro de Jefatura
-  const mostrarFiltroJefatura = userRol === "admin" || userRol === "gerencia_general" || userRol === "gerencia";
+  // Solo admin y gerencia_general pueden ver y cambiar el filtro de Jefatura
+  const mostrarFiltroJefatura = userRol === "admin" || userRol === "gerencia_general";
 
   useEffect(() => {
     if (!dataLoading && user) {

@@ -88,7 +88,16 @@ export default function SeguimientoEmpresas() {
         url = `/empresas/seguimiento-logs?periodo=${filtroPeriodo}`;
       }
       const res = await api.get(url);
-      setSeguimientoLogs(res.data || []);
+      const rawLogs = res.data || [];
+      const uniqueMap = new Map();
+      rawLogs.forEach(log => {
+        const d = log.fecha ? log.fecha.substring(0, 10) : "";
+        const key = `${log.empresa_id}_${log.estado}_${d}_${log.reunion_id || 'manual'}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, log);
+        }
+      });
+      setSeguimientoLogs(Array.from(uniqueMap.values()));
     } catch (err) {
       console.error("Error cargando logs de seguimiento:", err);
     }
@@ -242,7 +251,16 @@ export default function SeguimientoEmpresas() {
     let logs = [];
     try {
       const hRes = await api.get(`/empresas/${emp.id}/historial`);
-      logs = hRes.data || [];
+      const rawLogs = hRes.data || [];
+      const uniqueMap = new Map();
+      rawLogs.forEach(log => {
+        const d = log.fecha ? log.fecha.substring(0, 10) : "";
+        const key = `${log.estado}_${d}_${log.reunion_id || 'manual'}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, log);
+        }
+      });
+      logs = Array.from(uniqueMap.values());
     } catch (e) {
       console.error("Error obteniendo historial:", e);
     }

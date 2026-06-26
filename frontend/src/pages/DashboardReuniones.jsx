@@ -384,10 +384,14 @@ export default function DashboardReuniones() {
       const esReunionPropia = esRolRestringido && Number(r.ejecutiva_id) === Number(user?.id);
       
       const isInterna = r.empresa_nombre === "PROFORMA INTERNA" || r.tipo_reu === "Reunión Interna Proforma";
+      
+      if (activeTab === "excluidas" && r.estado_envio !== "no_aplica") return false;
+      if (activeTab !== "excluidas" && r.estado_envio === "no_aplica") return false;
+
       if (activeTab === "internas" && !isInterna) return false;
       if (activeTab === "clientes" && isInterna) return false;
       if (activeTab === "proximas" && r.estado_envio !== "agendada") return false;
-      if (activeTab !== "proximas" && (r.estado_envio === "agendada" || r.estado_envio === "cancelada")) return false;
+      if (activeTab !== "proximas" && activeTab !== "excluidas" && (r.estado_envio === "agendada" || r.estado_envio === "cancelada")) return false;
 
       const pasaMacroYJef = isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
@@ -452,8 +456,21 @@ export default function DashboardReuniones() {
 
   // 🔹 CÁLCULO DE DATOS DE REUNIONES ÚNICAS
   const realizedReuniones = useMemo(() => {
-    return filteredReuniones.filter(r => r.estado_envio !== 'agendada');
+    return filteredReuniones.filter(r => 
+      r.estado_envio !== 'agendada' && 
+      r.estado_envio !== 'no_aplica' && 
+      r.estado_envio !== 'cancelada' &&
+      !r.is_huerfana
+    );
   }, [filteredReuniones]);
+
+  const excluidasOSinEmpresaCount = useMemo(() => {
+    return filteredReuniones.filter(r => r.estado_envio === 'no_aplica' || r.is_huerfana).length;
+  }, [filteredReuniones]);
+
+  const minutasEnviadasCount = useMemo(() => {
+    return realizedReuniones.filter(r => r.estado_envio === 'enviado').length;
+  }, [realizedReuniones]);
 
   const reunionesEsteMes = useMemo(() => {
     return realizedReuniones.filter((r) => {
@@ -796,8 +813,8 @@ export default function DashboardReuniones() {
           </div>
         </div>
 
-        {/* --- KPI CARDS (6 COLUMNAS CON REUNIONES ÚNICAS) --- */}
-        <div className="responsive-grid-6" style={{ marginBottom: "30px" }}>
+        {/* --- KPI CARDS --- */}
+        <div className="responsive-grid-4" style={{ marginBottom: "30px" }}>
           <KpiCard
             title="Total Histórico"
             value={realizedReuniones.length}
@@ -843,6 +860,20 @@ export default function DashboardReuniones() {
             sub="Empresas reunidas"
             color="#10b981" // Emerald Green
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}
+          />
+          <KpiCard
+            title="Excluidas / Sin Empresa"
+            value={excluidasOSinEmpresaCount}
+            sub="No contabilizadas"
+            color="#ef4444" // Red
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>}
+          />
+          <KpiCard
+            title="Minutas Enviadas"
+            value={minutasEnviadasCount}
+            sub="Reuniones con minuta"
+            color="#14b8a6" // Teal
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>}
           />
         </div>
 
@@ -1157,6 +1188,23 @@ export default function DashboardReuniones() {
                   }}
                 >
                   📅 Próximas
+                </button>
+                <button
+                  onClick={() => { setActiveTab('excluidas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'excluidas' ? '#ef4444' : 'transparent',
+                    color: activeTab === 'excluidas' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'excluidas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'excluidas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🚫 Excluidas
                 </button>
               </div>
             </div>

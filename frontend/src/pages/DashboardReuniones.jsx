@@ -494,7 +494,30 @@ export default function DashboardReuniones() {
       return pasaMacroYJef && pasaEmpresa && pasaTipo && pasaPeriodo && pasaEstado;
     });
 
-    return result.sort(
+    // Deduplicate meetings that represent the same event (same date, same company, same subject)
+    // Combine executive names if they attended the same meeting
+    const uniqueMeetingsMap = new Map();
+    
+    for (const r of result) {
+      const d = r.fecha_reu ? r.fecha_reu.substring(0, 10) : "";
+      const asunto = r.asunto_teams || r.tipo_reu || "";
+      const empresa = r.empresa_id || r.empresa_nombre || "";
+      
+      const key = `${d}_${asunto}_${empresa}`;
+      
+      if (uniqueMeetingsMap.has(key)) {
+        const existing = uniqueMeetingsMap.get(key);
+        // Combine executive names if different
+        if (r.ejecutiva_nombre && existing.ejecutiva_nombre && !existing.ejecutiva_nombre.includes(r.ejecutiva_nombre)) {
+          existing.ejecutiva_nombre = `${existing.ejecutiva_nombre}, ${r.ejecutiva_nombre}`;
+        }
+      } else {
+        // Clone to avoid mutating original state if needed, though we only mutate ejecutiva_nombre
+        uniqueMeetingsMap.set(key, { ...r });
+      }
+    }
+
+    return Array.from(uniqueMeetingsMap.values()).sort(
       (a, b) => new Date(b.fecha_reu) - new Date(a.fecha_reu),
     );
   }, [

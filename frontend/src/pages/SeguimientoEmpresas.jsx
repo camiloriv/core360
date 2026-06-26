@@ -266,7 +266,34 @@ export default function SeguimientoEmpresas() {
     }
 
     // 2. Obtener reuniones asociadas a esta empresa desde el dashboard
-    const companyMeetings = (reuniones || []).filter((r) => r.empresa_id === emp.id);
+    // Deduplicate meetings with same date+subject (e.g. same Teams event attended by multiple executives)
+    const rawCompanyMeetings = (reuniones || []).filter((r) => r.empresa_id === emp.id);
+    const meetingMergeMap = new Map();
+    rawCompanyMeetings.forEach((r) => {
+      const d = r.fecha_reu ? r.fecha_reu.substring(0, 10) : "";
+      const asunto = r.asunto_teams || r.tipo_reu || "";
+      const key = `${d}_${asunto}`;
+      if (meetingMergeMap.has(key)) {
+        const existing = meetingMergeMap.get(key);
+        // Merge participants: combine enviado_a from both records
+        const parseEmails = (val) => {
+          if (!val) return [];
+          if (val.trim().startsWith("[")) {
+            try { return JSON.parse(val).map(e => String(e).trim()); } catch(e) {}
+          }
+          return val.split(",").map(e => e.trim()).filter(Boolean);
+        };
+        const existingEmails = parseEmails(existing.enviado_a);
+        const newEmails = parseEmails(r.enviado_a);
+        const mergedEmails = [...new Set([...existingEmails, ...newEmails])];
+        existing.enviado_a = mergedEmails.join(", ");
+        // Keep the record with more info (e.g. if one has correos_cc)
+        if (!existing.correos_cc && r.correos_cc) existing.correos_cc = r.correos_cc;
+      } else {
+        meetingMergeMap.set(key, { ...r });
+      }
+    });
+    const companyMeetings = Array.from(meetingMergeMap.values());
 
     // 3. Agrupar logs por reunion_id / event_id
     const logsByReunion = {};

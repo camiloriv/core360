@@ -383,17 +383,51 @@ export default function DashboardReuniones() {
       // Usar Number() para evitar type mismatch: la BD devuelve número pero localStorage puede devolver string
       const esReunionPropia = esRolRestringido && Number(r.ejecutiva_id) === Number(user?.id);
       
-      const isInterna = r.empresa_nombre === "PROFORMA INTERNA" || r.tipo_reu === "Reunión Interna Proforma";
+      // Helper function to extract emails from string or JSON
+      const extractEmails = (val) => {
+        if (!val) return [];
+        if (typeof val !== "string") return [];
+        if (val.trim().startsWith("[")) {
+          try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) {
+              return parsed.map(e => String(e).trim()).filter(e => e.includes("@"));
+            }
+          } catch (e) {}
+        }
+        const matches = val.match(/[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}/g);
+        return matches ? matches.map(e => e.trim()) : [];
+      };
+
+      const emailsEnviadoA = extractEmails(r.enviado_a);
+      const emailsCc = extractEmails(r.correos_cc);
+      const allEmails = [...emailsEnviadoA, ...emailsCc];
+
+      const isProforma = r.empresa_nombre === "PROFORMA INTERNA"
+        || r.tipo_reu === "Reunión Interna Proforma"
+        || (allEmails.length > 0 && allEmails.every(email => email.toLowerCase().endsWith("@proforma.cl")));
       
+      // Excluidas Check
       if (activeTab === "excluidas" && r.estado_envio !== "no_aplica") return false;
       if (activeTab !== "excluidas" && r.estado_envio === "no_aplica") return false;
 
-      if (activeTab === "internas" && !isInterna) return false;
-      if (activeTab === "clientes" && isInterna) return false;
-      if (activeTab === "proximas" && r.estado_envio !== "agendada") return false;
-      if (activeTab !== "proximas" && activeTab !== "excluidas" && (r.estado_envio === "agendada" || r.estado_envio === "cancelada")) return false;
+      // Tab filters logic
+      if (activeTab === "internas") {
+        if (!isProforma) return false;
+      }
+      if (activeTab === "clientes") {
+        if (isProforma) return false;
+        if (r.estado_envio === "agendada" || r.estado_envio === "cancelada") return false;
+      }
+      if (activeTab === "proximas") {
+        if (isProforma) return false;
+        if (r.estado_envio !== "agendada") return false;
+      }
+      if (activeTab === "todas") {
+        if (r.estado_envio === "agendada" || r.estado_envio === "cancelada") return false;
+      }
 
-      const pasaMacroYJef = isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      const pasaMacroYJef = isProforma || isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
       const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
 

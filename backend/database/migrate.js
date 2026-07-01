@@ -5,7 +5,7 @@ async function runMigrations() {
   let connection;
   try {
     connection = await db.getConnection();
-    
+
     // 1. Zonas table
     console.log("Migration: Checking/creating 'zonas' table...");
     await connection.query(`
@@ -22,7 +22,15 @@ async function runMigrations() {
       await connection.query('INSERT IGNORE INTO zonas (nombre) VALUES (?)', [zona]);
     }
 
-    // 3. Columns in usuarios table (zona_id, gerencia_id, vistas_permitidas)
+    // 3. Columns in usuarios table
+    const addColIfMissing = async (table, col, def) => {
+      const [cols] = await connection.query(`SHOW COLUMNS FROM ${table} LIKE '${col}'`);
+      if (cols.length === 0) {
+        console.log(`Migration: Adding '${col}' column to '${table}'...`);
+        await connection.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+      }
+    };
+
     const [userZonaCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'zona_id'");
     if (userZonaCol.length === 0) {
       console.log("Migration: Adding 'zona_id' column to 'usuarios'...");
@@ -37,44 +45,19 @@ async function runMigrations() {
       await connection.query('ALTER TABLE usuarios ADD CONSTRAINT fk_usuarios_gerencia FOREIGN KEY (gerencia_id) REFERENCES usuarios(id) ON DELETE SET NULL');
     }
 
-    const [userVistasCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'vistas_permitidas'");
-    if (userVistasCol.length === 0) {
-      console.log("Migration: Adding 'vistas_permitidas' column to 'usuarios'...");
-      await connection.query('ALTER TABLE usuarios ADD COLUMN vistas_permitidas TEXT NULL');
-    }
-
-    const [userReqCambioCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'requiere_cambio_clave'");
-    if (userReqCambioCol.length === 0) {
-      console.log("Migration: Adding 'requiere_cambio_clave' column to 'usuarios'...");
-      await connection.query('ALTER TABLE usuarios ADD COLUMN requiere_cambio_clave TINYINT(1) DEFAULT 0');
-    }
-
-    const [userSyncDeltaCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'sync_delta_token'");
-    if (userSyncDeltaCol.length === 0) {
-      console.log("Migration: Adding 'sync_delta_token' column to 'usuarios'...");
-      await connection.query('ALTER TABLE usuarios ADD COLUMN sync_delta_token TEXT NULL');
-    }
-
-    const [userUltimaSyncCol] = await connection.query("SHOW COLUMNS FROM usuarios LIKE 'ultima_sincronizacion'");
-    if (userUltimaSyncCol.length === 0) {
-      console.log("Migration: Adding 'ultima_sincronizacion' column to 'usuarios'...");
-      await connection.query('ALTER TABLE usuarios ADD COLUMN ultima_sincronizacion DATETIME NULL');
-    }
+    await addColIfMissing('usuarios', 'vistas_permitidas', 'TEXT NULL');
+    await addColIfMissing('usuarios', 'requiere_cambio_clave', 'TINYINT(1) DEFAULT 0');
+    await addColIfMissing('usuarios', 'sync_delta_token', 'TEXT NULL');
+    await addColIfMissing('usuarios', 'ultima_sincronizacion', 'DATETIME NULL');
 
     // Insertar PROFORMA INTERNA si no existe
     const [empProforma] = await connection.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
     if (empProforma.length === 0) {
       console.log("Migration: Inserting 'PROFORMA INTERNA' company...");
-      await connection.query(
-        "INSERT INTO empresas (nombre, jefatura_id) VALUES ('PROFORMA INTERNA', NULL)"
-      );
+      await connection.query("INSERT INTO empresas (nombre, jefatura_id) VALUES ('PROFORMA INTERNA', NULL)");
     }
 
-    // Forzar resincronización completa para que se guarden las reuniones internas que fueron ignoradas por falta de la empresa
-    console.log("Migration: Resetting sync_delta_token to force full sync...");
-    await connection.query("UPDATE usuarios SET sync_delta_token = NULL WHERE ultima_sincronizacion < '2026-06-25'");
-
-    // 4. Columns in empresas table (zona_id)
+    // 4. Columns in empresas table
     const [empZonaCol] = await connection.query("SHOW COLUMNS FROM empresas LIKE 'zona_id'");
     if (empZonaCol.length === 0) {
       console.log("Migration: Adding 'zona_id' column to 'empresas'...");
@@ -82,7 +65,7 @@ async function runMigrations() {
       await connection.query('ALTER TABLE empresas ADD CONSTRAINT fk_empresas_zona FOREIGN KEY (zona_id) REFERENCES zonas(id)');
     }
 
-    // 5. Intermedia table usuario_gerencias
+    // 5. Tabla usuario_gerencias
     await connection.query(`
       CREATE TABLE IF NOT EXISTS usuario_gerencias (
         usuario_id INT NOT NULL,
@@ -93,7 +76,7 @@ async function runMigrations() {
       )
     `);
 
-    // Migrate existing relationships to intermediate table
+    // Migrate existing jefaturas
     const [existingJefaturas] = await connection.query(`
       SELECT id, gerencia_id FROM usuarios
       WHERE permisos = 'jefatura' AND gerencia_id IS NOT NULL
@@ -112,7 +95,7 @@ async function runMigrations() {
       await connection.query('ALTER TABLE encuesta_catalogo_preguntas ADD COLUMN activo TINYINT(1) DEFAULT 1');
     }
 
-    // 7. Table 'empresa_seguimiento_log'
+    // 7. Tabla empresa_seguimiento_log
     console.log("Migration: Checking/creating 'empresa_seguimiento_log' table...");
     await connection.query(`
       CREATE TABLE IF NOT EXISTS empresa_seguimiento_log (
@@ -121,104 +104,29 @@ async function runMigrations() {
         estado VARCHAR(50) NOT NULL,
         fecha DATE NOT NULL,
         usuario_id INT NULL,
-        reunion_id VARCHAR(255) NULL,
+        reunion_id VARCHAR(500) NULL,
+        asunto VARCHAR(255) NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
       )
     `);
 
-    // Ensure reunion_id is large enough in case it was created with VARCHAR(20) before
     try {
-      await connection.query('ALTER TABLE empresa_seguimiento_log MODIFY reunion_id VARCHAR(255) NULL');
+      await connection.query('ALTER TABLE empresa_seguimiento_log MODIFY reunion_id VARCHAR(500) NULL');
     } catch (e) {
-      console.log("Migration: Note: reunion_id modify skipped or failed:", e.message);
+      // Ignore if already correct
     }
 
-    // Ensure asunto exists in log
     try {
-      const [logCols] = await connection.query("SHOW COLUMNS FROM empresa_seguimiento_log LIKE 'asunto'");
-      if (logCols.length === 0) {
-        console.log("Migration: Adding 'asunto' column to 'empresa_seguimiento_log'...");
+      const [logAsuntoCols] = await connection.query("SHOW COLUMNS FROM empresa_seguimiento_log LIKE 'asunto'");
+      if (logAsuntoCols.length === 0) {
         await connection.query("ALTER TABLE empresa_seguimiento_log ADD COLUMN asunto VARCHAR(255) DEFAULT NULL");
       }
     } catch (e) {
-      console.log("Migration: Note: log columns check failed:", e.message);
+      console.log("Migration: Note: log asunto check failed:", e.message);
     }
 
-    // Migrate existing logs to empresa_seguimiento_log
-    const [solicitadas] = await connection.query(`
-      SELECT id, fecha_solicitada FROM empresas 
-      WHERE fecha_solicitada IS NOT NULL AND estado_seguimiento IN ('solicitada','concretada')
-    `);
-    for (const emp of solicitadas) {
-      const [exists] = await connection.query(
-        "SELECT id FROM empresa_seguimiento_log WHERE empresa_id = ? AND estado = 'solicitada'",
-        [emp.id]
-      );
-      if (exists.length === 0) {
-        await connection.query(
-          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha) VALUES (?, 'solicitada', ?)",
-          [emp.id, emp.fecha_solicitada]
-        );
-      }
-    }
-
-    const [concretadas] = await connection.query(`
-      SELECT id, fecha_concretada FROM empresas 
-      WHERE fecha_concretada IS NOT NULL AND estado_seguimiento = 'concretada'
-    `);
-    for (const emp of concretadas) {
-      const [exists] = await connection.query(
-        "SELECT id FROM empresa_seguimiento_log WHERE empresa_id = ? AND estado = 'concretada'",
-        [emp.id]
-      );
-      if (exists.length === 0) {
-        await connection.query(
-          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha) VALUES (?, 'concretada', ?)",
-          [emp.id, emp.fecha_concretada]
-        );
-      }
-    }
-
-    const [gestionadas] = await connection.query(`
-      SELECT DISTINCT r.empresa_id, r.fecha_reu, r.id_reunion, r.ejecutiva_id
-      FROM reuniones r
-      WHERE r.estado_envio != 'pendiente' AND r.fecha_reu IS NOT NULL AND r.empresa_id IS NOT NULL
-    `);
-    for (const reu of gestionadas) {
-      const [exists] = await connection.query(
-        "SELECT id FROM empresa_seguimiento_log WHERE empresa_id = ? AND estado = 'gestionada' AND reunion_id = ?",
-        [reu.empresa_id, reu.id_reunion]
-      );
-      if (exists.length === 0) {
-        await connection.query(
-          "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id) VALUES (?, 'gestionada', ?, ?, ?)",
-          [reu.empresa_id, reu.fecha_reu, reu.ejecutiva_id, reu.id_reunion]
-        );
-      }
-    }
-
-    // 8. Columns in reuniones table
-    console.log("Migration: Checking columns in 'reuniones' table...");
-    const checkAndAddReunionColumn = async (colName, colDef) => {
-      const [cols] = await connection.query(`SHOW COLUMNS FROM reuniones LIKE '${colName}'`);
-      if (cols.length === 0) {
-        console.log(`Migration: Adding '${colName}' column to 'reuniones'...`);
-        await connection.query(`ALTER TABLE reuniones ADD COLUMN ${colName} ${colDef}`);
-      }
-    };
-
-    await checkAndAddReunionColumn('estado_envio', "VARCHAR(20) DEFAULT 'enviado'");
-    await checkAndAddReunionColumn('archivos_nombres', "TEXT NULL");
-    await checkAndAddReunionColumn('programar_encuesta', "TINYINT(1) DEFAULT 0");
-    await checkAndAddReunionColumn('encuesta_tipo', "VARCHAR(100) DEFAULT NULL");
-    await checkAndAddReunionColumn('encuesta_programada_para', "DATETIME DEFAULT NULL");
-    await checkAndAddReunionColumn('encuesta_estado_envio', "VARCHAR(20) DEFAULT 'pendiente'");
-    await checkAndAddReunionColumn('encuesta_relacionada', "TINYINT(1) DEFAULT 0");
-    await checkAndAddReunionColumn('encuesta_destinatario', "VARCHAR(255) DEFAULT NULL");
-    await checkAndAddReunionColumn('asunto_teams', "VARCHAR(500) DEFAULT NULL");
-
-    // 9. Tabla empresa_dominios
+    // 8. Tabla empresa_dominios
     console.log("Migration: Checking/creating 'empresa_dominios' table...");
     await connection.query(`
       CREATE TABLE IF NOT EXISTS empresa_dominios (
@@ -231,24 +139,7 @@ async function runMigrations() {
       )
     `);
 
-    // 10. Tabla reuniones_huerfanas
-    console.log("Migration: Checking/creating 'reuniones_huerfanas' table...");
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS reuniones_huerfanas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id INT NOT NULL,
-        event_id VARCHAR(255) NOT NULL UNIQUE,
-        asunto VARCHAR(255) NOT NULL,
-        fecha DATE NOT NULL,
-        hora VARCHAR(10) NOT NULL,
-        asistentes TEXT,
-        estado VARCHAR(50) DEFAULT 'pendiente',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-      )
-    `);
-
-    // 11. Tabla empresa_contactos
+    // 9. Tabla empresa_contactos
     console.log("Migration: Checking/creating 'empresa_contactos' table...");
     await connection.query(`
       CREATE TABLE IF NOT EXISTS empresa_contactos (
@@ -262,34 +153,96 @@ async function runMigrations() {
       )
     `);
 
-    // 11b. Columnas faltantes en reuniones_huerfanas (ical_uid fue agregada después de la creación inicial)
-    try {
-      const [hIcalCol] = await connection.query("SHOW COLUMNS FROM reuniones_huerfanas LIKE 'ical_uid'");
-      if (hIcalCol.length === 0) {
-        console.log("Migration: Adding 'ical_uid' column to 'reuniones_huerfanas'...");
-        await connection.query("ALTER TABLE reuniones_huerfanas ADD COLUMN ical_uid VARCHAR(500) DEFAULT NULL");
-      }
-    } catch (e) {
-      console.log("Migration: Note: ical_uid check in reuniones_huerfanas failed:", e.message);
-    }
+    // ============================================================
+    // 10. NUEVA TABLA: teams_eventos (FUENTE DE LA VERDAD DESDE TEAMS)
+    // ============================================================
+    console.log("Migration: Checking/creating 'teams_eventos' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS teams_eventos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_id VARCHAR(500) NOT NULL,
+        ical_uid VARCHAR(500) DEFAULT NULL,
+        usuario_id INT NOT NULL,
+        empresa_id INT DEFAULT NULL,
+        asunto VARCHAR(500) NOT NULL,
+        fecha DATE NOT NULL,
+        hora TIME NOT NULL,
+        hora_fin TIME DEFAULT NULL,
+        estado ENUM('agendada','pasada','cancelada','ignorada') NOT NULL DEFAULT 'agendada',
+        es_online TINYINT(1) DEFAULT 1,
+        asistentes JSON DEFAULT NULL,
+        join_url TEXT DEFAULT NULL,
+        ultima_sync DATETIME DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_event_id (event_id),
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL
+      )
+    `);
 
-    // 11c. Columnas faltantes en reuniones (event_id, asunto_teams, ical_uid)
-    await checkAndAddReunionColumn('event_id', "VARCHAR(255) DEFAULT NULL");
-    await checkAndAddReunionColumn('asunto_teams', "VARCHAR(500) DEFAULT NULL");
-    try {
-      const [rIcalCol] = await connection.query("SHOW COLUMNS FROM reuniones LIKE 'ical_uid'");
-      if (rIcalCol.length === 0) {
-        console.log("Migration: Adding 'ical_uid' column to 'reuniones'...");
-        await connection.query("ALTER TABLE reuniones ADD COLUMN ical_uid VARCHAR(500) DEFAULT NULL");
-      }
-    } catch (e) {
-      console.log("Migration: Note: ical_uid check in reuniones failed:", e.message);
-    }
+    // ============================================================
+    // 11. NUEVA TABLA: minutas (antes llamada 'reuniones')
+    // ============================================================
+    console.log("Migration: Checking/creating 'minutas' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS minutas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_minuta VARCHAR(30) NOT NULL UNIQUE,
+        teams_evento_id INT DEFAULT NULL,
+        ejecutiva_id INT NOT NULL,
+        empresa_id INT NOT NULL,
+        tipo_reu VARCHAR(100) DEFAULT NULL,
+        enviado_a TEXT DEFAULT NULL,
+        enviado_por VARCHAR(255) DEFAULT NULL,
+        participantes TEXT DEFAULT NULL,
+        motivo_reu TEXT DEFAULT NULL,
+        minuta TEXT DEFAULT NULL,
+        form_f TEXT DEFAULT NULL,
+        fecha_reu DATE NOT NULL,
+        hora VARCHAR(10) NOT NULL,
+        lugar VARCHAR(255) DEFAULT 'Teams',
+        documentos_adjuntos TEXT DEFAULT NULL,
+        estado_envio ENUM('borrador','enviado','no_aplica') NOT NULL DEFAULT 'borrador',
+        archivos_nombres TEXT DEFAULT NULL,
+        programar_encuesta TINYINT(1) DEFAULT 0,
+        encuesta_tipo VARCHAR(100) DEFAULT NULL,
+        encuesta_programada_para DATETIME DEFAULT NULL,
+        encuesta_estado_envio VARCHAR(20) DEFAULT 'pendiente',
+        encuesta_relacionada TINYINT(1) DEFAULT 0,
+        encuesta_destinatario VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (teams_evento_id) REFERENCES teams_eventos(id) ON DELETE SET NULL,
+        FOREIGN KEY (ejecutiva_id) REFERENCES usuarios(id),
+        FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+      )
+    `);
 
-    // 12. Migrar contraseñas a bcrypt
+    // ============================================================
+    // 12. Tabla sync_log (control de sincronizaciones diarias)
+    // ============================================================
+    console.log("Migration: Checking/creating 'sync_log' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tipo VARCHAR(50) NOT NULL DEFAULT 'diaria',
+        ejecutado_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        resultado TEXT DEFAULT NULL
+      )
+    `);
+
+    // ============================================================
+    // BACKWARD COMPAT: Mantener tabla 'reuniones' por si hay referencias
+    // pero ya NO es la fuente de datos del dashboard
+    // ============================================================
+    // La tabla reuniones antigua se deja intacta para no romper nada,
+    // pero el sistema ya no la usa como fuente de verdad.
+
+    // 13. Migrar contraseñas a bcrypt
     await migratePasswords();
 
-    // 13. Opcional: Resetear contraseñas de todos a 123 en desarrollo
+    // 14. Opcional: Resetear contraseñas en desarrollo
     if (process.env.RESET_PASSWORDS_DEV === 'true') {
       console.log("Migration: RESET_PASSWORDS_DEV is active. Setting everyone's password to '123'...");
       const bcrypt = require('bcrypt');
@@ -298,7 +251,7 @@ async function runMigrations() {
       console.log(`Migration: Successfully reset passwords for ${pwdResult.affectedRows} users.`);
     }
 
-    // 14. Sembrar datos para inducción / demostración de plataforma
+    // 15. Sembrar datos de inducción
     try {
       const { seedInductionData } = require("./scripts/seed_induction");
       await seedInductionData(connection);

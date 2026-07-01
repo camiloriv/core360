@@ -1,28 +1,9 @@
 require("dotenv").config();
 const db = require("../../database/connection");
 
-const generarIdReunion = async () => {
-    const year = new Date().getFullYear();
-    const sql = `
-        SELECT id_reunion 
-        FROM reuniones 
-        WHERE id_reunion LIKE ? 
-        ORDER BY CAST(SUBSTRING(id_reunion, 10) AS UNSIGNED) DESC 
-        LIMIT 1
-    `;
-    const [result] = await db.query(sql, [`REU-${year}-%`]);
-
-    let maxNum = 0;
-    if (result.length > 0 && result[0].id_reunion) {
-        const parts = result[0].id_reunion.split('-');
-        if (parts.length === 3) {
-            maxNum = parseInt(parts[2], 10) || 0;
-        }
-    }
-    const correlativo = String(maxNum + 1).padStart(4, "0");
-    return `REU-${year}-${correlativo}`;
-};
-
+// ============================================================
+// GRAPH API: Token management
+// ============================================================
 let graphToken = null;
 let tokenExpiresAt = null;
 
@@ -31,16 +12,19 @@ const getGraphToken = async () => {
         return graphToken;
     }
 
-    const response = await fetch(`https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            client_id: process.env.AZURE_CLIENT_ID,
-            client_secret: process.env.AZURE_CLIENT_SECRET,
-            scope: "https://graph.microsoft.com/.default",
-            grant_type: "client_credentials"
-        })
-    });
+    const response = await fetch(
+        `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                client_id: process.env.AZURE_CLIENT_ID,
+                client_secret: process.env.AZURE_CLIENT_SECRET,
+                scope: "https://graph.microsoft.com/.default",
+                grant_type: "client_credentials"
+            })
+        }
+    );
 
     if (!response.ok) {
         const errText = await response.text();
@@ -49,10 +33,50 @@ const getGraphToken = async () => {
 
     const data = await response.json();
     graphToken = data.access_token;
-    tokenExpiresAt = new Date(new Date().getTime() + (data.expires_in - 300) * 1000); 
+    tokenExpiresAt = new Date(new Date().getTime() + (data.expires_in - 300) * 1000);
     return graphToken;
 };
 
+// ============================================================
+// HELPERS
+// ============================================================
+const formatDate = (dateTimeStr) => {
+    if (!dateTimeStr) return null;
+    return dateTimeStr.split('T')[0];
+};
+
+const formatTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '00:00';
+    const timePart = dateTimeStr.split('T')[1] || '';
+    return timePart.substring(0, 5);
+};
+
+const resolveDisplayName = async (email, dbName = '') => {
+    if (!email) return '';
+    email = email.trim().toLowerCase();
+
+    try {
+        const [userRows] = await db.query("SELECT nombre FROM usuarios WHERE LOWER(correo) = ?", [email]);
+        if (userRows.length > 0 && userRows[0].nombre) return userRows[0].nombre;
+    } catch (e) { /* ignore */ }
+
+    try {
+        const [contactRows] = await db.query(
+            "SELECT nombre FROM empresa_contactos WHERE LOWER(correo) = ? AND nombre IS NOT NULL AND nombre != '' LIMIT 1",
+            [email]
+        );
+        if (contactRows.length > 0 && contactRows[0].nombre) return contactRows[0].nombre;
+    } catch (e) { /* ignore */ }
+
+    if (dbName && !dbName.includes('@')) return dbName;
+
+    const username = email.split('@')[0];
+    return username.split(/[\._-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+};
+
+// ============================================================
+// POST /agendamiento — Crear reunión en Teams y registrar en teams_eventos
+// ============================================================
 const crearReunionTeams = async (req, res) => {
     try {
         const usuarioCorreo = req.usuario.correo;
@@ -62,41 +86,27 @@ const crearReunionTeams = async (req, res) => {
 
         const { empresa_id, destinatarios, asistentes_internos, fecha, hora, duracion, asunto, detalle, modalidad, direccion } = req.body;
 
-        // Parse dateTime and calculate end time
-        // fecha = YYYY-MM-DD, hora = HH:mm
         const startDateTimeStr = `${fecha}T${hora}:00`;
-        
-        // Calculate end using local arithmetic to avoid timezone shifts
+
         const year = parseInt(fecha.split('-')[0]);
         const month = parseInt(fecha.split('-')[1]) - 1;
         const day = parseInt(fecha.split('-')[2]);
         const hour = parseInt(hora.split(':')[0]);
         const minute = parseInt(hora.split(':')[1]);
-        
-        const endObj = new Date(year, month, day, hour, minute + parseInt(duracion));
-        
-        const endYear = endObj.getFullYear();
-        const endMonth = String(endObj.getMonth() + 1).padStart(2, "0");
-        const endDay = String(endObj.getDate()).padStart(2, "0");
-        const endHour = String(endObj.getHours()).padStart(2, "0");
-        const endMinute = String(endObj.getMinutes()).padStart(2, "0");
-        
-        const endDateTimeStr = `${endYear}-${endMonth}-${endDay}T${endHour}:${endMinute}:00`;
 
-        // Map attendees
+        const endObj = new Date(year, month, day, hour, minute + parseInt(duracion || 60));
+        const endDateTimeStr = `${endObj.getFullYear()}-${String(endObj.getMonth() + 1).padStart(2, "0")}-${String(endObj.getDate()).padStart(2, "0")}T${String(endObj.getHours()).padStart(2, "0")}:${String(endObj.getMinutes()).padStart(2, "0")}:00`;
+        const horaFin = `${String(endObj.getHours()).padStart(2, "0")}:${String(endObj.getMinutes()).padStart(2, "0")}`;
+
         const attendees = [];
         if (destinatarios) {
             destinatarios.split(',').forEach(email => {
-                if (email.trim()) {
-                    attendees.push({ emailAddress: { address: email.trim() }, type: "required" });
-                }
+                if (email.trim()) attendees.push({ emailAddress: { address: email.trim() }, type: "required" });
             });
         }
         if (asistentes_internos) {
             asistentes_internos.split(',').forEach(email => {
-                if (email.trim()) {
-                    attendees.push({ emailAddress: { address: email.trim() }, type: "optional" });
-                }
+                if (email.trim()) attendees.push({ emailAddress: { address: email.trim() }, type: "optional" });
             });
         }
 
@@ -105,19 +115,10 @@ const crearReunionTeams = async (req, res) => {
 
         const eventPayload = {
             subject: finalSubject,
-            body: {
-                contentType: "HTML",
-                content: detalle || "Reunión generada desde CORE 360"
-            },
-            start: {
-                dateTime: startDateTimeStr,
-                timeZone: "America/Santiago"
-            },
-            end: {
-                dateTime: endDateTimeStr,
-                timeZone: "America/Santiago"
-            },
-            attendees: attendees
+            body: { contentType: "HTML", content: detalle || "Reunión generada desde CORE 360" },
+            start: { dateTime: startDateTimeStr, timeZone: "America/Santiago" },
+            end: { dateTime: endDateTimeStr, timeZone: "America/Santiago" },
+            attendees
         };
 
         if (isPresencial) {
@@ -132,10 +133,7 @@ const crearReunionTeams = async (req, res) => {
 
         const response = await fetch(endpoint, {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Content-Type": "application/json"
-            },
+            headers: { "Authorization": `Bearer ${accessToken}`, "Content-Type": "application/json" },
             body: JSON.stringify(eventPayload)
         });
 
@@ -145,35 +143,69 @@ const crearReunionTeams = async (req, res) => {
         }
 
         const data = await response.json();
-        
-        if (empresa_id) {
-            const fechaVal = fecha;
-            await db.query("UPDATE empresas SET estado_seguimiento = ?, fecha_concretada = ? WHERE id = ?", ['agendada', fechaVal, empresa_id]);
-            await db.query("INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, ?, ?, ?, ?, ?)", [empresa_id, 'agendada', fechaVal, req.usuario.id, data.id, finalSubject]);
 
-            // Aprendizaje de dominios y contactos
-            if (destinatarios) {
-                const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
-                const correos = destinatarios.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-                
-                for (const email of correos) {
-                    if (email.includes('@')) {
-                        const dom = '@' + email.split('@')[1];
-                        if (!dominiosGenericos.includes(dom.substring(1))) {
-                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
-                            
-                            const [existing] = await db.query("SELECT id FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                            if (existing.length === 0) {
-                                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, NULL)", [empresa_id, email]);
-                            }
+        // Registrar en teams_eventos (fuente de la verdad)
+        const allAttendees = attendees.map(a => ({ email: a.emailAddress.address, name: a.emailAddress.name || '' }));
+        const asistentesJson = JSON.stringify(allAttendees);
+
+        const empresaIdVal = empresa_id ? parseInt(empresa_id) : null;
+
+        await db.query(`
+            INSERT INTO teams_eventos 
+                (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, es_online, asistentes, join_url, ultima_sync)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'agendada', ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                empresa_id = VALUES(empresa_id),
+                asunto = VALUES(asunto),
+                fecha = VALUES(fecha),
+                hora = VALUES(hora),
+                hora_fin = VALUES(hora_fin),
+                estado = 'agendada',
+                es_online = VALUES(es_online),
+                asistentes = VALUES(asistentes),
+                join_url = VALUES(join_url),
+                ultima_sync = NOW()
+        `, [
+            data.id, req.usuario.id, empresaIdVal, finalSubject,
+            fecha, hora, horaFin,
+            isPresencial ? 0 : 1,
+            asistentesJson,
+            data.onlineMeeting?.joinUrl || null
+        ]);
+
+        // Aprendizaje de dominios/contactos
+        if (empresa_id && destinatarios) {
+            const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+            const correos = destinatarios.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+            for (const email of correos) {
+                if (email.includes('@')) {
+                    const dom = '@' + email.split('@')[1];
+                    if (!dominiosGenericos.includes(dom.substring(1))) {
+                        await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                        const [existing] = await db.query("SELECT id FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
+                        if (existing.length === 0) {
+                            await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, NULL)", [empresa_id, email]);
                         }
                     }
                 }
             }
         }
-        
-        return res.status(200).json({ 
-            success: true, 
+
+        // Registrar en empresa_seguimiento_log si tiene empresa
+        if (empresa_id) {
+            await db.query(
+                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
+                [empresa_id, fecha, req.usuario.id, data.id, finalSubject]
+            );
+            await db.query(
+                "UPDATE empresas SET estado_seguimiento = 'agendada', fecha_concretada = ? WHERE id = ?",
+                [fecha, empresa_id]
+            );
+        }
+
+        return res.status(200).json({
+            success: true,
             message: isPresencial ? "Reunión agendada en tu calendario" : "Reunión agendada en Teams",
             joinUrl: data.onlineMeeting?.joinUrl || null,
             eventId: data.id
@@ -185,59 +217,9 @@ const crearReunionTeams = async (req, res) => {
     }
 };
 
-const obtenerEventosCalendario = async (req, res) => {
-    try {
-        const usuarioCorreo = req.usuario.correo;
-        const { start, end } = req.query;
-
-        if (!usuarioCorreo) {
-            return res.status(400).json({ error: "Usuario sin correo configurado." });
-        }
-        if (!start || !end) {
-            return res.status(400).json({ error: "Se requieren los parámetros start y end." });
-        }
-
-        const accessToken = await getGraphToken();
-        const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=1000`;
-
-        const response = await fetch(endpoint, {
-            method: "GET",
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Prefer": "outlook.timezone=\"UTC\""
-            }
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            if (response.status === 404 || response.status === 403) {
-                // If mailbox not found or no permissions, just return empty to not break the UI
-                return res.status(200).json({ events: [] });
-            }
-            throw new Error(`Graph API Error: ${errorText}`);
-        }
-
-        const data = await response.json();
-        
-        // Formatear para react-big-calendar
-        const events = data.value.map(item => ({
-            id: item.id,
-            title: item.subject,
-            start: item.start.dateTime + "Z",
-            end: item.end.dateTime + "Z",
-            isOnlineMeeting: item.isOnlineMeeting,
-            joinUrl: item.onlineMeeting?.joinUrl
-        }));
-
-        res.status(200).json({ events });
-
-    } catch (error) {
-        console.error("Error en obtenerEventosCalendario:", error);
-        // Si hay error (por ej. falta de permisos temporalmente), devolvemos array vacío para que el frontend no colapse.
-        res.status(200).json({ events: [] });
-    }
-};
-
+// ============================================================
+// DELETE/CANCEL — Anular reunión en Teams y marcar en teams_eventos
+// ============================================================
 const anularReunionTeams = async (req, res) => {
     try {
         const usuarioCorreo = req.usuario.correo;
@@ -260,28 +242,39 @@ const anularReunionTeams = async (req, res) => {
             throw new Error(`Graph API Error: ${errorText}`);
         }
 
+        // Marcar como cancelada en teams_eventos
+        await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventId]);
+
+        // También marcar la minuta relacionada como no_aplica (si hay una borrador)
+        const [teEvt] = await db.query("SELECT id FROM teams_eventos WHERE event_id = ?", [eventId]);
+        if (teEvt.length > 0) {
+            await db.query(
+                "UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'",
+                [teEvt[0].id]
+            );
+        }
+
+        // Determinar empresa_id desde teams_eventos si no vino en body
         let empId = empresa_id;
-        if (!empId) {
-            const [rows] = await db.query("SELECT empresa_id FROM empresa_seguimiento_log WHERE reunion_id = ? ORDER BY id DESC LIMIT 1", [eventId]);
-            if (rows.length > 0) empId = rows[0].empresa_id;
+        if (!empId && teEvt.length > 0) {
+            const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
+            if (teData.length > 0) empId = teData[0].empresa_id;
         }
 
         if (empId) {
-            const fechaVal = new Date().toISOString().split('T')[0];
-            await db.query("UPDATE empresas SET estado_seguimiento = ? WHERE id = ?", ['pendiente', empId]);
-            
-            // Buscar el asunto original para registrarlo en el log de cancelación
             const [prevLog] = await db.query(
                 "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
                 [eventId]
             );
             const asuntoOriginal = prevLog.length > 0 ? prevLog[0].asunto : null;
             const asuntoCancelacion = asuntoOriginal ? `Cancelada: ${asuntoOriginal}` : "Reunión cancelada en Teams";
+            const fechaVal = new Date().toISOString().split('T')[0];
 
             await db.query(
                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
                 [empId, fechaVal, req.usuario.id, eventId, asuntoCancelacion]
             );
+            await db.query("UPDATE empresas SET estado_seguimiento = 'pendiente' WHERE id = ?", [empId]);
         }
 
         return res.status(200).json({ success: true, message: "Reunión anulada." });
@@ -291,43 +284,57 @@ const anularReunionTeams = async (req, res) => {
     }
 };
 
-const resolveDisplayName = async (email, dbName = '') => {
-    if (!email) return '';
-    email = email.trim().toLowerCase();
-    
-    // 1. Try to find in usuarios
+// ============================================================
+// GET /agendamiento/calendario — Vista de calendario
+// ============================================================
+const obtenerEventosCalendario = async (req, res) => {
     try {
-        const [userRows] = await db.query("SELECT nombre FROM usuarios WHERE LOWER(correo) = ?", [email]);
-        if (userRows.length > 0 && userRows[0].nombre) {
-            return userRows[0].nombre;
-        }
-    } catch (e) {
-        console.error("Error al buscar en usuarios:", e);
-    }
-    
-    // 2. Try to find in empresa_contactos
-    try {
-        const [contactRows] = await db.query("SELECT nombre FROM empresa_contactos WHERE LOWER(correo) = ? AND nombre IS NOT NULL AND nombre != '' LIMIT 1", [email]);
-        if (contactRows.length > 0 && contactRows[0].nombre) {
-            return contactRows[0].nombre;
-        }
-    } catch (e) {
-        console.error("Error al buscar en contactos:", e);
-    }
+        const usuarioCorreo = req.usuario.correo;
+        const { start, end } = req.query;
 
-    // 3. Fallback: If we have a name passed from Microsoft Graph, use it if it's not an email
-    if (dbName && !dbName.includes('@')) {
-        return dbName;
-    }
+        if (!usuarioCorreo) return res.status(400).json({ error: "Usuario sin correo configurado." });
+        if (!start || !end) return res.status(400).json({ error: "Se requieren los parámetros start y end." });
 
-    // 4. Default fallback: format username nicely (e.g. john.doe -> John Doe)
-    const username = email.split('@')[0];
-    return username
-        .split(/[\._-]+/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
+        const accessToken = await getGraphToken();
+        const endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=1000`;
+
+        const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "Prefer": "outlook.timezone=\"UTC\""
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404 || response.status === 403) {
+                return res.status(200).json({ events: [] });
+            }
+            const errorText = await response.text();
+            throw new Error(`Graph API Error: ${errorText}`);
+        }
+
+        const data = await response.json();
+        const events = data.value.map(item => ({
+            id: item.id,
+            title: item.subject,
+            start: item.start.dateTime + "Z",
+            end: item.end.dateTime + "Z",
+            isOnlineMeeting: item.isOnlineMeeting,
+            joinUrl: item.onlineMeeting?.joinUrl
+        }));
+
+        res.status(200).json({ events });
+    } catch (error) {
+        console.error("Error en obtenerEventosCalendario:", error);
+        res.status(200).json({ events: [] });
+    }
 };
 
+// ============================================================
+// POST /agendamiento/sync-past — Sincronización con Microsoft Graph
+// Escribe en teams_eventos (nueva fuente de la verdad)
+// ============================================================
 const syncEventosPasados = async (req, res) => {
     try {
         const usuarioCorreo = req.usuario.correo;
@@ -338,8 +345,8 @@ const syncEventosPasados = async (req, res) => {
         }
 
         const now = new Date();
-        const start = new Date(now.getFullYear(), 0, 1).toISOString(); // 1 Enero
-        const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();   // 1 año futuro
+        const start = new Date(now.getFullYear(), 0, 1).toISOString();
+        const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();
 
         const accessToken = await getGraphToken();
 
@@ -371,17 +378,17 @@ const syncEventosPasados = async (req, res) => {
 
             if (!response.ok) {
                 if (response.status === 410) {
-                    // Token expirado o inválido, forzar sincronización completa próxima vez
+                    // Token expirado → forzar sync completo
                     await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
                 }
-                return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró", events: [] });
+                if (!res.headersSent) {
+                    return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró. Se intentará de nuevo.", procesados: 0 });
+                }
+                return;
             }
 
             const data = await response.json();
-            
-            if (data.value && data.value.length > 0) {
-                allRawEvents.push(...data.value);
-            }
+            if (data.value && data.value.length > 0) allRawEvents.push(...data.value);
 
             if (data['@odata.nextLink']) {
                 currentEndpoint = data['@odata.nextLink'];
@@ -399,119 +406,59 @@ const syncEventosPasados = async (req, res) => {
             await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
         }
 
-        const rawEvents = allRawEvents;
-        const currentEventMap = new Map();
-        rawEvents.forEach(e => currentEventMap.set(e.id, e));
-
-        const [reunionesDocs] = await db.query("SELECT id_reunion, event_id, ical_uid, fecha_reu, hora, motivo_reu, estado_envio, empresa_id, tipo_reu FROM reuniones");
-        const [huerfanasDocs] = await db.query("SELECT id, event_id, ical_uid, fecha, hora, asunto, estado FROM reuniones_huerfanas WHERE usuario_id = ?", [usuarioId]);
-        
-        const reunionesByEventId = new Map();
-        reunionesDocs.forEach(r => {
-            if (r.event_id) reunionesByEventId.set(r.event_id, r);
-            if (!r.event_id && r.ical_uid) reunionesByEventId.set(r.ical_uid, r);
-        });
-
-        const huerfanasByEventId = new Map();
-        huerfanasDocs.forEach(r => {
-            if (r.event_id) huerfanasByEventId.set(r.event_id, r);
-            if (!r.event_id && r.ical_uid) huerfanasByEventId.set(r.ical_uid, r);
-        });
-
+        // Cargar dominios conocidos para matching
         const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
-        
-        const formatDateStr = (val) => {
-            if (!val) return "";
-            if (typeof val === 'string') return val.split('T')[0];
-            return val.toISOString().split('T')[0];
-        };
 
-        const todayStr = formatDateStr(now);
+        const todayStr = now.toISOString().split('T')[0];
         let procesados = 0;
 
-        for (const event of rawEvents) {
-            const existingReunion = reunionesByEventId.get(event.id) || (event.iCalUId && reunionesByEventId.get(event.iCalUId));
-            const existingHuerfana = huerfanasByEventId.get(event.id) || (event.iCalUId && huerfanasByEventId.get(event.iCalUId));
-
-            if (event['@removed']) {
-                if (existingReunion && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado' && existingReunion.estado_envio !== 'borrador') {
-                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
-                    if (existingReunion.empresa_id) {
-                        await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
-                            [existingReunion.empresa_id, todayStr, usuarioId, event.id, "Eliminada desde Outlook (Delta)"]
-                        );
-                    }
-                    procesados++;
-                }
-                if (existingHuerfana && existingHuerfana.estado !== 'cancelada') {
-                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [existingHuerfana.id]);
-                    procesados++;
-                }
-                continue;
-            }
-
-            const fecha = event.start.dateTime.split('T')[0];
-            const hora = event.start.dateTime.split('T')[1].substring(0,5);
-            const isEventPast = new Date(event.end.dateTime + "Z") < now;
-            const isCancelled = event.isCancelled || false;
-
-            if (existingReunion) {
-                const fDb = formatDateStr(existingReunion.fecha_reu);
-                const hDb = existingReunion.hora ? existingReunion.hora.substring(0, 5) : "";
-                
-                if (isCancelled && existingReunion.estado_envio !== 'cancelada' && existingReunion.estado_envio !== 'enviado' && existingReunion.estado_envio !== 'borrador') {
-                    await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [existingReunion.id_reunion]);
-                    if (existingReunion.empresa_id) {
-                        await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
-                            [existingReunion.empresa_id, todayStr, usuarioId, event.id, "Cancelada desde Outlook"]
-                        );
-                    }
-                    procesados++;
-                } else if (!isCancelled && (fDb !== fecha || hDb !== hora)) {
-                    await db.query("UPDATE reuniones SET fecha_reu = ?, hora = ? WHERE id_reunion = ?", [fecha, hora, existingReunion.id_reunion]);
-                    if (existingReunion.empresa_id) {
-                        await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
-                            [existingReunion.empresa_id, fecha, usuarioId, event.id, "Reagendada desde Outlook"]
-                        );
-                    }
-                    procesados++;
-                }
-                
-                if (!isCancelled && isEventPast && existingReunion.estado_envio === 'agendada') {
-                    const nuevoEstado = existingReunion.tipo_reu === 'Reunión Interna Proforma' ? 'no_aplica' : 'borrador';
-                    await db.query("UPDATE reuniones SET estado_envio = ? WHERE id_reunion = ?", [nuevoEstado, existingReunion.id_reunion]);
-                    procesados++;
-                }
-                continue;
-            }
-
-            if (existingHuerfana) {
-                const fDb = formatDateStr(existingHuerfana.fecha);
-                const hDb = existingHuerfana.hora ? existingHuerfana.hora.substring(0, 5) : "";
-                
-                if (isCancelled && existingHuerfana.estado !== 'cancelada') {
-                    await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [existingHuerfana.id]);
-                    procesados++;
-                } else if (!isCancelled && (fDb !== fecha || hDb !== hora)) {
-                    await db.query("UPDATE reuniones_huerfanas SET fecha = ?, hora = ? WHERE id = ?", [fecha, hora, existingHuerfana.id]);
-                    procesados++;
-                }
-                continue;
-            }
-
-            if (isCancelled) continue;
-
-            const subjectLower = (event.subject || '').toLowerCase();
-            const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
-            const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
-            const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
-
-            if (!hasOnlineLink && !isPresencial) continue;
-
+        for (const event of allRawEvents) {
             try {
+                const eventKey = event.id;
+
+                // === EVENTO ELIMINADO (delta @removed) ===
+                if (event['@removed']) {
+                    await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventKey]);
+                    // Marcar minuta borrador relacionada como no_aplica
+                    const [te] = await db.query("SELECT id, empresa_id FROM teams_eventos WHERE event_id = ?", [eventKey]);
+                    if (te.length > 0) {
+                        await db.query("UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [te[0].id]);
+                        if (te[0].empresa_id) {
+                            await db.query(
+                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, 'Eliminada desde Outlook')",
+                                [te[0].empresa_id, todayStr, usuarioId, eventKey]
+                            );
+                        }
+                    }
+                    procesados++;
+                    continue;
+                }
+
+                const fecha = formatDate(event.start.dateTime);
+                const hora = formatTime(event.start.dateTime);
+                const horaFin = formatTime(event.end.dateTime);
+                const isEventPast = new Date(event.end.dateTime + "Z") < now;
+                const isCancelled = event.isCancelled || false;
+
+                if (isCancelled) {
+                    await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventKey]);
+                    const [te] = await db.query("SELECT id, empresa_id FROM teams_eventos WHERE event_id = ?", [eventKey]);
+                    if (te.length > 0) {
+                        await db.query("UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [te[0].id]);
+                    }
+                    continue;
+                }
+
+                // Determinar tipo de evento
+                const subjectLower = (event.subject || '').toLowerCase();
+                const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
+                const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
+                const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
+
+                // Solo procesar reuniones Teams (online o presencial marcado)
+                if (!hasOnlineLink && !isPresencial) continue;
+
+                // Resolver asistentes
                 const attendees = event.attendees || [];
                 const parsedAttendees = await Promise.all(attendees.map(async (a) => {
                     const email = (a.emailAddress.address || '').toLowerCase().trim();
@@ -520,46 +467,39 @@ const syncEventosPasados = async (req, res) => {
                     return { name, email };
                 }));
                 const filteredAttendees = parsedAttendees.filter(Boolean);
-
                 const emails = filteredAttendees.map(a => a.email);
-                const allInternal = emails.every(e => e.endsWith('@proforma.cl'));
-                const asstStr = JSON.stringify(filteredAttendees);
 
                 if (emails.length === 0) {
-                    await db.query(
-                        "INSERT INTO reuniones_huerfanas (usuario_id, event_id, asunto, fecha, hora, asistentes, estado, ical_uid) VALUES (?, ?, ?, ?, ?, ?, 'ignorado', ?)",
-                        [usuarioId, event.id, event.subject || 'Sin asunto', fecha, hora, asstStr, event.iCalUId || null]
-                    );
+                    // Sin asistentes → ignorar
+                    await upsertTeamsEvento({
+                        event, fecha, hora, horaFin, usuarioId,
+                        empresa_id: null, estado: 'ignorada',
+                        filteredAttendees, isPresencial, isEventPast
+                    });
                     continue;
                 }
 
+                const allInternal = emails.every(e => e.endsWith('@proforma.cl'));
+
+                // === REUNIÓN INTERNA PROFORMA ===
                 if (allInternal) {
-                    const id_reunion = await generarIdReunion();
-                    const names = filteredAttendees.map(a => a.name);
-                    const linkTeams = event.onlineMeeting?.joinUrl || '';
-                    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
-                    
                     const [empRows] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
                     const idProforma = empRows.length > 0 ? empRows[0].id : null;
 
-                    if (idProforma) {
-                        const estadoNuevo = isEventPast ? 'no_aplica' : 'agendada';
-                        await db.query(
-                            `INSERT IGNORE INTO reuniones (
-                                id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
-                                lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                            [
-                                id_reunion, usuarioId, idProforma, 
-                                'Reunión Interna Proforma', 
-                                fecha, hora, lugarStr,
-                                estadoNuevo, '[]', event.id, names.join(", "),
-                                event.subject || 'Sin asunto',
-                                event.subject || 'Sin asunto',
-                                event.iCalUId || null
-                            ]
+                    const estado = isEventPast ? 'pasada' : 'agendada';
+                    await upsertTeamsEvento({
+                        event, fecha, hora, horaFin, usuarioId,
+                        empresa_id: idProforma, estado,
+                        filteredAttendees, isPresencial, isEventPast
+                    });
+
+                    if (!isEventPast && idProforma) {
+                        // Registrar agendamiento
+                        const [existing] = await db.query(
+                            "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
+                            [event.id]
                         );
-                        if (estadoNuevo === 'agendada') {
+                        if (existing.length === 0) {
                             await db.query(
                                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
                                 [idProforma, fecha, usuarioId, event.id, event.subject || 'Reunión Interna']
@@ -570,9 +510,10 @@ const syncEventosPasados = async (req, res) => {
                     continue;
                 }
 
+                // === MATCHING POR DOMINIO ===
                 const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
                 const externalDomains = new Set();
-                
+
                 for (const email of emails) {
                     if (email.includes('@')) {
                         const dom = email.split('@')[1].toLowerCase();
@@ -589,90 +530,115 @@ const syncEventosPasados = async (req, res) => {
                     if (match) matchedEmpresaId = match.empresa_id;
                 }
 
-                if (matchedEmpresaId) {
-                    const id_reunion = await generarIdReunion();
-                    const names = filteredAttendees.map(a => a.name);
-                    const externalEmails = emails.filter(email => !email.endsWith('@proforma.cl'));
-                    const enviadoAStr = JSON.stringify(externalEmails);
+                // También intentar matching por correo exacto
+                if (!matchedEmpresaId) {
+                    for (const email of emails) {
+                        if (!email.endsWith('@proforma.cl')) {
+                            const [contactMatch] = await db.query(
+                                "SELECT empresa_id FROM empresa_contactos WHERE correo = ? LIMIT 1",
+                                [email]
+                            );
+                            if (contactMatch.length > 0) {
+                                matchedEmpresaId = contactMatch[0].empresa_id;
+                                break;
+                            }
+                        }
+                    }
+                }
 
-                    const linkTeams = event.onlineMeeting?.joinUrl || '';
-                    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
-                    const estadoNuevo = isEventPast ? 'borrador' : 'agendada';
+                const estado = isEventPast ? 'pasada' : 'agendada';
 
-                    await db.query(
-                        `INSERT IGNORE INTO reuniones (
-                            id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
-                            lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [
-                            id_reunion, usuarioId, matchedEmpresaId, 
-                            '', 
-                            fecha, hora, lugarStr,
-                            estadoNuevo, enviadoAStr, event.id, names.join(", "),
-                            event.subject || 'Sin asunto',
-                            event.subject || 'Sin asunto',
-                            event.iCalUId || null
-                        ]
+                await upsertTeamsEvento({
+                    event, fecha, hora, horaFin, usuarioId,
+                    empresa_id: matchedEmpresaId, estado,
+                    filteredAttendees, isPresencial, isEventPast
+                });
+
+                // Si tiene empresa y es agendada, registrar en log
+                if (matchedEmpresaId && !isEventPast) {
+                    const [existing] = await db.query(
+                        "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
+                        [event.id]
                     );
-
-                    if (estadoNuevo === 'agendada' || estadoNuevo === 'borrador') {
-                        const estadoLog = estadoNuevo === 'agendada' ? 'agendada' : 'gestionada';
-                        const fechaLog = estadoNuevo === 'agendada' ? fecha : todayStr;
+                    if (existing.length === 0) {
                         await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, ?, ?, ?, ?, ?)",
-                            [matchedEmpresaId, estadoLog, fechaLog, usuarioId, event.id, event.subject || 'Sin asunto']
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
+                            [matchedEmpresaId, fecha, usuarioId, event.id, event.subject || 'Sin asunto']
+                        );
+                        await db.query(
+                            "UPDATE empresas SET estado_seguimiento = 'agendada', fecha_concretada = ? WHERE id = ?",
+                            [fecha, matchedEmpresaId]
                         );
                     }
-
-                } else {
-                    await db.query(
-                        "INSERT INTO reuniones_huerfanas (usuario_id, event_id, asunto, fecha, hora, asistentes, estado, ical_uid) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)",
-                        [usuarioId, event.id, event.subject || 'Sin asunto', fecha, hora, asstStr, event.iCalUId || null]
-                    );
                 }
+
                 procesados++;
             } catch (eventError) {
-                console.error(`Error procesando evento individual ${event.id}:`, eventError);
+                console.error(`Error procesando evento ${event.id}:`, eventError);
             }
         }
 
-        if (!isDeltaRequest) {
-            for (const [eventId, r] of reunionesByEventId.entries()) {
-                if (!r.event_id) continue;
-                const fDb = r.fecha_reu ? formatDateStr(r.fecha_reu) : "";
-                if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
-                    if (!currentEventMap.has(eventId) && r.estado_envio !== 'cancelada' && r.estado_envio !== 'enviado') {
-                        await db.query("UPDATE reuniones SET estado_envio = 'cancelada' WHERE id_reunion = ?", [r.id_reunion]);
-                        if (r.empresa_id) {
-                            await db.query(
-                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
-                                [r.empresa_id, todayStr, usuarioId, eventId, "Eliminada desde Outlook"]
-                            );
-                        }
-                        procesados++;
-                    }
-                }
-            }
-
-            for (const [eventId, r] of huerfanasByEventId.entries()) {
-                if (!r.event_id) continue;
-                const fDb = r.fecha ? formatDateStr(r.fecha) : "";
-                if (fDb >= start.split('T')[0] && fDb <= end.split('T')[0]) {
-                    if (!currentEventMap.has(eventId) && r.estado !== 'cancelada') {
-                        await db.query("UPDATE reuniones_huerfanas SET estado = 'cancelada' WHERE id = ?", [r.id]);
-                        procesados++;
-                    }
-                }
-            }
+        if (!res.headersSent) {
+            res.status(200).json({ success: true, procesados });
         }
-
-        res.status(200).json({ success: true, procesados });
     } catch (error) {
         console.error("Error en syncEventosPasados:", error);
-        res.status(500).json({ error: "Error interno en sincronización." });
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Error interno en sincronización." });
+        }
     }
 };
 
+/**
+ * Función auxiliar: upsert en teams_eventos
+ * Crea o actualiza el registro de un evento de Teams
+ */
+const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empresa_id, estado, filteredAttendees, isPresencial, isEventPast }) => {
+    const asistentesJson = JSON.stringify(filteredAttendees);
+    const joinUrl = event.onlineMeeting?.joinUrl || null;
+    const es_online = isPresencial ? 0 : 1;
+
+    // Verificar si ya existe
+    const [existing] = await db.query("SELECT id, estado FROM teams_eventos WHERE event_id = ?", [event.id]);
+
+    if (existing.length > 0) {
+        // Ya existe → actualizar fecha/hora/estado si cambió
+        const existingEstado = existing[0].estado;
+        // No revertir una cancelación manual
+        const nuevoEstado = (existingEstado === 'cancelada') ? 'cancelada' : estado;
+
+        await db.query(`
+            UPDATE teams_eventos 
+            SET fecha = ?, hora = ?, hora_fin = ?, estado = ?, asistentes = ?, join_url = ?, ultima_sync = NOW(),
+                empresa_id = COALESCE(empresa_id, ?)
+            WHERE event_id = ?
+        `, [fecha, hora, horaFin, nuevoEstado, asistentesJson, empresa_id, empresa_id, event.id]);
+    } else {
+        // No existe → crear
+        await db.query(`
+            INSERT INTO teams_eventos
+                (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, es_online, asistentes, join_url, ultima_sync)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        `, [
+            event.id,
+            event.iCalUId || null,
+            usuarioId,
+            empresa_id,
+            event.subject || 'Sin asunto',
+            fecha,
+            hora,
+            horaFin,
+            estado,
+            es_online,
+            asistentesJson,
+            joinUrl
+        ]);
+    }
+};
+
+// ============================================================
+// GET /agendamiento/sync-status
+// ============================================================
 const getSyncStatus = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
@@ -684,262 +650,205 @@ const getSyncStatus = async (req, res) => {
     }
 };
 
-/**
- * Función auxiliar para procesar la creación de una reunión (borrador)
- * a partir de un registro de huerfana.
- */
-const crearBorradorDesdeHuerfana = async (huerfana, empresa_id) => {
-    const id_reunion = await generarIdReunion();
-
-    // Parse asistentes
-    let attendeesList = [];
+// ============================================================
+// GET /agendamiento/teams-eventos — Listar eventos de Teams del usuario
+// (para la vista de vinculación de empresa)
+// ============================================================
+const getTeamsEventos = async (req, res) => {
     try {
-        attendeesList = JSON.parse(huerfana.asistentes || '[]');
-    } catch(e) {}
+        const usuarioId = req.usuario.id;
+        const rol = req.usuario.permisos;
 
-    const names = [];
-    const externalEmails = [];
+        let whereExtra = "";
+        let params = [usuarioId];
 
-    for (const item of attendeesList) {
-        let email = "";
-        let originalName = "";
-
-        if (typeof item === 'string') {
-            email = item.trim();
-        } else if (item && typeof item === 'object') {
-            email = (item.email || '').trim();
-            originalName = (item.name || '').trim();
+        if (rol === 'ejecutiva') {
+            // Solo sus propios eventos
+            whereExtra = "AND te.usuario_id = ?";
+        } else if (rol === 'jefatura') {
+            whereExtra = `AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?))`;
+            params.push(usuarioId);
+        } else {
+            // admin, gerencia → todos
+            whereExtra = "AND 1=1";
+            params = [];
         }
 
-        if (email) {
-            const resolvedName = await resolveDisplayName(email, originalName);
-            names.push(resolvedName);
-            if (!email.toLowerCase().endsWith('@proforma.cl')) {
-                externalEmails.push(email);
-            }
-        }
-    }
+        const [rows] = await db.query(`
+            SELECT 
+                te.id, te.event_id, te.asunto, te.fecha, te.hora, te.hora_fin,
+                te.estado, te.es_online, te.asistentes, te.join_url, te.ultima_sync,
+                te.empresa_id,
+                emp.nombre AS empresa_nombre,
+                u.nombre AS usuario_nombre,
+                m.id AS minuta_id, m.id_minuta, m.estado_envio AS minuta_estado
+            FROM teams_eventos te
+            LEFT JOIN empresas emp ON te.empresa_id = emp.id
+            LEFT JOIN usuarios u ON te.usuario_id = u.id
+            LEFT JOIN minutas m ON m.teams_evento_id = te.id
+            WHERE te.estado NOT IN ('cancelada', 'ignorada')
+            ${whereExtra}
+            ORDER BY te.fecha DESC, te.hora DESC
+        `, params);
 
-    const participantesNames = names.join(", ");
-    const enviadoAStr = JSON.stringify(externalEmails);
-
-    const subjectLower = (huerfana.asunto || '').toLowerCase();
-    const isPresencial = subjectLower.includes('presencial');
-    const lugarStr = isPresencial ? 'Presencial' : 'Teams';
-
-    await db.query(
-        `INSERT IGNORE INTO reuniones (
-            id_reunion, ejecutiva_id, empresa_id, tipo_reu, fecha_reu, hora, 
-            lugar, estado_envio, enviado_a, event_id, participantes, motivo_reu, asunto_teams, ical_uid
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', ?, ?, ?, ?, ?, ?)`,
-        [
-            id_reunion, huerfana.usuario_id, empresa_id, 
-            '', 
-            huerfana.fecha, huerfana.hora, lugarStr,
-            enviadoAStr, huerfana.event_id,
-            participantesNames,
-            huerfana.asunto,
-            huerfana.asunto,
-            huerfana.ical_uid || null
-        ]
-    );
-
-    await db.query("UPDATE reuniones_huerfanas SET estado = 'vinculada' WHERE id = ?", [huerfana.id]);
-
-    if (empresa_id) {
-        await db.query(
-            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
-            [empresa_id, huerfana.fecha, huerfana.usuario_id, huerfana.event_id, huerfana.asunto || 'Sin asunto']
-        );
+        res.json(rows);
+    } catch (error) {
+        console.error("Error en getTeamsEventos:", error);
+        res.status(500).json({ error: "Error interno." });
     }
 };
 
-const vincularHuerfana = async (req, res) => {
+// ============================================================
+// POST /agendamiento/teams-eventos/:id/vincular — Vincular empresa a evento
+// ============================================================
+const vincularEmpresaAEvento = async (req, res) => {
     try {
-        const { id, empresa_id, dominios } = req.body;
-        const [rows] = await db.query("SELECT * FROM reuniones_huerfanas WHERE id = ?", [id]);
-        if (rows.length === 0) return res.status(404).json({ error: "No encontrada" });
-        const huerfanaPrincipal = rows[0];
+        const { id } = req.params;
+        const { empresa_id, dominios } = req.body;
 
-        let vinculadasExtras = 0;
+        if (!empresa_id) return res.status(400).json({ error: "empresa_id es requerido." });
 
-        if (empresa_id) {
-            // 1. Aprender dominios y contactos de la reunión seleccionada
-            let attendeesList = [];
-            try {
-                attendeesList = JSON.parse(huerfanaPrincipal.asistentes || '[]');
-            } catch(e) {}
+        // Obtener el evento
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
-            const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
-            
-            for (const item of attendeesList) {
-                let email = "";
-                let name = null;
+        const evento = rows[0];
 
-                if (typeof item === 'string') {
-                    email = item.trim().toLowerCase();
-                } else if (item && typeof item === 'object') {
-                    email = (item.email || '').trim().toLowerCase();
-                    name = (item.name || '').trim() || null;
+        // Actualizar empresa en teams_eventos
+        await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, id]);
+
+        // Aprender dominios y contactos
+        let attendeesList = [];
+        try { attendeesList = JSON.parse(evento.asistentes || '[]'); } catch (e) {}
+
+        const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+
+        for (const item of attendeesList) {
+            const email = (typeof item === 'string' ? item : item.email || '').trim().toLowerCase();
+            const name = typeof item === 'object' ? (item.name || null) : null;
+
+            if (email && email.includes('@')) {
+                const dom = '@' + email.split('@')[1];
+                if (!dominiosGenericos.includes(dom.substring(1))) {
+                    const shouldSaveDomain = !dominios || dominios.includes(dom);
+                    if (shouldSaveDomain) {
+                        await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                        const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
+                        if (existing.length === 0) {
+                            await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
+                        } else if (name && !existing[0].nombre) {
+                            await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                        }
+                    }
                 }
+            }
+        }
 
-                if (email && email.includes('@')) {
+        // Auto-vincular otros eventos pendientes (retro-match)
+        const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
+        const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
+        const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
+        const knownEmails = new Set(contactosDocs.map(c => c.correo));
+
+        const [sinEmpresa] = await db.query(
+            "SELECT * FROM teams_eventos WHERE empresa_id IS NULL AND estado NOT IN ('cancelada', 'ignorada') AND id != ?",
+            [id]
+        );
+
+        let autoVinculados = 0;
+        for (const evt of sinEmpresa) {
+            let evtAttendees = [];
+            try { evtAttendees = JSON.parse(evt.asistentes || '[]'); } catch (e) {}
+
+            const externalDomains = new Set();
+            let matched = false;
+
+            for (const item of evtAttendees) {
+                const email = (typeof item === 'string' ? item : item.email || '').trim().toLowerCase();
+                if (!email) continue;
+                if (knownEmails.has(email)) { matched = true; break; }
+                if (email.includes('@')) {
                     const dom = '@' + email.split('@')[1];
                     if (!dominiosGenericos.includes(dom.substring(1))) {
-                        const shouldSaveDomain = dominios === undefined || dominios.includes(dom);
-                        if (shouldSaveDomain) {
-                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
-                            
-                            const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                            if (existing.length === 0) {
-                                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
-                            } else if (name && !existing[0].nombre) {
-                                await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
-                            }
-                        }
+                        externalDomains.add(dom);
+                        if (knownDomains.has(dom)) matched = true;
                     }
                 }
             }
 
-            // 3. Auto-Vincular otras huérfanas pendientes (Retro-match)
-            const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
-            const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
-            
-            const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
-            const knownEmails = new Set(contactosDocs.map(c => c.correo));
-
-            // Buscar todas las huérfanas pendientes restantes (excluyendo la que estamos vinculando)
-            const [pendientes] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente' AND id != ?", [id]);
-
-            for (const h of pendientes) {
-                let hAttendees = [];
-                try { hAttendees = JSON.parse(h.asistentes || '[]'); } catch(e) {}
-                
-                const externalDomains = new Set();
-                let matchedByEmail = false;
-                let matchedByDomain = false;
-
-                for (const item of hAttendees) {
-                    let email = "";
-                    if (typeof item === 'string') email = item.trim().toLowerCase();
-                    else if (item && typeof item === 'object') email = (item.email || '').trim().toLowerCase();
-
-                    if (email) {
-                        if (knownEmails.has(email)) {
-                            matchedByEmail = true;
-                        }
-                        if (email.includes('@')) {
-                            const dom = email.split('@')[1];
-                            const domWithAt = '@' + dom;
-                            if (!dominiosGenericos.includes(dom)) {
-                                externalDomains.add(domWithAt);
-                                if (knownDomains.has(domWithAt)) {
-                                    matchedByDomain = true;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Vinculamos solo si:
-                // 1. Hay un match explícito por correo o por dominio
-                // 2. Y la reunión tiene MÁXIMO UN dominio corporativo externo (si hay más de 1, requiere revisión manual)
-                if ((matchedByEmail || matchedByDomain) && externalDomains.size <= 1) {
-                    await crearBorradorDesdeHuerfana(h, empresa_id);
-                    vinculadasExtras++;
-                }
+            if (matched && externalDomains.size <= 1) {
+                await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, evt.id]);
+                autoVinculados++;
             }
         }
 
-        // 2. Vincular la reunión principal
-        await crearBorradorDesdeHuerfana(huerfanaPrincipal, empresa_id || null);
-
-        let msj = "Reunión vinculada exitosamente.";
-        if (empresa_id && vinculadasExtras > 0) {
-            msj += ` Adicionalmente se auto-vincularon ${vinculadasExtras} reuniones relacionadas.`;
+        // Registrar en empresa_seguimiento_log
+        const [existingLog] = await db.query(
+            "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
+            [evento.event_id]
+        );
+        if (existingLog.length === 0) {
+            await db.query(
+                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
+                [empresa_id, evento.fecha, req.usuario.id, evento.event_id, evento.asunto]
+            );
         }
 
-        res.json({ success: true, message: msj });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Error al vincular." });
+        let message = "Evento vinculado exitosamente.";
+        if (autoVinculados > 0) message += ` Se auto-vincularon ${autoVinculados} eventos adicionales.`;
+
+        res.json({ success: true, message });
+    } catch (error) {
+        console.error("Error en vincularEmpresaAEvento:", error);
+        res.status(500).json({ error: "Error interno." });
     }
 };
 
-const descartarHuerfana = async (req, res) => {
+// ============================================================
+// POST /agendamiento/teams-eventos/:id/desvincular — Quitar empresa de un evento
+// ============================================================
+const desvincularEmpresaDeEvento = async (req, res) => {
     try {
-        const { id } = req.body;
-        await db.query("UPDATE reuniones_huerfanas SET estado = 'ignorado' WHERE id = ?", [id]);
-        res.json({ success: true });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Error al descartar." });
-    }
-};
+        const { id } = req.params;
+        const { dominios } = req.body;
 
-const getHuerfanas = async (req, res) => {
-    try {
-        const [rows] = await db.query("SELECT * FROM reuniones_huerfanas WHERE estado = 'pendiente' AND usuario_id = ?", [req.usuario.id]);
-        res.json(rows);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Error al obtener huérfanas." });
-    }
-};
+        const [rows] = await db.query("SELECT empresa_id FROM teams_eventos WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
-const desvincularBorrador = async (req, res) => {
-    try {
-        const { id_reunion, dominio, dominios } = req.body;
-        
-        // 1. Get the draft event_id
-        const [reuniones] = await db.query("SELECT event_id, estado_envio, empresa_id FROM reuniones WHERE id_reunion = ?", [id_reunion]);
-        if (reuniones.length === 0) {
-            return res.status(404).json({ error: "Reunión no encontrada." });
-        }
+        const empresa_id = rows[0].empresa_id;
 
-        const { event_id, estado_envio, empresa_id } = reuniones[0];
-
-        if (estado_envio !== 'borrador') {
-            return res.status(400).json({ error: "Solo se pueden desvincular reuniones en borrador." });
-        }
-
-        const targetDominios = Array.isArray(dominios)
-            ? dominios
-            : (dominio ? [dominio] : []);
-
-        if (targetDominios.length > 0 && empresa_id) {
-            for (const dom of targetDominios) {
-                // Delete domain mapping if it was saved by mistake so it doesn't auto-link in the future
+        // Eliminar dominios si se indicaron
+        if (dominios && Array.isArray(dominios) && empresa_id) {
+            for (const dom of dominios) {
                 await db.query("DELETE FROM empresa_dominios WHERE empresa_id = ? AND dominio = ?", [empresa_id, dom]);
             }
         }
 
-        // Revert the orphan meeting back to pendiente
-        if (event_id) {
-            await db.query("UPDATE reuniones_huerfanas SET estado = 'pendiente' WHERE event_id = ?", [event_id]);
-        }
+        // Si hay una minuta borrador vinculada, eliminarla
+        await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [id]);
 
-        // Delete the draft from reuniones (only the selected one)
-        await db.query("DELETE FROM reuniones WHERE id_reunion = ?", [id_reunion]);
+        // Quitar empresa del evento
+        await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [id]);
 
-        res.json({ success: true, message: "Reunión desvinculada." });
-    } catch (e) {
-        console.error("Error al desvincular borrador:", e);
-        res.status(500).json({ error: "Error interno al desvincular borrador." });
+        res.json({ success: true, message: "Empresa desvinculada del evento." });
+    } catch (error) {
+        console.error("Error en desvincularEmpresaDeEvento:", error);
+        res.status(500).json({ error: "Error interno." });
     }
 };
 
+// ============================================================
+// GET /agendamiento/debug (mantener para compatibilidad)
+// ============================================================
 const debugProforma = async (req, res) => {
     try {
         const [emp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
         const [users] = await db.query("SELECT id, correo, sync_delta_token, ultima_sincronizacion FROM usuarios LIMIT 5");
-        const [reus] = await db.query("SELECT id_reunion, ejecutiva_id, tipo_reu, fecha_reu, estado_envio FROM reuniones WHERE empresa_id = ? OR estado_envio = 'agendada' ORDER BY id DESC LIMIT 50", [emp.length > 0 ? emp[0].id : null]);
-        const [agendadas] = await db.query("SELECT id, reunion_id, estado, fecha FROM empresa_seguimiento_log WHERE estado = 'agendada' ORDER BY id DESC LIMIT 20");
+        const [teEvts] = await db.query("SELECT id, event_id, asunto, fecha, hora, estado, empresa_id FROM teams_eventos ORDER BY fecha DESC LIMIT 30");
         res.json({
             proforma_interna: emp,
-            users: users,
-            reuniones_agendadas_y_proforma: reus,
-            logs_agendadas: agendadas
+            users,
+            teams_eventos: teEvts
         });
     } catch (e) {
         res.json({ error: e.message });
@@ -952,9 +861,8 @@ module.exports = {
     anularReunionTeams,
     syncEventosPasados,
     getSyncStatus,
-    vincularHuerfana,
-    descartarHuerfana,
-    getHuerfanas,
-    desvincularBorrador,
+    getTeamsEventos,
+    vincularEmpresaAEvento,
+    desvincularEmpresaDeEvento,
     debugProforma
 };

@@ -345,7 +345,7 @@ const syncEventosPasados = async (req, res) => {
         }
 
         const now = new Date();
-        const start = new Date(now.getFullYear(), 0, 1).toISOString();
+        const start = "2026-01-01T00:00:00.000Z";
         const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();
 
         const accessToken = await getGraphToken();
@@ -439,6 +439,11 @@ const syncEventosPasados = async (req, res) => {
                 const horaFin = formatTime(event.end.dateTime);
                 const isEventPast = new Date(event.end.dateTime + "Z") < now;
                 const isCancelled = event.isCancelled || false;
+
+                // Forzar límite: ignorar cualquier evento antes del 1 de enero de 2026
+                if (new Date(event.start.dateTime) < new Date("2026-01-01T00:00:00Z")) {
+                    continue;
+                }
 
                 if (isCancelled) {
                     await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventKey]);

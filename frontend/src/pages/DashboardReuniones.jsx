@@ -1215,23 +1215,7 @@ export default function DashboardReuniones() {
               
               {/* Opciones de filtro de pestaña integradas al lado del título */}
               <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '6px' }}>
-                <button
-                  onClick={() => { setActiveTab('todas'); setCurrentPage(1); }}
-                  style={{
-                    padding: '4px 10px',
-                    background: activeTab === 'todas' ? 'white' : 'transparent',
-                    color: activeTab === 'todas' ? '#334155' : '#64748b',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontWeight: activeTab === 'todas' ? 'bold' : '600',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    boxShadow: activeTab === 'todas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Todas
-                </button>
+
                 <button
                   onClick={() => { setActiveTab('clientes'); setCurrentPage(1); }}
                   style={{
@@ -1283,23 +1267,7 @@ export default function DashboardReuniones() {
                 >
                   📅 Próximas
                 </button>
-                <button
-                  onClick={() => { setActiveTab('excluidas'); setCurrentPage(1); }}
-                  style={{
-                    padding: '4px 10px',
-                    background: activeTab === 'excluidas' ? '#ef4444' : 'transparent',
-                    color: activeTab === 'excluidas' ? 'white' : '#64748b',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontWeight: activeTab === 'excluidas' ? 'bold' : '600',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    boxShadow: activeTab === 'excluidas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  🚫 Excluidas
-                </button>
+
               </div>
             </div>
             <button
@@ -1421,12 +1389,12 @@ export default function DashboardReuniones() {
                                 ⏳ Esperando Empresa
                               </div>
                               <span
-                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, true, false); }}
+                                onClick={(e) => { e.stopPropagation(); navigate("/agendamiento/vincular"); }}
                                 style={{
-                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
+                                  fontSize: "10px", color: "#1e40af", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
                                 }}
-                              >🚫 No aplica</span>
+                              >🔗 Vincular Empresa</span>
                             </div>
                           ) : (r.estado_envio === "no_aplica" || (r._isProforma && r.estado_envio !== "enviado" && r.estado_envio !== "borrador" && r.estado_envio !== "agendada")) ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
@@ -1465,18 +1433,35 @@ export default function DashboardReuniones() {
                             </div>
 
                           ) : r.estado_envio === "borrador" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
-                              <div
-                                onClick={() => navigate("/home", { state: { draft: r } })}
-                                style={{
-                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                  background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
-                              >
-                                ✍️ Pendiente de Minuta
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <div
+                                  onClick={() => navigate("/home", { state: { draft: r } })}
+                                  style={{
+                                    color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                    background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
+                                    display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
+                                  title="Redactar Minuta"
+                                >
+                                  ✍️ Pendiente de Minuta
+                                </div>
+                                <div
+                                  onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
+                                  style={{
+                                    color: "white", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                    background: "#ef4444", padding: "4px 8px", borderRadius: "4px",
+                                    display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s",
+                                    height: "100%", boxSizing: "border-box"
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#dc2626")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#ef4444")}
+                                  title="No aplica"
+                                >
+                                  ✖
+                                </div>
                               </div>
                               <div style={{ display: "flex", gap: "6px" }}>
                                 {r.event_id && (
@@ -1488,13 +1473,6 @@ export default function DashboardReuniones() {
                                     }}
                                   >🔗 Desvincular</span>
                                 )}
-                                <span
-                                  onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
-                                  style={{
-                                    fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
-                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
-                                  }}
-                                >🚫 No aplica</span>
                               </div>
                             </div>
                           ) : r.estado_envio === "agendada" ? (

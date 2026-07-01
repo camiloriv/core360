@@ -93,13 +93,13 @@ exports.listarReuniones = async (req, res) => {
                 WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
                 WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
                 WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
-                WHEN te.estado = 'pasada' AND te.empresa_id IS NULL THEN 'huerfana'
+                WHEN te.empresa_id IS NULL                          THEN 'huerfana'
                 WHEN te.estado = 'pasada'                           THEN 'programado'
                 ELSE te.estado
             END                             AS estado_envio,
 
             -- ¿Es huérfana? (Para el frontend legacy)
-            (te.estado = 'pasada' AND te.empresa_id IS NULL) AS is_huerfana,
+            (te.empresa_id IS NULL) AS is_huerfana,
 
             -- ¿Tiene minuta?
             (m.id IS NOT NULL)              AS tiene_minuta,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useDashboardData } from "../hooks/useDashboardData";
+import { useDashboardData, clearDashboardCache } from "../hooks/useDashboardData";
 import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, descartarHuerfana } from "../services/agendamientoService";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
@@ -47,6 +47,7 @@ export default function VincularReuniones() {
       
       try {
         await syncEventosPasados();
+        clearDashboardCache();
         Swal.fire("Sincronizado", "Tu calendario ha sido sincronizado con éxito", "success");
         await fetchSyncStatus();
       } catch (e) {
@@ -82,6 +83,7 @@ export default function VincularReuniones() {
       });
       
       const result = await vincularHuerfana(idHuerfana, empresaId);
+      clearDashboardCache();
       
       Swal.fire({
         title: "Vinculada",
@@ -97,6 +99,7 @@ export default function VincularReuniones() {
   const handleDescartar = async (idHuerfana) => {
     try {
       await descartarHuerfana(idHuerfana);
+      clearDashboardCache();
       Swal.fire({
         title: "Descartada",
         text: "La reunión ha sido ignorada.",

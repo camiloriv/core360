@@ -176,17 +176,21 @@ export default function DashboardReuniones() {
   }, []);
 
   const externalAttendees = useMemo(() => {
-    if (!selectedOrphan || !selectedOrphan.participantes) return [];
+    if (!selectedOrphan) return [];
+    
+    const participantsData = selectedOrphan.participantes || selectedOrphan.asistentes;
+    if (!participantsData) return [];
+
     try {
-      const parsed = JSON.parse(selectedOrphan.participantes);
+      const parsed = typeof participantsData === "string" ? JSON.parse(participantsData) : participantsData;
       if (Array.isArray(parsed)) {
-        return parsed.filter(p => p && p.email && !p.email.toLowerCase().endsWith("@proforma.cl"));
+        return parsed.filter(p => p && (p.email || p.name));
       }
     } catch (e) {
-      return selectedOrphan.participantes
+      return String(participantsData)
         .split(",")
         .map(name => ({ name: name.trim(), email: "" }))
-        .filter(p => p.name && !p.name.toLowerCase().includes("@proforma.cl"));
+        .filter(p => p.name);
     }
     return [];
   }, [selectedOrphan]);
@@ -438,10 +442,7 @@ export default function DashboardReuniones() {
 
       const isFuture = meetingDate >= today;
 
-      // Excluidas Check
-      if (activeTab === "excluidas" && r.estado_envio !== "no_aplica") return false;
-      if (activeTab !== "excluidas" && r.estado_envio === "no_aplica") return false;
-
+      // (Excluidas filtering removed so no_aplica stays visible)
       // Tab filters logic
       if (activeTab === "internas") {
         if (!isProforma) return false;
@@ -535,8 +536,11 @@ export default function DashboardReuniones() {
   ]);
 
   const huerfanasCount = useMemo(() => {
-    return reuniones.filter(r => r.is_huerfana).length;
-  }, [reuniones]);
+    return reuniones.filter(r => {
+      const isOwn = userRol !== 'ejecutiva' || r.ejecutiva_id === user?.id;
+      return r.is_huerfana && r.estado_envio !== "no_aplica" && r.estado_envio !== "cancelada" && isOwn;
+    }).length;
+  }, [reuniones, userRol, user]);
 
   // Reiniciar página a 1 cuando cambien los filtros
   const isFirstRender = React.useRef(true);
@@ -1299,7 +1303,7 @@ export default function DashboardReuniones() {
                   <th style={styles.thCell}>FECHA / ID</th>
                   <th style={styles.thCell}>EMPRESA</th>
                   <th style={styles.thCell}>TIPO / MOTIVO</th>
-                  <th style={styles.thCell}>MINUTA</th>
+                  <th style={{...styles.thCell, textAlign: "center"}}>MINUTA</th>
                   <th style={styles.thCell}>FECHA DE ENVÍO</th>
                   <th style={styles.thCell}>ADJUNTOS</th>
                 </tr>
@@ -1344,7 +1348,21 @@ export default function DashboardReuniones() {
                             🔗 Vincular Empresa
                           </div>
                         ) : (
-                          <div style={styles.companyName}>{r.empresa_nombre}</div>
+                          <div 
+                            style={{...styles.companyName, cursor: "pointer", textDecoration: "underline"}}
+                            title="Modificar/Desvincular Empresa"
+                            onClick={() => {
+                              setSelectedOrphanId(r.id_reunion);
+                              setSelectedOrphan(r);
+                              setSearchEmpresa("");
+                              setSelectedEmpresaId(r.empresa_id ? String(r.empresa_id) : "");
+                              setShowEmpresaDropdown(false);
+                              setNoAplicaEmpresa(false);
+                              setIsAssignModalOpen(true);
+                            }}
+                          >
+                            {r.empresa_nombre}
+                          </div>
                         )}
                       </td>
                       <td style={styles.tdCell}>
@@ -1385,51 +1403,20 @@ export default function DashboardReuniones() {
                           </div>
                         )}
                       </td>
-                      <td style={styles.tdCell}>
-                        <div style={{ position: "relative" }} onMouseLeave={() => setOpenDropdownId(null)}>
+                      <td style={{...styles.tdCell, textAlign: "center"}}>
+                        <div style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }} onMouseLeave={() => setOpenDropdownId(null)}>
                           {r.estado_envio === "huerfana" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
-                              <div style={{
-                                color: "#991b1b", fontWeight: "bold", fontSize: "12px",
-                                background: "#fee2e2", padding: "4px 8px", borderRadius: "4px",
-                                display: "inline-block", whiteSpace: "nowrap"
-                              }}>
-                                ⏳ Esperando Empresa
-                              </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
+                              <span style={{ color: "var(--text-muted)" }}>-</span>
                             </div>
                           ) : (r.estado_envio === "no_aplica" || (r._isProforma && r.estado_envio !== "enviado" && r.estado_envio !== "borrador" && r.estado_envio !== "agendada")) ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <div style={{
                                 color: "#475569", fontWeight: "bold", fontSize: "12px",
                                 background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
                                 display: "inline-block", whiteSpace: "nowrap"
                               }}>
                                 🚫 No aplica
-                              </div>
-                              <div style={{ display: "flex", gap: "6px" }}>
-                                <span
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    if (r.estado_envio === "no_aplica") {
-                                      handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true);
-                                    } else {
-                                      // If it was implicitly no_aplica, clicking revert might mean we want to change it to borrador
-                                      // Actually, the user can just upload a minuta or we leave it as explicitly no aplica if they click No aplica
-                                      handleMarcarNoAplica(r.id_reunion, Boolean(r.is_huerfana), true);
-                                    }
-                                  }}
-                                  style={{
-                                    fontSize: "10px", color: "#2563eb", cursor: "pointer", textDecoration: "underline",
-                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
-                                  }}
-                                >↩️ Revertir</span>
-                                <span
-                                  onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
-                                  style={{
-                                    fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
-                                    fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
-                                  }}
-                                >👥 Ver participantes</span>
                               </div>
                             </div>
 
@@ -1464,20 +1451,9 @@ export default function DashboardReuniones() {
                                   ✖
                                 </div>
                               </div>
-                              <div style={{ display: "flex", gap: "6px" }}>
-                                {r.event_id && (
-                                  <span
-                                    onClick={(e) => { e.stopPropagation(); handleDesvincular(r); }}
-                                    style={{
-                                      fontSize: "10px", color: "#be123c", cursor: "pointer", textDecoration: "underline",
-                                      fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#ffe4e6"
-                                    }}
-                                  >🔗 Desvincular</span>
-                                )}
-                              </div>
                             </div>
                           ) : r.estado_envio === "agendada" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <div
                                 onClick={() => navigate("/home", { state: { draft: r } })}
                                 style={{
@@ -1499,7 +1475,7 @@ export default function DashboardReuniones() {
                               >🚫 No aplica</span>
                             </div>
                           ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <div
                                 onClick={() => handleVerMinuta(r)}
                                 style={{
@@ -1803,11 +1779,11 @@ export default function DashboardReuniones() {
                   <strong>Reunión:</strong> {selectedOrphan.asunto_teams || selectedOrphan.motivo_reu || 'Sin asunto'}
                 </div>
                 <div style={{ marginBottom: "8px" }}>
-                  <strong>Fecha:</strong> {new Date(selectedOrphan.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })} {selectedOrphan.hora}
+                  <strong>Fecha:</strong> {new Date(selectedOrphan.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })} {selectedOrphan.hora ? selectedOrphan.hora.substring(0, 5) : ''}
                 </div>
                 {externalAttendees.length > 0 ? (
                   <div>
-                    <strong>Participantes Externos:</strong>
+                    <strong>Participantes:</strong>
                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "16px", maxHeight: "100px", overflowY: "auto", listStyleType: "disc" }}>
                       {externalAttendees.map((p, idx) => (
                         <li key={idx} style={{ fontSize: "12px", marginBottom: "2px" }}>
@@ -1818,7 +1794,7 @@ export default function DashboardReuniones() {
                   </div>
                 ) : (
                   <div>
-                    <strong>Participantes Externos:</strong> Ninguno detectado
+                    <strong>Participantes:</strong> Ninguno detectado
                   </div>
                 )}
               </div>
@@ -1938,6 +1914,20 @@ export default function DashboardReuniones() {
             </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", flexShrink: 0, marginTop: "16px" }}>
+              {selectedOrphan?.empresa_id && (
+                <button
+                  className="core360-btn"
+                  style={{ background: "#fee2e2", color: "#b91c1c", border: "1px solid #fecaca", padding: "8px 16px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginRight: "auto" }}
+                  onClick={() => {
+                    setIsAssignModalOpen(false);
+                    handleDesvincular(selectedOrphan);
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fecaca")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fee2e2")}
+                >
+                  Desvincular
+                </button>
+              )}
               <button
                 className="core360-btn secondary"
                 onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); setNoAplicaEmpresa(false); }}

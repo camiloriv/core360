@@ -31,7 +31,7 @@ const buildRoleWhereClause = (usuario_id, rol) => {
     } else if (rol === 'ejecutiva') {
         whereClause += ` AND (
             te.usuario_id = ?
-            OR te.usuario_id = (SELECT COALESCE(jefatura_id, 0) FROM usuarios WHERE id = ?)
+            OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?)
         )`;
         params.push(usuario_id, usuario_id);
     }
@@ -90,6 +90,7 @@ exports.listarReuniones = async (req, res) => {
             -- Estado consolidado para el dashboard
             CASE
                 WHEN te.estado = 'cancelada'                        THEN 'cancelada'
+                WHEN te.estado = 'ignorada'                         THEN 'no_aplica'
                 WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
                 WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
                 WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
@@ -114,7 +115,6 @@ exports.listarReuniones = async (req, res) => {
         LEFT JOIN minutas m ON m.teams_evento_id = te.id
 
         ${whereClause}
-        AND te.estado NOT IN ('ignorada')
 
         ORDER BY te.fecha DESC, te.hora DESC
     `;
@@ -574,6 +574,17 @@ exports.marcarNoAplica = async (req, res) => {
         if (minutaRows.length > 0) {
             const nuevoEstado = noAplica ? 'no_aplica' : 'borrador';
             await db.query("UPDATE minutas SET estado_envio = ? WHERE id_minuta = ?", [nuevoEstado, id]);
+
+            if (noAplica && minutaRows[0].teams_evento_id) {
+                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, asunto FROM teams_eventos WHERE id = ?", [minutaRows[0].teams_evento_id]);
+                if (teRows.length > 0 && teRows[0].empresa_id) {
+                    await db.query(
+                        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
+                        [teRows[0].empresa_id, teRows[0].fecha, req.usuario.id, teRows[0].event_id, teRows[0].asunto || 'Reunión No Aplica']
+                    );
+                }
+            }
+
             return res.json({ success: true, message: "Estado de minuta actualizado" });
         }
 
@@ -582,6 +593,17 @@ exports.marcarNoAplica = async (req, res) => {
         if (!isNaN(teId)) {
             const nuevoEstado = noAplica ? 'ignorada' : 'pasada';
             await db.query("UPDATE teams_eventos SET estado = ? WHERE id = ?", [nuevoEstado, teId]);
+
+            if (noAplica) {
+                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, asunto FROM teams_eventos WHERE id = ?", [teId]);
+                if (teRows.length > 0 && teRows[0].empresa_id) {
+                    await db.query(
+                        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
+                        [teRows[0].empresa_id, teRows[0].fecha, req.usuario.id, teRows[0].event_id, teRows[0].asunto || 'Reunión No Aplica']
+                    );
+                }
+            }
+
             return res.json({ success: true, message: "Estado del evento actualizado" });
         }
 

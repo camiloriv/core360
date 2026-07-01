@@ -583,12 +583,46 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
         // No revertir una cancelación manual
         const nuevoEstado = (existingEstado === 'cancelada') ? 'cancelada' : estado;
 
+        // Detectar reagendamiento: si la fecha cambió y tiene empresa
+        const [prevData] = await db.query("SELECT fecha, empresa_id, asunto FROM teams_eventos WHERE event_id = ?", [event.id]);
+        if (prevData.length > 0 && prevData[0].fecha) {
+            const oldFecha = new Date(prevData[0].fecha).toISOString().split('T')[0];
+            const newFecha = fecha;
+            if (oldFecha !== newFecha && prevData[0].empresa_id) {
+                await db.query(
+                    "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
+                    [prevData[0].empresa_id, newFecha, usuarioId, event.id, `Reagendada: ${prevData[0].asunto || 'Sin asunto'} (antes: ${oldFecha})`]
+                );
+            }
+        }
+
         await db.query(`
             UPDATE teams_eventos 
             SET fecha = ?, hora = ?, hora_fin = ?, estado = ?, asistentes = ?, join_url = ?, ultima_sync = NOW(),
                 empresa_id = COALESCE(empresa_id, ?)
             WHERE event_id = ?
         `, [fecha, hora, horaFin, nuevoEstado, asistentesJson, empresa_id, empresa_id, event.id]);
+
+        // Detectar reunión concretada: pasó de agendada a pasada
+        if (existingEstado === 'agendada' && nuevoEstado === 'pasada') {
+            const resolvedEmpresaId = prevData?.[0]?.empresa_id || empresa_id;
+            if (resolvedEmpresaId) {
+                const [existingConcretada] = await db.query(
+                    "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'concretada'",
+                    [event.id]
+                );
+                if (existingConcretada.length === 0) {
+                    await db.query(
+                        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'concretada', ?, ?, ?, ?)",
+                        [resolvedEmpresaId, fecha, usuarioId, event.id, prevData?.[0]?.asunto || event.subject || 'Reunión concretada']
+                    );
+                    await db.query(
+                        "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
+                        [fecha, resolvedEmpresaId]
+                    );
+                }
+            }
+        }
     } else {
         // No existe → crear
         await db.query(`
@@ -639,8 +673,9 @@ const getTeamsEventos = async (req, res) => {
         let params = [usuarioId];
 
         if (rol === 'ejecutiva') {
-            // Solo sus propios eventos
-            whereExtra = "AND te.usuario_id = ?";
+            // Solo sus propios eventos o donde es invitado
+            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?))";
+            params.push(usuarioId);
         } else if (rol === 'jefatura') {
             whereExtra = `AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?))`;
             params.push(usuarioId);

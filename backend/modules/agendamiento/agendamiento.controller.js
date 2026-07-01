@@ -479,36 +479,7 @@ const syncEventosPasados = async (req, res) => {
                     continue;
                 }
 
-                const allInternal = emails.every(e => e.endsWith('@proforma.cl'));
 
-                // === REUNIÓN INTERNA PROFORMA ===
-                if (allInternal) {
-                    const [empRows] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
-                    const idProforma = empRows.length > 0 ? empRows[0].id : null;
-
-                    const estado = isEventPast ? 'pasada' : 'agendada';
-                    await upsertTeamsEvento({
-                        event, fecha, hora, horaFin, usuarioId,
-                        empresa_id: idProforma, estado,
-                        filteredAttendees, isPresencial, isEventPast
-                    });
-
-                    if (!isEventPast && idProforma) {
-                        // Registrar agendamiento
-                        const [existing] = await db.query(
-                            "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
-                            [event.id]
-                        );
-                        if (existing.length === 0) {
-                            await db.query(
-                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
-                                [idProforma, fecha, usuarioId, event.id, event.subject || 'Reunión Interna']
-                            );
-                        }
-                    }
-                    procesados++;
-                    continue;
-                }
 
                 // === MATCHING POR DOMINIO ===
                 const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];

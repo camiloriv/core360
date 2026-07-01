@@ -68,7 +68,7 @@ exports.listarReuniones = async (req, res) => {
 
             -- Datos de la minuta (NULL si no tiene)
             m.id                            AS minuta_row_id,
-            m.id_minuta,
+            COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
             m.tipo_reu,
             m.enviado_a,
             m.enviado_por,
@@ -93,10 +93,13 @@ exports.listarReuniones = async (req, res) => {
                 WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
                 WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
                 WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
-                WHEN te.estado = 'pasada' AND te.empresa_id IS NULL THEN 'sin_empresa'
-                WHEN te.estado = 'pasada'                           THEN 'pendiente_minuta'
+                WHEN te.estado = 'pasada' AND te.empresa_id IS NULL THEN 'huerfana'
+                WHEN te.estado = 'pasada'                           THEN 'programado'
                 ELSE te.estado
-            END                             AS estado_display,
+            END                             AS estado_envio,
+
+            -- ¿Es huérfana? (Para el frontend legacy)
+            (te.estado = 'pasada' AND te.empresa_id IS NULL) AS is_huerfana,
 
             -- ¿Tiene minuta?
             (m.id IS NOT NULL)              AS tiene_minuta,

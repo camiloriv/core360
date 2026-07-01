@@ -16,7 +16,9 @@ export default function VincularReuniones() {
   const fetchHuerfanas = async () => {
     try {
       const { data } = await obtenerHuerfanas();
-      setHuerfanas(data || []);
+      // Filtrar solo las que no tienen empresa asignada
+      const sinEmpresa = (data || []).filter(e => e.empresa_id === null);
+      setHuerfanas(sinEmpresa);
     } catch (e) {
       console.error(e);
     }

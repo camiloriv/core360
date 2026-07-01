@@ -1323,8 +1323,16 @@ export default function DashboardReuniones() {
                       <td style={styles.tdCell}>
                         {r.is_huerfana ? (
                           <div 
-                            style={{ ...styles.companyName, color: "#2563eb", cursor: "pointer", textDecoration: "underline" }}
-                            onClick={() => {
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: "4px",
+                              padding: "4px 8px", background: "#dbeafe", color: "#1e40af",
+                              borderRadius: "4px", fontSize: "11px", fontWeight: "bold",
+                              cursor: "pointer", border: "1px solid #bfdbfe", transition: "background 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "#bfdbfe"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "#dbeafe"}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedOrphan(r);
                               setSelectedOrphanId(r.id_reunion);
                               setSearchEmpresa("");
@@ -1333,7 +1341,7 @@ export default function DashboardReuniones() {
                               setIsAssignModalOpen(true);
                             }}
                           >
-                            {r.empresa_nombre}
+                            🔗 Vincular Empresa
                           </div>
                         ) : (
                           <div style={styles.companyName}>{r.empresa_nombre}</div>
@@ -1388,13 +1396,6 @@ export default function DashboardReuniones() {
                               }}>
                                 ⏳ Esperando Empresa
                               </div>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); navigate("/agendamiento/vincular"); }}
-                                style={{
-                                  fontSize: "10px", color: "#1e40af", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#dbeafe"
-                                }}
-                              >🔗 Vincular Empresa</span>
                             </div>
                           ) : (r.estado_envio === "no_aplica" || (r._isProforma && r.estado_envio !== "enviado" && r.estado_envio !== "borrador" && r.estado_envio !== "agendada")) ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>

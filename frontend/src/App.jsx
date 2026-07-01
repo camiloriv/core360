@@ -23,6 +23,7 @@ const SeguimientoEmpresas = lazy(() => import("./pages/SeguimientoEmpresas"));
 const GestionUsuarios = lazy(() => import("./pages/GestionUsuarios"));
 const AgendarReunion = lazy(() => import("./pages/AgendarReunion"));
 const VincularReuniones = lazy(() => import("./pages/VincularReuniones"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 
 const LoadingFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', width: '100%' }}>
@@ -122,6 +123,7 @@ const MainLayout = () => {
             
             {/* Solo Administradores */}
             <Route path="/gestion-usuarios" element={<ProtectedRoute allowedRoles={['admin']} path="/gestion-usuarios"><GestionUsuarios /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']} path="/admin"><AdminPanel /></ProtectedRoute>} />
           </Routes>
         </Suspense>
       </div>

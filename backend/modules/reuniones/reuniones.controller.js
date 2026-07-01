@@ -94,7 +94,7 @@ exports.listarReuniones = async (req, res) => {
                 WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
                 WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
                 WHEN te.empresa_id IS NULL                          THEN 'huerfana'
-                WHEN te.estado = 'pasada'                           THEN 'programado'
+                WHEN te.estado = 'pasada'                           THEN 'borrador'
                 ELSE te.estado
             END                             AS estado_envio,
 

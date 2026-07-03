@@ -90,7 +90,7 @@ exports.listarReuniones = async (req, res) => {
             -- Estado consolidado para el dashboard
             CASE
                 WHEN te.estado = 'cancelada'                        THEN 'cancelada'
-                WHEN te.estado = 'ignorada'                         THEN 'no_aplica'
+                WHEN te.estado = 'excluida'                         THEN 'excluida'
                 WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
                 WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
                 WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
@@ -99,8 +99,11 @@ exports.listarReuniones = async (req, res) => {
                 ELSE te.estado
             END                             AS estado_envio,
 
-            -- ¿Es huérfana? (Para el frontend legacy)
-            (te.empresa_id IS NULL) AS is_huerfana,
+            -- Estado raw del evento Teams (para clasificación de tabs en frontend)
+            te.estado                       AS te_estado,
+
+            -- ¿Es huérfana? (no tiene empresa Y no está excluida)
+            (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
 
             -- ¿Tiene minuta?
             (m.id IS NOT NULL)              AS tiene_minuta,
@@ -146,7 +149,7 @@ exports.obtenerStats = async (req, res) => {
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             ${whereClause}
             AND m.tipo_reu IS NOT NULL AND m.tipo_reu != ''
-            AND te.estado NOT IN ('ignorada', 'cancelada')
+            AND te.estado NOT IN ('excluida', 'cancelada')
             GROUP BY m.tipo_reu
             ORDER BY value DESC
         `, params);
@@ -159,7 +162,7 @@ exports.obtenerStats = async (req, res) => {
             LEFT JOIN usuarios u ON te.usuario_id = u.id
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             ${whereClause}
-            AND te.estado NOT IN ('ignorada', 'cancelada')
+            AND te.estado NOT IN ('excluida', 'cancelada')
             GROUP BY u.id, u.nombre
             ORDER BY value DESC
         `, params);
@@ -178,7 +181,7 @@ exports.obtenerStats = async (req, res) => {
             LEFT JOIN minutas m ON m.teams_evento_id = te.id
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             ${whereClause}
-            AND te.estado NOT IN ('ignorada', 'cancelada')
+            AND te.estado NOT IN ('excluida', 'cancelada')
         `, params);
         stats.resumen = resumen[0];
 
@@ -190,7 +193,7 @@ exports.obtenerStats = async (req, res) => {
             FROM teams_eventos te
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             ${whereClause}
-            AND te.estado NOT IN ('ignorada', 'cancelada')
+            AND te.estado NOT IN ('excluida', 'cancelada')
             AND te.fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
             GROUP BY mes
             ORDER BY mes ASC
@@ -291,7 +294,8 @@ exports.crearReunion = async (req, res) => {
         tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
         motivo_reu, minuta, form_f, empresa_id,
         programar_encuesta, encuesta_tipo, encuesta_programada_para, encuesta_destinatario,
-        teams_evento_id  // ID interno de teams_eventos (si viene de un evento Teams)
+        teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
+        asunto_correo     // Asunto personalizado para minutas sin empresa (excluidas/proforma)
     } = req.body;
 
     const archivos = req.files || [];
@@ -303,7 +307,8 @@ exports.crearReunion = async (req, res) => {
         return res.status(400).json({ error: "El tamaño total de los archivos adjuntos supera el límite de 20MB." });
     }
 
-    if (!ejecutiva_id || !empresa_id || !fecha_reu || !hora) {
+    // empresa_id puede ser null para reuniones excluidas o proforma sin empresa asignada
+    if (!ejecutiva_id || !fecha_reu || !hora) {
         return res.status(400).json({ error: "Campos obligatorios faltantes" });
     }
 
@@ -353,15 +358,17 @@ exports.crearReunion = async (req, res) => {
             await db.query("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
         }
 
-        // Registrar en empresa_seguimiento_log
-        await db.query(
-            "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
-            [fecha_reu, empresa_id]
-        );
-        await db.query(
-            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
-            [empresa_id, fecha_reu, ejecutiva_id, id_minuta, motivo_reu || 'Minuta de reunión registrada']
-        );
+        // Registrar en empresa_seguimiento_log (solo si hay empresa)
+        if (empresa_id) {
+            await db.query(
+                "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
+                [fecha_reu, empresa_id]
+            );
+            await db.query(
+                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
+                [empresa_id, fecha_reu, ejecutiva_id, id_minuta, motivo_reu || 'Minuta de reunión registrada']
+            );
+        }
 
         // Auto-aprendizaje de dominios/contactos
         if (enviado_a) {
@@ -376,7 +383,7 @@ exports.crearReunion = async (req, res) => {
                 const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
 
                 for (const correo of correos) {
-                    if (correo && correo.includes('@')) {
+                    if (correo && correo.includes('@') && empresa_id) {
                         const dominio = '@' + correo.split('@')[1].toLowerCase();
                         const domSinArroba = dominio.substring(1);
                         if (!dominiosGenericos.includes(domSinArroba)) {
@@ -400,7 +407,7 @@ exports.crearReunion = async (req, res) => {
                 e.correo AS ejecutiva_correo,
                 j.correo AS jefatura_correo
             FROM minutas m
-            JOIN empresas emp ON m.empresa_id = emp.id
+            LEFT JOIN empresas emp ON m.empresa_id = emp.id
             LEFT JOIN zonas z ON emp.zona_id = z.id
             JOIN usuarios e ON m.ejecutiva_id = e.id
             LEFT JOIN usuarios j ON e.jefatura_id = j.id
@@ -414,19 +421,30 @@ exports.crearReunion = async (req, res) => {
             try {
                 const enviado_por_correo = req.body.enviado_por_correo;
                 const enviado_por_id = req.body.enviado_por_id;
+
+                // Si hay empresa, usar el CC normal; si no, solo el ejecutivo
                 const correosCc = req.body.correos_cc !== undefined
                     ? req.body.correos_cc
-                    : await calcularDefaultCc(data.empresa_id, data.ejecutiva_id, enviado_por_correo, enviado_por_id);
+                    : (empresa_id
+                        ? await calcularDefaultCc(data.empresa_id, data.ejecutiva_id, enviado_por_correo, enviado_por_id)
+                        : (data.ejecutiva_correo || ''));
+
+                // Asunto del correo: personalizado si no hay empresa
+                const asuntoCorreo = asunto_correo
+                    ? asunto_correo
+                    : (data.empresa_nombre
+                        ? `Reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
+                        : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
                 enviarCorreo({
                     to: data.enviado_a,
                     cc: correosCc,
                     userEmail: req.usuario?.correo,
-                    subject: `Reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`,
+                    subject: asuntoCorreo,
                     data: {
                         id_reunion: data.id_minuta,
                         participantes: data.participantes,
-                        empresa: data.empresa_nombre,
+                        empresa: data.empresa_nombre || '',
                         ejecutiva: data.ejecutiva_nombre,
                         fecha_reu: data.fecha_reu,
                         hora: data.hora,
@@ -591,7 +609,7 @@ exports.marcarNoAplica = async (req, res) => {
         // Intentar como teams_evento_id (número)
         const teId = parseInt(id);
         if (!isNaN(teId)) {
-            const nuevoEstado = noAplica ? 'ignorada' : 'pasada';
+            const nuevoEstado = noAplica ? 'excluida' : 'pasada';
             await db.query("UPDATE teams_eventos SET estado = ? WHERE id = ?", [nuevoEstado, teId]);
 
             if (noAplica) {

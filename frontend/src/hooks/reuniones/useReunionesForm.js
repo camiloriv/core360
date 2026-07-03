@@ -15,6 +15,7 @@ const initialState = {
   lugar: "",
   documentos_adjuntos: "",
   motivo_reu: "",
+  asunto_correo: "",
   minuta: "",
   form_f: "",
   archivos: [],

@@ -12,6 +12,10 @@ export const anularReunionTeams = (payload) => {
   return api.post('/agendamiento/anular', payload);
 };
 
+export const marcarReagendada = (payload) => {
+  return api.post('/agendamiento/marcar-reagendada', payload);
+};
+
 export const syncEventosPasados = async () => {
   return api.post('/agendamiento/sync-past');
 };
@@ -35,5 +39,13 @@ export const descartarHuerfana = async (id) => {
 
 export const desvincularBorrador = async (id_reunion, dominios) => {
   return api.post(`/agendamiento/teams-eventos/${id_reunion}/desvincular`, { dominios });
+};
+
+export const marcarExcluida = async (id) => {
+  return api.post(`/agendamiento/teams-eventos/${id}/marcar-excluida`);
+};
+
+export const marcarProforma = async (id) => {
+  return api.post(`/agendamiento/teams-eventos/${id}/marcar-proforma`);
 };
 

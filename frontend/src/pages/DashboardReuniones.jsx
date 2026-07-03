@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useNavigate } from "react-router-dom";
-import { syncEventosPasados, desvincularBorrador, vincularHuerfana } from "../services/agendamientoService";
+import { syncEventosPasados, desvincularBorrador, vincularHuerfana, marcarExcluida, marcarProforma } from "../services/agendamientoService";
 import { marcarNoAplica } from "../services/reunionesService";
 import {
   BarChart,
@@ -165,6 +165,7 @@ export default function DashboardReuniones() {
   const [searchEmpresa, setSearchEmpresa] = useState("");
   const [showEmpresaDropdown, setShowEmpresaDropdown] = useState(false);
   const [noAplicaEmpresa, setNoAplicaEmpresa] = useState(false);
+  const [clasificacion, setClasificacion] = useState('empresa'); // 'empresa' | 'proforma' | 'excluida'
   const [globalEmpresas, setGlobalEmpresas] = useState([]);
 
   useEffect(() => {
@@ -244,33 +245,44 @@ export default function DashboardReuniones() {
   };
 
   const handleAsignarEmpresa = async () => {
-    if (!noAplicaEmpresa && !selectedEmpresaId) {
-      Swal.fire("Atención", "Debes seleccionar una empresa o marcar la opción 'No aplica'", "warning");
+    if (clasificacion === 'empresa' && !selectedEmpresaId) {
+      Swal.fire("Atención", "Debes seleccionar una empresa o elegir otra clasificación.", "warning");
       return;
     }
     try {
       Swal.fire({
-        title: 'Vinculando y buscando coincidencias...',
-        text: 'Por favor espera, esto puede tomar unos segundos.',
+        title: 'Procesando...',
+        text: 'Por favor espera.',
         allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        }
+        didOpen: () => { Swal.showLoading(); }
       });
-      
-      const realId = selectedOrphan.id || (typeof selectedOrphanId === 'string' && selectedOrphanId.startsWith('huerfana-') ? selectedOrphanId.replace('huerfana-', '') : selectedOrphanId);
-      const result = await vincularHuerfana(realId, noAplicaEmpresa ? null : selectedEmpresaId, noAplicaEmpresa ? [] : selectedDomains);
-      
-      Swal.fire("Éxito", result?.data?.message || "Empresa asignada correctamente. Borrador generado.", "success");
+
+      const realId = selectedOrphan.teams_evento_id ||
+        (typeof selectedOrphanId === 'string' && selectedOrphanId.startsWith('huerfana-')
+          ? selectedOrphanId.replace('huerfana-', '')
+          : selectedOrphanId);
+
+      let result;
+      if (clasificacion === 'excluida') {
+        result = await marcarExcluida(realId);
+      } else if (clasificacion === 'proforma') {
+        result = await marcarProforma(realId);
+      } else {
+        result = await vincularHuerfana(realId, selectedEmpresaId, selectedDomains);
+      }
+
+      Swal.fire("Éxito", result?.data?.message || "Clasificación aplicada correctamente.", "success");
       setIsAssignModalOpen(false);
       setSelectedOrphanId(null);
       setSelectedOrphan(null);
       setSelectedEmpresaId("");
+      setSearchEmpresa("");
       setNoAplicaEmpresa(false);
+      setClasificacion('empresa');
       refetch();
     } catch (e) {
       console.error(e);
-      Swal.fire("Error", "No se pudo vincular la reunión", "error");
+      Swal.fire("Error", "No se pudo aplicar la clasificación", "error");
     }
   };
 
@@ -281,6 +293,9 @@ export default function DashboardReuniones() {
   const [filtroEstado, setFiltroEstado] = useState(() => sessionStorage.getItem('reuniones_estado') || "Todos");
   const [activeTab, setActiveTab] = useState("clientes");
   const [filtroPeriodo, setFiltroPeriodo] = useState(() => sessionStorage.getItem('reuniones_periodo') || `anio-${new Date().getFullYear()}`);
+
+  // Dominios internos Proforma
+  const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
 
   useEffect(() => {
     sessionStorage.setItem('reuniones_macro', filtroMacroZona);
@@ -407,11 +422,23 @@ export default function DashboardReuniones() {
       const emailsCc = extractEmails(r.correos_cc);
       const allEmails = [...emailsEnviadoA, ...emailsCc];
 
-      const isProforma = r.empresa_nombre === "PROFORMA INTERNA"
+      // --- CLASIFICACIÓN PRINCIPAL ---
+      const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
+
+      // Excluida: estado raw del evento
+      const isExcluida = r.te_estado === 'excluida';
+
+      // Proforma: TODOS los emails son de dominio Proforma
+      const isProforma = !isExcluida && (
+        r.empresa_nombre === "PROFORMA INTERNA"
         || r.tipo_reu === "Reunión Interna Proforma"
-        || (allEmails.length > 0 && allEmails.every(email => email.toLowerCase().endsWith("@proforma.cl")));
+        || (allEmails.length > 0 && allEmails.every(email =>
+            PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d))
+          ))
+      );
 
       r._isProforma = isProforma;
+      r._isExcluida = isExcluida;
 
       
       // Helper to get local date to avoid timezone shift
@@ -442,27 +469,28 @@ export default function DashboardReuniones() {
 
       const isFuture = meetingDate >= today;
 
-      // (Excluidas filtering removed so no_aplica stays visible)
       // Tab filters logic
-      if (activeTab === "internas") {
+      if (activeTab === "internas" || activeTab === "proforma") {
         if (!isProforma) return false;
       }
       if (activeTab === "clientes") {
-        if (isProforma) return false;
-        // Exclude upcoming meetings (future and not finalized)
+        if (isProforma || isExcluida) return false;
         const isUpcoming = isFuture && r.estado_envio !== "enviado";
         if (isUpcoming || r.estado_envio === "cancelada") return false;
       }
       if (activeTab === "proximas") {
-        if (isProforma) return false;
-        // Only show upcoming meetings (future and not finalized, or explicitly 'agendada')
+        if (isProforma || isExcluida) return false;
         const isUpcoming = (isFuture && r.estado_envio !== "enviado") || r.estado_envio === "agendada";
         if (!isUpcoming) return false;
       }
+      if (activeTab === "excluidas") {
+        if (!isExcluida) return false;
+      }
       if (activeTab === "todas") {
-        // Under 'todas' (realized list), hide upcoming meetings
-        const isUpcoming = isFuture && r.estado_envio !== "enviado";
-        if (isUpcoming || r.estado_envio === "cancelada") return false;
+        // Todas las reuniones pasadas: clientes + proforma + excluidas, sin próximas ni canceladas
+        if (r.estado_envio === "cancelada") return false;
+        const isUpcoming = isFuture && r.estado_envio !== "enviado" && r.estado_envio !== "agendada";
+        if (isUpcoming) return false;
       }
 
       const pasaMacroYJef = isProforma || isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
@@ -1238,21 +1266,38 @@ export default function DashboardReuniones() {
                   🏢 Clientes
                 </button>
                 <button
-                  onClick={() => { setActiveTab('internas'); setCurrentPage(1); }}
+                  onClick={() => { setActiveTab('proforma'); setCurrentPage(1); }}
                   style={{
                     padding: '4px 10px',
-                    background: activeTab === 'internas' ? '#1e293b' : 'transparent',
-                    color: activeTab === 'internas' ? 'white' : '#64748b',
+                    background: (activeTab === 'proforma' || activeTab === 'internas') ? '#1e293b' : 'transparent',
+                    color: (activeTab === 'proforma' || activeTab === 'internas') ? 'white' : '#64748b',
                     border: 'none',
                     borderRadius: '4px',
-                    fontWeight: activeTab === 'internas' ? 'bold' : '600',
+                    fontWeight: (activeTab === 'proforma' || activeTab === 'internas') ? 'bold' : '600',
                     fontSize: '11px',
                     cursor: 'pointer',
-                    boxShadow: activeTab === 'internas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    boxShadow: (activeTab === 'proforma' || activeTab === 'internas') ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                     transition: 'all 0.2s'
                   }}
                 >
                   👥 Proforma
+                </button>
+                <button
+                  onClick={() => { setActiveTab('excluidas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'excluidas' ? '#7c3aed' : 'transparent',
+                    color: activeTab === 'excluidas' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'excluidas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'excluidas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🚫 Excluidas
                 </button>
                 <button
                   onClick={() => { setActiveTab('proximas'); setCurrentPage(1); }}
@@ -1270,6 +1315,23 @@ export default function DashboardReuniones() {
                   }}
                 >
                   📅 Próximas
+                </button>
+                <button
+                  onClick={() => { setActiveTab('todas'); setCurrentPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    background: activeTab === 'todas' ? '#475569' : 'transparent',
+                    color: activeTab === 'todas' ? 'white' : '#64748b',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontWeight: activeTab === 'todas' ? 'bold' : '600',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    boxShadow: activeTab === 'todas' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  📋 Todas
                 </button>
 
               </div>
@@ -1409,47 +1471,41 @@ export default function DashboardReuniones() {
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span style={{ color: "var(--text-muted)" }}>-</span>
                             </div>
-                          ) : (r.estado_envio === "no_aplica" || (r._isProforma && r.estado_envio !== "enviado" && r.estado_envio !== "borrador" && r.estado_envio !== "agendada")) ? (
+                          ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <div style={{
-                                color: "#475569", fontWeight: "bold", fontSize: "12px",
-                                background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
+                                color: "#6d28d9", fontWeight: "bold", fontSize: "12px",
+                                background: "#ede9fe", padding: "4px 8px", borderRadius: "4px",
                                 display: "inline-block", whiteSpace: "nowrap"
                               }}>
-                                🚫 No aplica
+                                🚫 Excluida
+                              </div>
+                              <div
+                                onClick={() => navigate("/home", { state: { draft: r } })}
+                                style={{
+                                  color: "#6d28d9", fontWeight: "600", cursor: "pointer", fontSize: "11px",
+                                  textDecoration: "underline", padding: "2px 0"
+                                }}
+                                title="Crear minuta para esta reunión"
+                              >
+                                ✍️ Crear Minuta
                               </div>
                             </div>
 
                           ) : r.estado_envio === "borrador" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <div
-                                  onClick={() => navigate("/home", { state: { draft: r } })}
-                                  style={{
-                                    color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                    background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
-                                    display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                  }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
-                                  title="Redactar Minuta"
-                                >
-                                  ✍️ Pendiente de Minuta
-                                </div>
-                                <div
-                                  onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
-                                  style={{
-                                    color: "white", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                    background: "#ef4444", padding: "4px 8px", borderRadius: "4px",
-                                    display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s",
-                                    height: "100%", boxSizing: "border-box"
-                                  }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#dc2626")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#ef4444")}
-                                  title="No aplica"
-                                >
-                                  ✖
-                                </div>
+                              <div
+                                onClick={() => navigate("/home", { state: { draft: r } })}
+                                style={{
+                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                  background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
+                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
+                                title="Redactar Minuta"
+                              >
+                                ✍️ Pendiente de Minuta
                               </div>
                             </div>
                           ) : r.estado_envio === "agendada" ? (
@@ -1800,29 +1856,79 @@ export default function DashboardReuniones() {
               </div>
             )}
 
-            <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "16px" }}>
-              Selecciona la empresa correspondiente. Una vez asignada, el dominio se guardará para auto-vincular futuras reuniones.
-            </p>
-            
-            <div style={{ marginBottom: "16px", background: "#f8fafc", padding: "10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px", color: "#334155", margin: 0 }}>
-                <input 
-                  type="checkbox" 
-                  checked={noAplicaEmpresa} 
-                  onChange={(e) => {
-                    setNoAplicaEmpresa(e.target.checked);
-                    if (e.target.checked) {
-                      setSelectedEmpresaId("");
-                      setSearchEmpresa("");
-                    }
-                  }} 
-                  style={{ width: "16px", height: "16px", accentColor: "var(--primary-color)", cursor: "pointer" }}
-                />
-                <strong>No aplica empresa</strong> (Webinar, Reunión Interna, etc.)
-              </label>
+            {/* --- Clasificación principal --- */}
+            <div style={{ marginBottom: "16px" }}>
+              <p style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.05em" }}>
+                Clasificar reunión como:
+              </p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {/* Botón Proforma */}
+                <button
+                  onClick={() => { setClasificacion('proforma'); setSelectedEmpresaId(''); setSearchEmpresa(''); }}
+                  style={{
+                    flex: 1,
+                    padding: "10px 8px",
+                    background: clasificacion === 'proforma' ? '#1e293b' : '#f8fafc',
+                    color: clasificacion === 'proforma' ? 'white' : '#334155',
+                    border: clasificacion === 'proforma' ? '2px solid #1e293b' : '2px solid #e2e8f0',
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "center"
+                  }}
+                >
+                  👥 Reunión Proforma
+                  <div style={{ fontSize: "10px", fontWeight: "400", marginTop: "2px", opacity: 0.8 }}>
+                    Solo participantes internos
+                  </div>
+                </button>
+                {/* Botón No Aplica / Excluida */}
+                <button
+                  onClick={() => { setClasificacion('excluida'); setSelectedEmpresaId(''); setSearchEmpresa(''); }}
+                  style={{
+                    flex: 1,
+                    padding: "10px 8px",
+                    background: clasificacion === 'excluida' ? '#7c3aed' : '#f8fafc',
+                    color: clasificacion === 'excluida' ? 'white' : '#334155',
+                    border: clasificacion === 'excluida' ? '2px solid #7c3aed' : '2px solid #e2e8f0',
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "center"
+                  }}
+                >
+                  🚫 No Aplica Empresa
+                  <div style={{ fontSize: "10px", fontWeight: "400", marginTop: "2px", opacity: 0.8 }}>
+                    Webinar, multi-empresa, etc.
+                  </div>
+                </button>
+              </div>
             </div>
 
-            {detectedDomains.length > 0 && !noAplicaEmpresa && (
+            {/* --- Separador "O asignar a empresa" --- */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+              <div style={{ flex: 1, height: "1px", background: "#e2e8f0" }} />
+              <span
+                style={{
+                  fontSize: "11px", color: "#94a3b8", fontWeight: "600",
+                  cursor: "pointer", padding: "4px 8px",
+                  background: clasificacion === 'empresa' ? '#eff6ff' : 'transparent',
+                  border: clasificacion === 'empresa' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  borderRadius: "4px", whiteSpace: "nowrap"
+                }}
+                onClick={() => setClasificacion('empresa')}
+              >
+                🏢 O asignar a una empresa
+              </span>
+              <div style={{ flex: 1, height: "1px", background: "#e2e8f0" }} />
+            </div>
+
+            {/* Dominios detectados (solo para empresa) */}
+            {detectedDomains.length > 0 && clasificacion === 'empresa' && (
               <div style={{ marginBottom: "16px", background: "#f8fafc", padding: "12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>
                   Asociar Dominios para Auto-vincular:
@@ -1849,18 +1955,19 @@ export default function DashboardReuniones() {
               </div>
             )}
 
-            <div style={{ marginBottom: "20px", position: "relative", opacity: noAplicaEmpresa ? 0.5 : 1 }}>
+            {/* Buscador de empresa (solo activo si clasificacion === 'empresa') */}
+            <div style={{ marginBottom: "20px", position: "relative", opacity: clasificacion !== 'empresa' ? 0.4 : 1, pointerEvents: clasificacion !== 'empresa' ? 'none' : 'auto' }}>
               <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "bold", color: "#334155" }}>
                 Empresa
               </label>
               <input
                 type="text"
-                placeholder={noAplicaEmpresa ? "Deshabilitado" : "Escribe para buscar empresa..."}
+                placeholder={clasificacion !== 'empresa' ? "Selecciona la clasificación de arriba" : "Escribe para buscar empresa..."}
                 value={searchEmpresa}
-                disabled={noAplicaEmpresa}
+                disabled={clasificacion !== 'empresa'}
                 onChange={(e) => {
                   setSearchEmpresa(e.target.value);
-                  setSelectedEmpresaId(""); // Resetea id si escribe algo distinto
+                  setSelectedEmpresaId("");
                   setShowEmpresaDropdown(true);
                 }}
                 onFocus={() => setShowEmpresaDropdown(true)}
@@ -1868,20 +1975,20 @@ export default function DashboardReuniones() {
                 className="core360-input"
                 style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid var(--border-input)" }}
               />
-              {showEmpresaDropdown && (
+              {showEmpresaDropdown && clasificacion === 'empresa' && (
                 <div style={{
                   position: "absolute",
-                  top: "100%",
+                  bottom: "100%",
                   left: 0,
                   right: 0,
-                  maxHeight: "200px",
+                  maxHeight: "180px",
                   overflowY: "auto",
                   background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "6px",
-                  marginTop: "4px",
+                  border: "2px solid #2563eb",
+                  borderRadius: "8px",
+                  marginBottom: "8px",
                   zIndex: 10,
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                  boxShadow: "0 -10px 25px rgba(37, 99, 235, 0.15), 0 -5px 12px rgba(0, 0, 0, 0.08)"
                 }}>
                   {globalEmpresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).length > 0 ? (
                     globalEmpresas.filter(emp => emp.nombre.toLowerCase().includes(searchEmpresa.toLowerCase())).map(emp => (
@@ -1893,9 +2000,11 @@ export default function DashboardReuniones() {
                           setShowEmpresaDropdown(false);
                         }}
                         style={{
-                          padding: "10px",
+                          padding: "6px 10px",
                           cursor: "pointer",
                           borderBottom: "1px solid #f1f5f9",
+                          fontSize: "12.5px",
+                          lineHeight: "1.3",
                           backgroundColor: selectedEmpresaId === emp.id ? "#f1f5f9" : "transparent"
                         }}
                         onMouseEnter={(e) => e.target.style.backgroundColor = "#f8fafc"}
@@ -1905,7 +2014,7 @@ export default function DashboardReuniones() {
                       </div>
                     ))
                   ) : (
-                    <div style={{ padding: "10px", color: "#64748b", fontSize: "13px" }}>
+                    <div style={{ padding: "8px 10px", color: "#64748b", fontSize: "12.5px" }}>
                       No se encontraron empresas.
                     </div>
                   )}
@@ -1930,14 +2039,14 @@ export default function DashboardReuniones() {
               )}
               <button
                 className="core360-btn secondary"
-                onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); setNoAplicaEmpresa(false); }}
+                onClick={() => { setIsAssignModalOpen(false); setSelectedOrphanId(null); setSelectedOrphan(null); setSelectedEmpresaId(""); setSearchEmpresa(""); setShowEmpresaDropdown(false); setNoAplicaEmpresa(false); setClasificacion('empresa'); }}
               >
                 Cancelar
               </button>
               <button
                 className="core360-btn primary"
                 onClick={handleAsignarEmpresa}
-                disabled={!selectedEmpresaId && !noAplicaEmpresa}
+                disabled={clasificacion === 'empresa' && !selectedEmpresaId}
               >
                 Asignar
               </button>

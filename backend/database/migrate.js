@@ -173,6 +173,8 @@ async function runMigrations() {
         asistentes JSON DEFAULT NULL,
         join_url TEXT DEFAULT NULL,
         ultima_sync DATETIME DEFAULT NULL,
+        organizador JSON DEFAULT NULL,
+        body_preview TEXT DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY unique_event_id (event_id),
@@ -180,6 +182,10 @@ async function runMigrations() {
         FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL
       )
     `);
+
+    // Add new columns to existing teams_eventos if they don't exist
+    await addColIfMissing('teams_eventos', 'organizador', 'JSON DEFAULT NULL');
+    await addColIfMissing('teams_eventos', 'body_preview', 'TEXT DEFAULT NULL');
 
     // ============================================================
     // 11. NUEVA TABLA: minutas (antes llamada 'reuniones')
@@ -259,7 +265,45 @@ async function runMigrations() {
       console.error("Migration: Note: Seeding of induction data failed:", e.message);
     }
 
+    // ============================================================
+    // 16. ENUM excluida en teams_eventos (reemplaza ignorada)
+    // ============================================================
+    try {
+      const [enumRows] = await connection.query(`
+        SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'teams_eventos' AND COLUMN_NAME = 'estado'
+      `);
+      if (enumRows.length > 0 && !enumRows[0].COLUMN_TYPE.includes('excluida')) {
+        console.log("Migration: Updating teams_eventos.estado ENUM to include 'excluida'...");
+        await connection.query(`
+          ALTER TABLE teams_eventos
+          MODIFY COLUMN estado ENUM('agendada','pasada','cancelada','excluida') NOT NULL DEFAULT 'agendada'
+        `);
+      }
+    } catch (e) {
+      console.log("Migration: Note: teams_eventos estado ENUM update failed:", e.message);
+    }
+
+    // ============================================================
+    // 17. minutas.empresa_id permite NULL (para reuniones sin empresa)
+    // ============================================================
+    try {
+      const [nullableCheck] = await connection.query(`
+        SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'minutas' AND COLUMN_NAME = 'empresa_id'
+      `);
+      if (nullableCheck.length > 0 && nullableCheck[0].IS_NULLABLE === 'NO') {
+        console.log("Migration: Allowing NULL in minutas.empresa_id...");
+        await connection.query(`
+          ALTER TABLE minutas MODIFY COLUMN empresa_id INT NULL
+        `);
+      }
+    } catch (e) {
+      console.log("Migration: Note: minutas.empresa_id nullable update failed:", e.message);
+    }
+
     console.log("Migration: All migrations verified and applied successfully!");
+
   } catch (error) {
     console.error("Migration: Error during database migration:", error);
     throw error;

@@ -636,32 +636,7 @@ export default function EditorEncuestas() {
               });
             });
 
-            if (strictReturn) {
-              const vincularBtns = document.querySelectorAll(".swal-btn-vincular");
-              vincularBtns.forEach((btn) => {
-                btn.addEventListener("click", async () => {
-                  const preguntaId = btn.getAttribute("data-id");
-                  transitioning = true;
-                  Swal.close();
-                  try {
-                    await axios.post(`${API_BASE}/preguntas/vincular`, {
-                      templateId: selectedTemplate.id,
-                      preguntaId: parseInt(preguntaId),
-                    });
-                    await loadPreguntas(selectedTemplate.id);
-                    Swal.fire({
-                      title: 'Pregunta vinculada',
-                      icon: 'success',
-                      timer: 1000,
-                      showConfirmButton: false
-                    });
-                  } catch (err) {
-                    console.error("Error linking question:", err);
-                    Swal.fire("Error", "No se pudo vincular la pregunta.", "error");
-                  }
-                });
-              });
-            } else {
+            // Vincular block removed as requested
               const editarBtns = document.querySelectorAll(".swal-btn-editar");
               editarBtns.forEach((btn) => {
                 btn.addEventListener("click", async () => {
@@ -728,7 +703,6 @@ export default function EditorEncuestas() {
                   await handleEditPreguntaDirecta(null, strictReturn);
                 });
               }
-            }
           },
         });
 
@@ -1288,7 +1262,6 @@ export default function EditorEncuestas() {
                     </div>
                     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                         <button id="swal-mgr-btn-change-state" class="swal-lib-pill-btn swal-lib-pill-btn-edit" style="padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; background: #64748b; color: white; border: none;">⚙️ Cambiar Estado</button>
-                        <button id="swal-mgr-btn-link-existing" class="swal-lib-pill-btn" style="background: #10b981; color: white; border: none; padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; font-weight: 600; cursor: pointer;">🔍 Vincular</button>
                         <button id="swal-mgr-btn-create-question" class="swal-lib-pill-btn" style="background: #4f46e5; color: white; border: none; padding: 6px 12px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; font-weight: 600; cursor: pointer;">➕ Nueva Pregunta</button>
                     </div>
                 </div>
@@ -1443,17 +1416,11 @@ export default function EditorEncuestas() {
             }
           });
 
-        document
-          .getElementById("swal-mgr-btn-link-existing")
-          .addEventListener("click", async () => {
-            Swal.close();
-            await handleSelectFromLibrary(true);
-          });
+        // Vincular listener removed
 
         document
           .getElementById("swal-mgr-btn-create-question")
           .addEventListener("click", async () => {
-            Swal.close();
             await handleEditPregunta(null, true, currentQuestions.length + 1);
           });
 
@@ -1462,7 +1429,6 @@ export default function EditorEncuestas() {
           btn.addEventListener("click", async () => {
             const index = btn.getAttribute("data-index");
             const p = currentQuestions[index];
-            Swal.close();
             await handleEditPregunta(p, true, p.orden);
           });
         });
@@ -1473,7 +1439,6 @@ export default function EditorEncuestas() {
             const preguntaId = btn.getAttribute("data-id");
             const index = Array.from(unlinkBtns).indexOf(btn);
             const p = currentQuestions[index];
-            Swal.close();
 
             const confirm = await Swal.fire({
               title: "¿Quitar Pregunta?",
@@ -1521,9 +1486,8 @@ export default function EditorEncuestas() {
         upBtns.forEach((btn) => {
           btn.addEventListener("click", async () => {
             const index = parseInt(btn.getAttribute("data-index"));
-            Swal.close();
             await swapOrder(index, index - 1, currentQuestions);
-            setTimeout(() => handleOpenTemplateManager(template), 300);
+            handleOpenTemplateManager(template);
           });
         });
 
@@ -1531,9 +1495,8 @@ export default function EditorEncuestas() {
         downBtns.forEach((btn) => {
           btn.addEventListener("click", async () => {
             const index = parseInt(btn.getAttribute("data-index"));
-            Swal.close();
             await swapOrder(index, index + 1, currentQuestions);
-            setTimeout(() => handleOpenTemplateManager(template), 300);
+            handleOpenTemplateManager(template);
           });
         });
       },
@@ -1777,13 +1740,6 @@ export default function EditorEncuestas() {
                       style={{ background: "#64748b", color: "#fff", display: "inline-flex", alignItems: "center", gap: "4px" }}
                     >
                       ⚙️ {selectedTemplate.activo === 1 ? "Desactivar" : "Activar"}
-                    </button>
-                    <button
-                      onClick={() => handleSelectFromLibrary(true)}
-                      className="btn-editor-header"
-                      style={{ background: "#10b981", color: "#fff", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                    >
-                      🔍 Vincular Pregunta
                     </button>
                     <button
                       onClick={() => handleEditPregunta(null, false, preguntas.length + 1)}

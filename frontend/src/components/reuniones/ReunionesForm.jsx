@@ -86,7 +86,10 @@ function ReunionesForm({ onSuccess }) {
     if (location.state && location.state.draft) {
       const draft = location.state.draft;
       setField("id_reunion", draft.id_reunion);
-      setField("empresa_id", draft.empresa_id);
+      setField("empresa_id", draft.empresa_id || "");
+      if (!draft.empresa_id) {
+        setField("asunto_correo", draft.asunto_teams || draft.motivo_reu || "");
+      }
       setField("fecha_reu", new Date(draft.fecha_reu).toISOString().split('T')[0]);
       setField("hora", draft.hora);
       setField("tipo_reu", ""); // Dejar vacío para que el usuario seleccione
@@ -131,13 +134,16 @@ function ReunionesForm({ onSuccess }) {
     },
   });
 
+  const isSinEmpresa = location.state?.draft && !location.state.draft.empresa_id && location.state.draft.id_reunion;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];
-    if (!form.empresa_id) missingFields.push("Empresa");
-    if (!form.ejecutiva_id) missingFields.push("Ejecutiva");
+    if (!isSinEmpresa && !form.empresa_id) missingFields.push("Empresa");
+    if (!isSinEmpresa && !form.ejecutiva_id) missingFields.push("Ejecutiva");
+    if (isSinEmpresa && !form.asunto_correo) missingFields.push("Asunto del correo");
     if (!form.tipo_reu) missingFields.push("Tipo de Reunión");
     if (form.tipo_reu === "Otros" && (!form.tipo_reu_detalle || !form.tipo_reu_detalle.trim())) {
       missingFields.push("Especificar Tipo de Reunión");
@@ -322,15 +328,35 @@ function ReunionesForm({ onSuccess }) {
         </div>
 
         <div className="grid">
-          <SelectEmpresa
-            value={form.empresa_id}
-            empresas={empresas}
-            onChange={(e) => setField("empresa_id", e.target.value)}
-            required
-          />
+          {!isSinEmpresa ? (
+            <SelectEmpresa
+              value={form.empresa_id}
+              empresas={empresas}
+              onChange={(e) => setField("empresa_id", e.target.value)}
+              required
+            />
+          ) : (
+            <FormSection
+              label={
+                <>
+                  ASUNTO DEL CORREO <span style={{ color: "red" }}>*</span>
+                </>
+              }
+              full
+            >
+              <input
+                value={form.asunto_correo || ""}
+                onChange={(e) => setField("asunto_correo", e.target.value)}
+                placeholder="Ej: Minuta de Reunión Proforma..."
+              />
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Esta reunión no tiene una empresa asignada. Este asunto se utilizará para el correo a los participantes.
+              </p>
+            </FormSection>
+          )}
 
           {/* Selector de usuario asignado: visible para admin y gerencia */}
-          {(user.permisos === "admin" || user.permisos === "gerencia") && (
+          {!isSinEmpresa && (user.permisos === "admin" || user.permisos === "gerencia") && (
             <FormSection
               label={
                 <>

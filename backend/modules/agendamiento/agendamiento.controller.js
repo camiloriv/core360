@@ -173,16 +173,19 @@ const crearReunionTeams = async (req, res) => {
             data.onlineMeeting?.joinUrl || null
         ]);
 
-        // Aprendizaje de dominios/contactos
+        // Aprendizaje de contactos: registrar si el dominio coincide con la empresa
         if (empresa_id && destinatarios) {
-            const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
             const correos = destinatarios.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+            
+            // Obtener los dominios registrados para esta empresa
+            const [dominiosEmpresa] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
+            const dominiosList = dominiosEmpresa.map(d => d.dominio.toLowerCase().trim());
 
             for (const email of correos) {
                 if (email.includes('@')) {
                     const dom = '@' + email.split('@')[1];
-                    if (!dominiosGenericos.includes(dom.substring(1))) {
-                        await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                    // Si el dominio coincide con alguno de la empresa, agregar el contacto
+                    if (dominiosList.includes(dom)) {
                         const [existing] = await db.query("SELECT id FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
                         if (existing.length === 0) {
                             await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, NULL)", [empresa_id, email]);
@@ -223,7 +226,7 @@ const crearReunionTeams = async (req, res) => {
 const anularReunionTeams = async (req, res) => {
     try {
         const usuarioCorreo = req.usuario.correo;
-        const { eventId, empresa_id } = req.body;
+        const { eventId, empresa_id, motivo } = req.body;
 
         if (!usuarioCorreo || !eventId) {
             return res.status(400).json({ error: "Faltan parámetros." });
@@ -267,7 +270,12 @@ const anularReunionTeams = async (req, res) => {
                 [eventId]
             );
             const asuntoOriginal = prevLog.length > 0 ? prevLog[0].asunto : null;
-            const asuntoCancelacion = asuntoOriginal ? `Cancelada: ${asuntoOriginal}` : "Reunión cancelada en Teams";
+            let asuntoCancelacion = asuntoOriginal ? `Cancelada: ${asuntoOriginal}` : "Reunión cancelada en Teams";
+            
+            if (motivo && motivo.trim().length > 0) {
+                asuntoCancelacion += ` - Motivo: ${motivo.trim()}`;
+            }
+
             const fechaVal = new Date().toISOString().split('T')[0];
 
             await db.query(
@@ -281,6 +289,52 @@ const anularReunionTeams = async (req, res) => {
     } catch (error) {
         console.error("Error en anularReunionTeams:", error);
         res.status(500).json({ error: "Error interno al anular la reunión." });
+    }
+};
+
+// ============================================================
+// POST /agendamiento/marcar-reagendada — Registrar intención de reagendar
+// ============================================================
+const marcarReagendada = async (req, res) => {
+    try {
+        const { eventId, motivo } = req.body;
+        if (!eventId) {
+            return res.status(400).json({ error: "Faltan parámetros." });
+        }
+
+        // Determinar empresa_id desde teams_eventos
+        const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
+        if (teData.length === 0 || !teData[0].empresa_id) {
+            return res.status(400).json({ error: "No se puede registrar motivo en una reunión sin empresa vinculada." });
+        }
+        
+        const empId = teData[0].empresa_id;
+
+        const [prevLog] = await db.query(
+            "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
+            [eventId]
+        );
+        const asuntoOriginal = prevLog.length > 0 ? prevLog[0].asunto : null;
+        let asuntoReagendada = asuntoOriginal ? `Reagendada: ${asuntoOriginal}` : "Reunión reagendada";
+        
+        if (motivo && motivo.trim().length > 0) {
+            asuntoReagendada += ` - Motivo: ${motivo.trim()}`;
+        }
+
+        const fechaVal = new Date().toISOString().split('T')[0];
+
+        await db.query(
+            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
+            [empId, fechaVal, req.usuario.id, eventId, asuntoReagendada]
+        );
+        
+        // Mantener el estado de seguimiento pendiente
+        await db.query("UPDATE empresas SET estado_seguimiento = 'pendiente' WHERE id = ?", [empId]);
+
+        return res.status(200).json({ success: true, message: "Motivo registrado con éxito." });
+    } catch (error) {
+        console.error("Error en marcarReagendada:", error);
+        res.status(500).json({ error: "Error interno al registrar reagendamiento." });
     }
 };
 
@@ -315,14 +369,30 @@ const obtenerEventosCalendario = async (req, res) => {
         }
 
         const data = await response.json();
-        const events = data.value.map(item => ({
-            id: item.id,
-            title: item.subject,
-            start: item.start.dateTime + "Z",
-            end: item.end.dateTime + "Z",
-            isOnlineMeeting: item.isOnlineMeeting,
-            joinUrl: item.onlineMeeting?.joinUrl
-        }));
+        const events = data.value.map(item => {
+            const attendees = item.attendees || [];
+            const parsedAttendees = attendees.map(a => {
+                const email = (a.emailAddress?.address || '').toLowerCase().trim();
+                const name = a.emailAddress?.name || '';
+                return email ? { name, email, response: a.status?.response || 'none', type: a.type || 'required' } : null;
+            }).filter(Boolean);
+
+            const organizerEmail = (item.organizer?.emailAddress?.address || '').toLowerCase().trim();
+            const organizerName = item.organizer?.emailAddress?.name || '';
+            const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
+
+            return {
+                id: item.id,
+                title: item.subject,
+                start: item.start.dateTime + "Z",
+                end: item.end.dateTime + "Z",
+                isOnlineMeeting: item.isOnlineMeeting,
+                joinUrl: item.onlineMeeting?.joinUrl,
+                asistentes: parsedAttendees,
+                organizador: organizador,
+                bodyPreview: item.bodyPreview || ''
+            };
+        });
 
         res.status(200).json({ events });
     } catch (error) {
@@ -469,17 +539,30 @@ const syncEventosPasados = async (req, res) => {
                     const email = (a.emailAddress.address || '').toLowerCase().trim();
                     if (!email) return null;
                     const name = await resolveDisplayName(email, a.emailAddress.name || '');
-                    return { name, email };
+                    return { 
+                        name, 
+                        email, 
+                        response: a.status?.response || 'none',
+                        type: a.type || 'required' 
+                    };
                 }));
                 const filteredAttendees = parsedAttendees.filter(Boolean);
                 const emails = filteredAttendees.map(a => a.email);
+                
+                // Resolver organizador
+                const organizerEmail = (event.organizer?.emailAddress?.address || '').toLowerCase().trim();
+                const organizerName = event.organizer?.emailAddress?.name || '';
+                const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
+
+                // Extraer preview del cuerpo
+                const bodyPreview = event.bodyPreview || '';
 
                 if (emails.length === 0) {
                     // Sin asistentes → ignorar
                     await upsertTeamsEvento({
                         event, fecha, hora, horaFin, usuarioId,
-                        empresa_id: null, estado: 'ignorada',
-                        filteredAttendees, isPresencial, isEventPast
+                        empresa_id: null, estado: 'excluida',
+                        filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview
                     });
                     continue;
                 }
@@ -527,7 +610,7 @@ const syncEventosPasados = async (req, res) => {
                 await upsertTeamsEvento({
                     event, fecha, hora, horaFin, usuarioId,
                     empresa_id: matchedEmpresaId, estado,
-                    filteredAttendees, isPresencial, isEventPast
+                    filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview
                 });
 
                 // Si tiene empresa y es agendada, registrar en log
@@ -569,8 +652,9 @@ const syncEventosPasados = async (req, res) => {
  * Función auxiliar: upsert en teams_eventos
  * Crea o actualiza el registro de un evento de Teams
  */
-const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empresa_id, estado, filteredAttendees, isPresencial, isEventPast }) => {
+const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empresa_id, estado, filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview }) => {
     const asistentesJson = JSON.stringify(filteredAttendees);
+    const organizadorJson = organizador ? JSON.stringify(organizador) : null;
     const joinUrl = event.onlineMeeting?.joinUrl || null;
     const es_online = isPresencial ? 0 : 1;
 
@@ -598,10 +682,9 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
 
         await db.query(`
             UPDATE teams_eventos 
-            SET fecha = ?, hora = ?, hora_fin = ?, estado = ?, asistentes = ?, join_url = ?, ultima_sync = NOW(),
-                empresa_id = COALESCE(empresa_id, ?)
+            SET fecha = ?, hora = ?, hora_fin = ?, asistentes = ?, join_url = ?, es_online = ?, ultima_sync = NOW(), estado = ?, organizador = ?, body_preview = ?
             WHERE event_id = ?
-        `, [fecha, hora, horaFin, nuevoEstado, asistentesJson, empresa_id, empresa_id, event.id]);
+        `, [fecha, hora, horaFin, asistentesJson, joinUrl, es_online, nuevoEstado, organizadorJson, bodyPreview, event.id]);
 
         // Detectar reunión concretada: pasó de agendada a pasada
         if (existingEstado === 'agendada' && nuevoEstado === 'pasada') {
@@ -626,9 +709,9 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
     } else {
         // No existe → crear
         await db.query(`
-            INSERT INTO teams_eventos
-                (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, es_online, asistentes, join_url, ultima_sync)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            INSERT INTO teams_eventos 
+            (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, asistentes, join_url, es_online, ultima_sync, organizador, body_preview)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
         `, [
             event.id,
             event.iCalUId || null,
@@ -639,9 +722,11 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
             hora,
             horaFin,
             estado,
-            es_online,
             asistentesJson,
-            joinUrl
+            joinUrl,
+            es_online,
+            organizadorJson,
+            bodyPreview
         ]);
     }
 };
@@ -689,6 +774,7 @@ const getTeamsEventos = async (req, res) => {
             SELECT 
                 te.id, te.event_id, te.asunto, te.fecha, te.hora, te.hora_fin,
                 te.estado, te.es_online, te.asistentes, te.join_url, te.ultima_sync,
+                te.organizador, te.body_preview,
                 te.empresa_id,
                 emp.nombre AS empresa_nombre,
                 u.nombre AS usuario_nombre,
@@ -697,7 +783,7 @@ const getTeamsEventos = async (req, res) => {
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             LEFT JOIN usuarios u ON te.usuario_id = u.id
             LEFT JOIN minutas m ON m.teams_evento_id = te.id
-            WHERE te.estado NOT IN ('cancelada', 'ignorada')
+            WHERE te.estado NOT IN ('cancelada', 'excluida')
             ${whereExtra}
             ORDER BY te.fecha DESC, te.hora DESC
         `, params);
@@ -762,7 +848,7 @@ const vincularEmpresaAEvento = async (req, res) => {
         const knownEmails = new Set(contactosDocs.map(c => c.correo));
 
         const [sinEmpresa] = await db.query(
-            "SELECT * FROM teams_eventos WHERE empresa_id IS NULL AND estado NOT IN ('cancelada', 'ignorada') AND id != ?",
+            "SELECT * FROM teams_eventos WHERE empresa_id IS NULL AND estado NOT IN ('cancelada', 'excluida') AND id != ?",
             [id]
         );
 
@@ -866,6 +952,67 @@ const debugProforma = async (req, res) => {
     }
 };
 
+// ============================================================
+// POST /agendamiento/teams-eventos/:id/marcar-excluida
+// Marca una reunion como excluida (efecto global, sin empresa)
+// ============================================================
+const marcarExcluida = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Obtener datos del evento antes de actualizar
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+
+        const evento = rows[0];
+
+        // Actualizar a excluida (sin filtrar por usuario → efecto global)
+        await db.query("UPDATE teams_eventos SET estado = 'excluida' WHERE id = ?", [id]);
+
+        // Si tenía empresa, registrar en log
+        if (evento.empresa_id) {
+            await db.query(
+                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
+                [evento.empresa_id, evento.fecha, req.usuario.id, evento.event_id, evento.asunto || 'Reunión excluida']
+            );
+        }
+
+        res.json({ success: true, message: "Reunión marcada como excluida." });
+    } catch (error) {
+        console.error("Error en marcarExcluida:", error);
+        res.status(500).json({ error: "Error interno." });
+    }
+};
+
+// ============================================================
+// POST /agendamiento/teams-eventos/:id/marcar-proforma
+// Asigna la empresa PROFORMA INTERNA al evento (efecto global)
+// ============================================================
+const marcarProforma = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Obtener ID de PROFORMA INTERNA
+        const [proformaRows] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA' LIMIT 1");
+        if (proformaRows.length === 0) {
+            return res.status(500).json({ error: "No se encontró la empresa PROFORMA INTERNA en la BD." });
+        }
+        const proformaId = proformaRows[0].id;
+
+        // Verificar que el evento existe
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+
+        // Actualizar empresa_id a PROFORMA INTERNA (sin filtrar por usuario → efecto global)
+        await db.query("UPDATE teams_eventos SET empresa_id = ?, estado = 'pasada' WHERE id = ?", [proformaId, id]);
+
+        res.json({ success: true, message: "Reunión asignada a Proforma Interna.", proforma_id: proformaId });
+    } catch (error) {
+        console.error("Error en marcarProforma:", error);
+        res.status(500).json({ error: "Error interno." });
+    }
+};
+
 module.exports = {
     crearReunionTeams,
     obtenerEventosCalendario,
@@ -875,5 +1022,8 @@ module.exports = {
     getTeamsEventos,
     vincularEmpresaAEvento,
     desvincularEmpresaDeEvento,
-    debugProforma
+    debugProforma,
+    marcarExcluida,
+    marcarProforma,
+    marcarReagendada
 };

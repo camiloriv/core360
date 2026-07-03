@@ -24,11 +24,11 @@
   - [x] Implementar manejador de menú SweetAlert2 (`handleTemplateOptions`) interactivo para el template seleccionado con opciones premium para Cargar, Editar o Eliminar.
   - [x] Estandarizar los tres botones de cabecera ("Biblioteca Maestro", "Dimensiones" y "Nuevo Template") con el mismo formato estilizado, fuente y transiciones premium utilizando la clase `.btn-editor-header`.
 
-- [/] **Corrección de Biblioteca Maestro**
-  - [/] Eliminar `Swal.close()` de las acciones de transición en `handleSelectFromLibrary` para solucionar el problema de botones "Eliminar" y "Nueva Pregunta" que no funcionan.
-  - [/] Garantizar la remoción total del botón "Vincular" y la limpieza de cualquier residuo en listeners.
-  - [/] Mejorar la transición de reordenar preguntas en el panel de control del template para actualizarse instantáneamente sin parpadeos.
-  - [/] Ejecutar compilación de producción con `npm run build` para asegurar cambios activos.
+- [x] **Corrección de Biblioteca Maestro**
+  - [x] Eliminar `Swal.close()` de las acciones de transición en `handleSelectFromLibrary` para solucionar el problema de botones "Eliminar" y "Nueva Pregunta" que no funcionan.
+  - [x] Garantizar la remoción total del botón "Vincular" y la limpieza de cualquier residuo en listeners.
+  - [x] Mejorar la transición de reordenar preguntas en el panel de control del template para actualizarse instantáneamente sin parpadeos.
+  - [x] Ejecutar compilación de producción con `npm run build` para asegurar cambios activos.
 
 - [x] **5. Reestructuración de Filtros de Vista Cobertura (Administrador)**
   - [x] En `SeguimientoEmpresas.jsx`, reordenar la disposición espacial de los filtros.

@@ -3,11 +3,10 @@ import Swal from "sweetalert2";
 
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import { crearReunionTeams } from "../../services/agendamientoService";
-import FormSection from "../form/core/FormSection";
 import SelectEmpresa from "../form/fields/SelectEmpresa";
 import AutocompleteInput from "../form/fields/AutocompleteInput";
 
-const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => {
+const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClose, dayEvents = [] }) => {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
   
   const [form, setForm] = useState({
@@ -25,14 +24,16 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
   
   const [loading, setLoading] = useState(false);
 
-  // Hook existente para obtener empresas, destinatarios, etc.
-  const { empresas, fetchEmpresas, destinatarios, ejecutivas } = useReunionesData(user, form.empresa_id);
+  // Hook para obtener empresas, destinatarios, etc.
+  const { empresas, destinatarios, ejecutivas } = useReunionesData(user, form.empresa_id);
 
-  // Cuando se hace click en el calendario (selectedDate / selectedEndDate), actualizar el form
+  // Sincronizar fecha y hora desde la selección en el calendario
   useEffect(() => {
     if (selectedDate) {
       const d = new Date(selectedDate);
-      const fecha = d.toISOString().split("T")[0];
+      const offset = d.getTimezoneOffset();
+      const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+      const fecha = localDate.toISOString().split("T")[0];
       const hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
       
       let duracion = "30"; // Default
@@ -59,11 +60,16 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
-    // Validación básica
-    if (!form.empresa_id || !form.fecha || !form.hora || !form.asunto) {
-      return Swal.fire("Campos Incompletos", "Por favor completa la Empresa, Fecha, Hora y Asunto", "warning");
+    if (!form.empresa_id) {
+      return Swal.fire("Empresa Requerida", "Por favor selecciona una Empresa", "warning");
+    }
+    if (!form.asunto) {
+      return Swal.fire("Título Requerido", "Por favor ingresa un título para la reunión", "warning");
+    }
+    if (!form.fecha || !form.hora) {
+      return Swal.fire("Fecha y Hora Requeridas", "Por favor ingresa la fecha y hora de la reunión", "warning");
     }
 
     setLoading(true);
@@ -74,12 +80,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
           icon: "success",
           title: "¡Reunión Agendada!",
           text: "El evento se ha creado en Microsoft Teams",
-          confirmButtonColor: "var(--secondary-color)",
-        });
-        // Reset form
-        setForm({
-          empresa_id: "", destinatarios: "", asistentes_internos: "", 
-          fecha: "", hora: "", duracion: "30", asunto: "", detalle: "", modalidad: "Teams", direccion: ""
+          confirmButtonColor: "#4f46e5",
         });
         if (onFormSubmitSuccess) onFormSubmitSuccess();
       }
@@ -90,59 +91,165 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
     }
   };
 
-  const defaultDurations = ["15", "30", "45", "60", "90", "120"];
-  const isCustomDuration = form.duracion && !defaultDurations.includes(form.duracion);
+  // Filtrar eventos del día seleccionado para mostrarlos en la barra lateral derecha
+  const filterDayEvents = () => {
+    if (!form.fecha) return [];
+    return dayEvents.filter(ev => {
+      const evDate = new Date(ev.start).toISOString().split("T")[0];
+      return evDate === form.fecha;
+    }).sort((a, b) => new Date(a.start) - new Date(b.start));
+  };
+
+  const selectedDayEvents = filterDayEvents();
+
+  // Calcular bloques ocupados y disponibles
+  const getScheduleSlots = () => {
+    if (!form.fecha) return { busy: [], free: [] };
+
+    // 1. Obtener y ordenar eventos del día
+    const dayEvts = selectedDayEvents.map(ev => {
+      const s = new Date(ev.start);
+      const e = ev.end ? new Date(ev.end) : new Date(s.getTime() + 30 * 60 * 1000);
+      return { start: s, end: e };
+    }).sort((a, b) => a.start - b.start);
+
+    // 2. Unificar rangos solapados
+    const mergedBusy = [];
+    dayEvts.forEach(ev => {
+      if (mergedBusy.length === 0) {
+        mergedBusy.push(ev);
+      } else {
+        const last = mergedBusy[mergedBusy.length - 1];
+        if (ev.start <= last.end) {
+          if (ev.end > last.end) {
+            last.end = ev.end;
+          }
+        } else {
+          mergedBusy.push(ev);
+        }
+      }
+    });
+
+    const formatTime = (d) => {
+      return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    };
+
+    // 3. Definir jornada de 08:00 a 20:00 en local
+    // Usamos el constructor local con partes para evitar saltos de zona horaria
+    const [year, month, day] = form.fecha.split("-").map(Number);
+    const dayStart = new Date(year, month - 1, day, 8, 0, 0);
+    const dayEnd = new Date(year, month - 1, day, 20, 0, 0);
+
+    const freeRanges = [];
+    let currentStart = dayStart;
+
+    mergedBusy.forEach(busy => {
+      if (busy.start > currentStart) {
+        const gapEnd = busy.start > dayEnd ? dayEnd : busy.start;
+        if (gapEnd > currentStart) {
+          freeRanges.push({ start: new Date(currentStart), end: new Date(gapEnd) });
+        }
+      }
+      if (busy.end > currentStart) {
+        currentStart = busy.end > dayEnd ? dayEnd : busy.end;
+      }
+    });
+
+    if (currentStart < dayEnd) {
+      freeRanges.push({ start: new Date(currentStart), end: new Date(dayEnd) });
+    }
+
+    return {
+      busy: mergedBusy.map(b => `${formatTime(b.start)} - ${formatTime(b.end)}`),
+      free: freeRanges.map(f => `${formatTime(f.start)} - ${formatTime(f.end)}`)
+    };
+  };
+
+  const { busy, free } = getScheduleSlots();
 
   return (
-    <div className="form-container">
-      <form onSubmit={handleSubmit}>
-        <FormSection title={`DETALLES DEL EVENTO (${form.modalidad === "Presencial" ? "PRESENCIAL" : "TEAMS"})`}>
-          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
+    <div className="teams-create-container" style={{
+      display: 'flex', flexDirection: 'column', height: '100%', width: '100%',
+      fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif", background: '#f3f4f6'
+    }}>
+      {/* Barra de Menú Superior */}
+      <div style={{
+        padding: '10px 20px', background: '#fff', borderBottom: '1px solid #e5e7eb',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+      }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div style={{
+            background: '#eff6ff', color: '#1d4ed8', borderBottom: '3px solid #1d4ed8',
+            padding: '8px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
+          }}>
+            📅 Evento
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            onClick={handleSubmit} 
+            disabled={loading}
+            style={{
+              background: '#4f46e5', border: '1px solid #4338ca', color: '#white',
+              padding: '6px 20px', borderRadius: '4px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px',
+              color: '#ffffff'
+            }}
+          >
+            {loading ? "Guardando..." : "💾 Guardar"}
+          </button>
+          <button 
+            onClick={onClose}
+            style={{
+              background: '#f3f4f6', border: '1px solid #d1d5db', color: '#4b5563',
+              padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px'
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      {/* Grid del Formulario + Calendario Lateral */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        
+        {/* Columna Izquierda: Formulario (Teams-like fields) */}
+        <div style={{ flex: 1, padding: '24px 36px', overflowY: 'auto', background: '#ffffff' }}>
+          
+          {/* Campo Empresa (sin el label doble superior) */}
+          <div style={{ marginBottom: '20px' }}>
             <SelectEmpresa 
               value={form.empresa_id} 
               onChange={handleChange} 
               empresas={empresas} 
             />
           </div>
-          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
-            <label>MODALIDAD *</label>
-            <select name="modalidad" value={form.modalidad} onChange={handleChange} required>
-              <option value="Teams">Reunión por Teams</option>
-              <option value="Presencial">Reunión Presencial</option>
-            </select>
-          </div>
-          
-          {form.modalidad === "Presencial" && (
-            <div className="form-group full-width" style={{ marginBottom: '15px' }}>
-              <label>DIRECCIÓN (UBICACIÓN) *</label>
-              <input 
-                type="text" 
-                name="direccion"
-                value={form.direccion} 
-                onChange={handleChange} 
-                placeholder="Ej. Av. Providencia 1234, Oficina 501" 
-                required={form.modalidad === "Presencial"} 
-              />
-            </div>
-          )}
-          
-          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
-            <label>ASUNTO *</label>
+
+          {/* Campo Agregar Título (Placeholder corregido y padding proporcional) */}
+          <div style={{ marginBottom: '24px', marginTop: '12px' }}>
             <input 
               type="text" 
               name="asunto"
               value={form.asunto} 
               onChange={handleChange} 
-              placeholder="Ej. Presentación de Resultados" 
+              placeholder="Agregar título" 
+              style={{
+                width: '100%', border: 'none', borderBottom: '1px solid #e2e8f0',
+                fontSize: '22px', fontWeight: '500', padding: '10px 0', outline: 'none',
+                color: '#111827', transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderBottomColor = '#4f46e5'}
+              onBlur={(e) => e.target.style.borderBottomColor = '#e2e8f0'}
               required 
             />
           </div>
-          
-          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
-            <label>CONTACTOS EXTERNOS (EMPRESA)</label>
+
+          {/* Campo Asistentes Externos */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Contactos Externos (Empresa)</label>
             <AutocompleteInput 
               id="destinatarios"
-              suggestions={destinatarios.filter(d => d && d.correo).map(d => `${d.nombre} <${d.correo}>`)}
+              suggestions={destinatarios}
               value={form.destinatarios}
               onChange={(e) => {
                 let val = e.target ? e.target.value : e;
@@ -150,15 +257,16 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
                 if (match) val = match[1];
                 handleAutocompleteChange("destinatarios", val);
               }}
-              placeholder="Selecciona contactos o escribe correos..."
+              placeholder="Invita contactos externos (escribe o selecciona)..."
             />
           </div>
-          
-          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
-            <label>ASISTENTES INTERNOS (PROFORMA)</label>
+
+          {/* Campo Asistentes Internos */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Asistentes Internos (Proforma)</label>
             <AutocompleteInput 
               id="asistentes_internos"
-              suggestions={ejecutivas.filter(e => e && e.correo).map(e => `${e.nombre} <${e.correo}>`)}
+              suggestions={ejecutivas.filter(e => e && e.correo).map(e => e.correo)}
               value={form.asistentes_internos}
               onChange={(e) => {
                 let val = e.target ? e.target.value : e;
@@ -166,70 +274,251 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess }) => 
                 if (match) val = match[1];
                 handleAutocompleteChange("asistentes_internos", val);
               }}
-              placeholder="Selecciona equipo interno..."
+              placeholder="Invita equipo interno (escribe o selecciona)..."
             />
           </div>
 
-          <div className="grid-3" style={{ marginBottom: '15px' }}>
-            <div className="form-group">
-              <label>FECHA *</label>
-              <input type="date" name="fecha" value={form.fecha} onChange={handleChange} required />
+          {/* Fila de Fecha y Hora */}
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>FECHA</label>
+              <input 
+                type="date" 
+                name="fecha" 
+                value={form.fecha} 
+                onChange={handleChange} 
+                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px' }}
+                required 
+              />
             </div>
-            <div className="form-group">
-              <label>HORA *</label>
-              <input type="time" name="hora" value={form.hora} onChange={handleChange} required />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>HORA</label>
+              <input 
+                type="time" 
+                name="hora" 
+                value={form.hora} 
+                onChange={handleChange} 
+                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px' }}
+                required 
+              />
             </div>
-            <div className="form-group">
-              <label>DURACIÓN *</label>
-              <select name="duracion" value={form.duracion} onChange={handleChange} required>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>DURACIÓN</label>
+              <select 
+                name="duracion" 
+                value={form.duracion} 
+                onChange={handleChange} 
+                style={{ padding: '9px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px', background: 'white' }}
+                required
+              >
                 <option value="15">15 minutos</option>
                 <option value="30">30 minutos</option>
                 <option value="45">45 minutos</option>
                 <option value="60">1 hora</option>
                 <option value="90">1.5 horas</option>
                 <option value="120">2 horas</option>
-                {isCustomDuration && (
-                  <option value={form.duracion}>
-                    {form.duracion >= 60 
-                      ? `${(form.duracion / 60).toFixed(1).replace(".0", "")} horas`
-                      : `${form.duracion} minutos`} (personalizado)
-                  </option>
-                )}
               </select>
             </div>
           </div>
 
-          <div className="form-group full-width" style={{ marginTop: '15px' }}>
-            <label>ORDEN DEL DÍA / DETALLE</label>
+          {/* Toggle Modalidad (Reunión de Teams) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px', marginBottom: '24px' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>Reunión de Teams</div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                {form.modalidad === "Teams" ? "Se generará un enlace automático en Microsoft Teams" : "Reunión presencial / física"}
+              </div>
+            </div>
+            <div>
+              <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={form.modalidad === "Teams"}
+                  onChange={(e) => setForm(prev => ({ ...prev, modalidad: e.target.checked ? "Teams" : "Presencial" }))}
+                  style={{ opacity: 0, width: 0, height: 0 }} 
+                />
+                <span className="slider" style={{
+                  position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: form.modalidad === "Teams" ? '#4f46e5' : '#ccc',
+                  transition: '.3s', borderRadius: '24px'
+                }}>
+                  <span style={{
+                    position: 'absolute', content: '""', height: '18px', width: '18px', left: '3px', bottom: '3px',
+                    backgroundColor: 'white', transition: '.3s', borderRadius: '50%',
+                    transform: form.modalidad === "Teams" ? 'translateX(24px)' : 'none'
+                  }} />
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Campo Dirección (si no es Teams) */}
+          {form.modalidad === "Presencial" && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Ubicación / Dirección *</label>
+              <input 
+                type="text" 
+                name="direccion"
+                value={form.direccion} 
+                onChange={handleChange} 
+                placeholder="Agregar dirección (Ej. Av. Providencia 1234)" 
+                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px', width: '100%' }}
+                required={form.modalidad === "Presencial"} 
+              />
+            </div>
+          )}
+
+          {/* Campo Orden del Día */}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Orden del día / Descripción</label>
             <textarea 
               name="detalle"
               value={form.detalle} 
               onChange={handleChange} 
               rows="4"
-              placeholder="Detalles que se incluirán en la invitación de Teams..."
+              placeholder="Agrega un mensaje para el cuerpo de la invitación..."
+              style={{
+                width: '100%', border: '1px solid #d1d5db', borderRadius: '4px',
+                padding: '10px', fontSize: '13px', outline: 'none', resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
             />
           </div>
-        </FormSection>
 
-        <div className="form-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {loading ? (
-              <>
-                <span className="spinner-small" style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '50%', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }}></span>
-                Procesando...
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
-                {form.modalidad === "Presencial" ? "Agendar Presencial" : "Agendar en Teams"}
-              </>
-            )}
-          </button>
         </div>
-      </form>
+
+        {/* Columna Derecha: Calendario del Día (Tope de agenda + Ocupado / Disponible) */}
+        <div style={{ width: '280px', padding: '24px', backgroundColor: '#fcfcfc', borderLeft: '1px solid #e5e7eb', overflowY: 'auto' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0' }}>Horario del Día</h3>
+          <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0' }}>Comprueba si tienes topes de agenda</p>
+          
+          {/* Listado de Citas */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+            {selectedDayEvents.length > 0 ? (
+              selectedDayEvents.map((ev, i) => {
+                const startTime = new Date(ev.start).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                const endTime = ev.end ? new Date(ev.end).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : "";
+                
+                return (
+                  <div key={i} style={{
+                    padding: '8px 12px', borderRadius: '6px',
+                    background: '#f1f5f9', borderLeft: '3px solid #3b82f6',
+                    fontSize: '12px', color: '#1e293b'
+                  }}>
+                    <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ev.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                      {startTime} - {endTime}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+                Sin citas agendadas
+              </div>
+            )}
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '16px 0' }} />
+
+          {/* Bloques Ocupados */}
+          <div style={{ marginBottom: '20px' }}>
+            <h4 style={{ fontSize: '12px', fontWeight: '700', color: '#b91c1c', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🔴 Ocupado
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {busy.length > 0 ? (
+                busy.map((timeRange, idx) => (
+                  <div key={idx} style={{ fontSize: '12px', color: '#475569', paddingLeft: '8px', borderLeft: '2px solid #ef4444' }}>
+                    {timeRange}
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Ninguno</div>
+              )}
+            </div>
+          </div>
+
+          {/* Bloques Disponibles */}
+          <div>
+            <h4 style={{ fontSize: '12px', fontWeight: '700', color: '#15803d', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🟢 Disponible (08:00 - 20:00)
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {free.length > 0 ? (
+                free.map((timeRange, idx) => (
+                  <div key={idx} style={{ fontSize: '12px', color: '#475569', paddingLeft: '8px', borderLeft: '2px solid #22c55e' }}>
+                    {timeRange}
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Sin disponibilidad</div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
       <style>{`
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        
+        /* Toggle Switch Teams-like style */
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 44px !important;
+          height: 22px !important;
+        }
+        .switch input { 
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background-color: #ccc;
+          transition: .2s;
+          border-radius: 22px;
+        }
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 16px;
+          width: 16px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: .2s;
+          border-radius: 50%;
+        }
+        input:checked + .slider {
+          background-color: #4f46e5;
+        }
+        input:checked + .slider:before {
+          transform: translateX(22px);
+        }
+        
+        /* Autocomplete Input overrides to resemble Teams borderless line input */
+        .teams-create-container .autocomplete-container input {
+          border: none !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          border-radius: 0 !important;
+          padding: 8px 0 !important;
+          font-size: 14px !important;
+          outline: none !important;
+          width: 100% !important;
+        }
+        .teams-create-container .autocomplete-container input:focus {
+          border-bottom-color: #4f46e5 !important;
+          box-shadow: none !important;
+        }
       `}</style>
     </div>
   );

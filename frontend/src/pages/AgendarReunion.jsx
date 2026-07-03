@@ -9,7 +9,8 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import Swal from "sweetalert2";
 
 import AgendarForm from "../components/agendar/AgendarForm";
-import { obtenerEventosCalendario, anularReunionTeams } from "../services/agendamientoService";
+import EventDetailsModal from "../components/reuniones/EventDetailsModal";
+import { obtenerEventosCalendario, anularReunionTeams, marcarReagendada } from "../services/agendamientoService";
 
 const locales = {
   "es": esLocale,
@@ -47,6 +48,7 @@ const AgendarReunion = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState("month");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRange, setSelectedRange] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -264,45 +266,68 @@ const AgendarReunion = () => {
     });
   };
 
-  // Abre el modal SweetAlert con el menú de detalles completo
+  // Abre el modal de detalles
   const openEventDetails = (event) => {
-    Swal.fire({
-      title: 'Detalles de Reunión',
-      text: event.title,
+    setSelectedEventDetails(event);
+  };
+
+  const handleJoinMeeting = (event) => {
+    if (event.joinUrl) {
+      window.open(event.joinUrl, '_blank');
+    } else {
+      Swal.fire('Sin enlace', 'Esta reunión no tiene un enlace de Teams asociado.', 'info');
+    }
+  };
+
+  const handleCancelMeeting = async (event) => {
+    const confirmDelete = await Swal.fire({
+      title: '¿Seguro que deseas anular?',
+      text: 'Ingresa un motivo para la anulación (opcional). Esta acción eliminará el evento de Microsoft Teams.',
+      input: 'text',
+      inputPlaceholder: 'Ej: Cliente canceló por tope de horario...',
+      icon: 'warning',
       showCancelButton: true,
-      showDenyButton: true,
-      confirmButtonText: 'Unirse a la llamada',
-      denyButtonText: 'Anular Reunión',
-      cancelButtonText: 'Cerrar',
-      confirmButtonColor: '#3b82f6',
-      denyButtonColor: '#ef4444',
-      showCloseButton: true,
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        if (event.joinUrl) window.open(event.joinUrl, '_blank');
-        else Swal.fire('Sin enlace', 'Esta reunión no tiene un enlace de Teams asociado.', 'info');
-      } else if (result.isDenied) {
-        const confirmDelete = await Swal.fire({
-          title: '¿Seguro que deseas anular?',
-          text: 'Esta acción eliminará el evento de Microsoft Teams y revertirá la cobertura.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Sí, anular',
-          cancelButtonText: 'Cancelar'
-        });
-        if (confirmDelete.isConfirmed) {
-          try {
-            const res = await anularReunionTeams({ eventId: event.id });
-            if (res.data.success) {
-              Swal.fire('Anulada', 'La reunión ha sido anulada exitosamente.', 'success');
-              fetchEvents();
-            }
-          } catch (err) {
-            Swal.fire('Error', 'No se pudo anular la reunión.', 'error');
-          }
-        }
-      }
+      confirmButtonText: 'Sí, anular',
+      cancelButtonText: 'Cancelar'
     });
+    if (confirmDelete.isConfirmed) {
+      try {
+        const motivo = confirmDelete.value || "";
+        const res = await anularReunionTeams({ eventId: event.id, motivo });
+        if (res.data.success) {
+          Swal.fire('Anulada', 'La reunión ha sido anulada exitosamente.', 'success');
+          setSelectedEventDetails(null);
+          fetchEvents();
+        }
+      } catch (err) {
+        Swal.fire('Error', 'No se pudo anular la reunión.', 'error');
+      }
+    }
+  };
+
+  const handleRescheduleMeeting = async (event) => {
+    const confirmReschedule = await Swal.fire({
+      title: 'Registrar Reagendamiento',
+      text: 'Ingresa el motivo por el cual se reagendó esta reunión.',
+      input: 'text',
+      inputPlaceholder: 'Ej: Cliente pidió posponer para la próxima semana...',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar motivo',
+      cancelButtonText: 'Cancelar'
+    });
+    if (confirmReschedule.isConfirmed) {
+      try {
+        const motivo = confirmReschedule.value || "";
+        const res = await marcarReagendada({ eventId: event.id, motivo });
+        if (res.data.success) {
+          Swal.fire('Motivo Guardado', 'Se ha registrado el motivo en el seguimiento de la empresa.', 'success');
+          setSelectedEventDetails(null);
+        }
+      } catch (err) {
+        Swal.fire('Atención', err.response?.data?.error || 'No se pudo registrar el motivo.', 'error');
+      }
+    }
   };
 
   const handleSelectEvent = (event) => {
@@ -552,6 +577,7 @@ const AgendarReunion = () => {
                 endAccessor="end"
                 style={{ flex: 1 }}
                 selectable
+                dayLayoutAlgorithm="no-overlap"
                 slotPropGetter={(date) => {
                   if (selectedRange) {
                     const time = date.getTime();
@@ -671,10 +697,15 @@ const AgendarReunion = () => {
       </div>
 
       {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setIsModalOpen(false)}>✕</button>
-            <AgendarForm selectedDate={selectedDate} selectedEndDate={selectedEndDate} onFormSubmitSuccess={handleFormSuccess} />
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}>
+          <div className="modal-content modal-teams-form">
+            <AgendarForm 
+              selectedDate={selectedDate} 
+              selectedEndDate={selectedEndDate} 
+              onFormSubmitSuccess={handleFormSuccess} 
+              onClose={() => setIsModalOpen(false)}
+              dayEvents={events}
+            />
           </div>
         </div>
       )}
@@ -930,15 +961,15 @@ const AgendarReunion = () => {
         .rbc-event {
           background-color: #eff6ff !important;
           color: #1d4ed8 !important;
-          border: none !important;
-          border-left: 3px solid #3b82f6 !important;
+          border: 1px solid #bfdbfe !important;
+          border-left: 4px solid #3b82f6 !important;
           border-radius: 4px !important;
-          padding: 1px 3px !important;
+          padding: 3px 6px !important;
           margin-bottom: 1px;
           margin-top: 1px;
-          font-size: 10.5px;
+          font-size: 11px;
           font-weight: 500;
-          line-height: 1.2;
+          line-height: 1.3;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
           transition: all 0.2s ease;
         }
@@ -955,6 +986,18 @@ const AgendarReunion = () => {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        /* Vista de Tiempo (Día / Semana): Permitir saltos de línea para ver títulos completos */
+        .rbc-time-view .rbc-event {
+          padding: 6px 8px !important;
+        }
+        .rbc-time-view .rbc-event-content {
+          white-space: normal !important;
+          word-break: break-word !important;
+          display: -webkit-box;
+          -webkit-line-clamp: 4;
+          -webkit-box-orient: vertical;
         }
 
         /* Botón de '+X more' */
@@ -986,6 +1029,15 @@ const AgendarReunion = () => {
           background: white; padding: 30px; border-radius: 16px;
           width: 550px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
           position: relative; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .modal-content.modal-teams-form {
+          width: 950px;
+          height: 650px;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          border-radius: 8px;
         }
         .modal-close {
           position: absolute; top: 16px; right: 20px;
@@ -1453,6 +1505,16 @@ const AgendarReunion = () => {
           }
         }
       `}</style>
+      
+      {selectedEventDetails && (
+        <EventDetailsModal 
+          event={selectedEventDetails} 
+          onClose={() => setSelectedEventDetails(null)} 
+          onJoin={handleJoinMeeting}
+          onCancel={handleCancelMeeting}
+          onReschedule={handleRescheduleMeeting}
+        />
+      )}
     </div>
   );
 };

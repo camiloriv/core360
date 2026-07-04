@@ -237,7 +237,7 @@ export default function Topbar({ user }) {
               alignItems: "center",
               justifyContent: "center",
               padding: "6px",
-              borderRadius: "50%",
+              borderRadius: "4px",
               transition: "background 0.2s"
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#eff6ff")}

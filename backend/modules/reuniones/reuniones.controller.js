@@ -609,20 +609,39 @@ exports.marcarNoAplica = async (req, res) => {
         // Intentar como teams_evento_id (número)
         const teId = parseInt(id);
         if (!isNaN(teId)) {
-            const nuevoEstado = noAplica ? 'excluida' : 'pasada';
-            await db.query("UPDATE teams_eventos SET estado = ? WHERE id = ?", [nuevoEstado, teId]);
-
             if (noAplica) {
-                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, asunto FROM teams_eventos WHERE id = ?", [teId]);
-                if (teRows.length > 0 && teRows[0].empresa_id) {
-                    await db.query(
-                        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
-                        [teRows[0].empresa_id, teRows[0].fecha, req.usuario.id, teRows[0].event_id, teRows[0].asunto || 'Reunión No Aplica']
-                    );
+                // En lugar de cambiar te.estado a 'excluida' (lo que la borraría de los KPIs),
+                // creamos una minuta con estado_envio = 'no_aplica' para que el evento siga activo y sumando a los KPIs.
+                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
+                if (teRows.length > 0) {
+                    const teRow = teRows[0];
+                    const idMinuta = `minuta-${teId}-${Date.now()}`;
+                    await db.query(`
+                        INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
+                        VALUES (?, ?, 'no_aplica', ?, ?, ?, ?, ?)
+                    `, [
+                        idMinuta, 
+                        teId, 
+                        req.usuario.id, 
+                        teRow.usuario_id || req.usuario.id,
+                        teRow.fecha,
+                        teRow.hora || '00:00',
+                        teRow.empresa_id || null
+                    ]);
+
+                    if (teRow.empresa_id) {
+                        await db.query(
+                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
+                            [teRow.empresa_id, teRow.fecha, req.usuario.id, teRow.event_id, teRow.asunto || 'Reunión No Aplica']
+                        );
+                    }
                 }
+            } else {
+                // Si por alguna razón se intentaba revertir un evento puro
+                await db.query("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
             }
 
-            return res.json({ success: true, message: "Estado del evento actualizado" });
+            return res.json({ success: true, message: "Estado de reunión actualizado (se conservó en los KPIs)" });
         }
 
         return res.status(404).json({ error: "Registro no encontrado" });

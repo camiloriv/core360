@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDashboardData, clearDashboardCache } from "../hooks/useDashboardData";
-import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, descartarHuerfana } from "../services/agendamientoService";
+import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, marcarExcluida } from "../services/agendamientoService";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
 import "../styles/core360-theme.css";
@@ -98,7 +98,7 @@ export default function VincularReuniones() {
 
   const handleDescartar = async (idHuerfana) => {
     try {
-      await descartarHuerfana(idHuerfana);
+      await marcarExcluida(idHuerfana);
       clearDashboardCache();
       Swal.fire({
         title: "Descartada",
@@ -205,125 +205,140 @@ export default function VincularReuniones() {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-            {[...huerfanas].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).map(h => (
-              <div key={h.id} style={{
-                background: "white",
-                padding: "20px",
-                borderRadius: "10px",
-                display: "flex",
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "20px",
-                border: "1px solid #ffe4e6",
-                boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)"
-              }}>
-                <div style={{ flex: "1 1 350px", minWidth: "280px" }}>
-                  <strong style={{ color: "#1e293b", fontSize: "15px", display: "block", marginBottom: "4px" }}>{h.asunto}</strong>
-                  <div style={{ fontSize: "13px", color: "#64748b", display: "flex", gap: "8px", alignItems: "center" }}>
-                    <span>📅 {new Date(h.fecha).toLocaleDateString()} a las {h.hora}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px", lineHeight: "1.4" }}>
-                    <span style={{ fontWeight: "600", color: "#475569" }}>Asistentes:</span> {(() => {
-                      if (!h.asistentes) return "Ninguno";
-                      try {
-                        const parsed = typeof h.asistentes === "string" ? JSON.parse(h.asistentes) : h.asistentes;
-                        if (Array.isArray(parsed)) {
-                          return parsed.map(item => {
-                            if (typeof item === 'string') return item;
-                            if (item && typeof item === 'object') {
-                              return item.name ? `${item.name} (${item.email})` : item.email;
-                            }
-                            return String(item);
-                          }).join(", ");
-                        }
-                      } catch (e) {}
-                      return String(h.asistentes);
-                    })()}
-                  </div>
-                </div>
-                <div style={{
+            {[...huerfanas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map(h => {
+              const asistentesList = (() => {
+                if (!h.asistentes) return "Ninguno";
+                try {
+                  const parsed = typeof h.asistentes === "string" ? JSON.parse(h.asistentes) : h.asistentes;
+                  if (Array.isArray(parsed)) {
+                    return parsed.map(item => {
+                      if (typeof item === 'string') return item;
+                      if (item && typeof item === 'object') {
+                        return item.name ? `${item.name} (${item.email})` : item.email;
+                      }
+                      return String(item);
+                    }).join(", ");
+                  }
+                } catch (e) {}
+                return String(h.asistentes);
+              })();
+
+              return (
+                <div key={h.id} style={{
+                  background: "white",
+                  padding: "20px",
+                  borderRadius: "10px",
                   display: "flex",
+                  flexDirection: "column",
                   gap: "12px",
-                  alignItems: "center",
-                  flex: "2 1 600px",
-                  minWidth: "320px",
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap"
+                  border: "1px solid #ffe4e6",
+                  boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)"
                 }}>
-                  <div style={{ flex: "1 1 250px", minWidth: "220px" }}>
-                    <SearchableFilter
-                      label=""
-                      value={huerfanasSeleccionadas[h.id] ? (empresas.find(e => e.id.toString() === huerfanasSeleccionadas[h.id])?.nombre || "") : ""}
-                      options={empresas.map(emp => emp.nombre)}
-                      onChange={(val) => {
-                        const found = empresas.find(e => e.nombre.toUpperCase() === (val || "").toUpperCase());
-                        setHuerfanasSeleccionadas(prev => ({
-                          ...prev,
-                          [h.id]: found ? found.id.toString() : ""
-                        }));
-                      }}
-                      placeholder="Buscar empresa..."
-                    />
+                  {/* Fila 1: Título de la reunión, fecha y organizador */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ flex: "1 1 300px" }}>
+                      <strong style={{ color: "#1e293b", fontSize: "16px", display: "block", marginBottom: "6px" }}>
+                        {h.asunto}
+                      </strong>
+                      <div style={{ fontSize: "13px", color: "#64748b", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                        <span>📅 {new Date(h.fecha).toLocaleDateString()} a las {h.hora}</span>
+                        <span style={{ color: "#94a3b8" }}>•</span>
+                        <span style={{ fontWeight: "500", color: "#334155", background: "#f1f5f9", padding: "2px 8px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          👤 Org: {h.usuario_nombre || h.organizador || "Desconocido"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => handleVincular(h.id, huerfanasSeleccionadas[h.id])}
-                    disabled={!huerfanasSeleccionadas[h.id]}
-                    style={{ 
-                      background: huerfanasSeleccionadas[h.id] ? "var(--primary-color)" : "#cbd5e1", 
-                      color: "white", 
-                      height: "42px", 
-                      padding: "0 22px", 
-                      border: "none", 
-                      borderRadius: "8px", 
-                      cursor: huerfanasSeleccionadas[h.id] ? "pointer" : "not-allowed", 
-                      fontWeight: "bold",
-                      fontSize: "13px",
-                      whiteSpace: "nowrap",
-                      transition: "all 0.2s ease",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: huerfanasSeleccionadas[h.id] ? "0 2px 4px rgba(30, 41, 59, 0.1)" : "none"
-                    }}
-                    onMouseOver={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "brightness(1.1)"; }}
-                    onMouseOut={(e) => { e.currentTarget.style.filter = "none"; }}
-                  >
-                    Vincular
-                  </button>
-                  <button 
-                    onClick={() => handleDescartar(h.id)}
-                    style={{ 
-                      background: "white", 
-                      color: "#475569", 
-                      height: "42px", 
-                      padding: "0 20px", 
-                      border: "1.5px solid #cbd5e1", 
-                      borderRadius: "8px", 
-                      cursor: "pointer",
-                      fontWeight: "600",
-                      fontSize: "13px",
-                      whiteSpace: "nowrap",
-                      transition: "all 0.2s ease",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                    onMouseOver={(e) => { 
-                      e.currentTarget.style.background = "#f8fafc"; 
-                      e.currentTarget.style.borderColor = "#94a3b8";
-                    }}
-                    onMouseOut={(e) => { 
-                      e.currentTarget.style.background = "white"; 
-                      e.currentTarget.style.borderColor = "#cbd5e1";
-                    }}
-                  >
-                    No aplica empresa
-                  </button>
+
+                  {/* Fila 2: Asistentes ocupando todo el ancho de la tarjeta */}
+                  <div style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", background: "#fafafa", padding: "10px 12px", borderRadius: "6px", border: "1px solid #f1f5f9" }}>
+                    <span style={{ fontWeight: "600", color: "#64748b" }}>Asistentes:</span> {asistentesList}
+                  </div>
+
+                  {/* Fila 3: Acciones de vinculación alineadas al final */}
+                  <div style={{
+                    display: "flex",
+                    gap: "12px",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    flexWrap: "wrap",
+                    borderTop: "1px solid #f1f5f9",
+                    paddingTop: "12px",
+                    marginTop: "4px"
+                  }}>
+                    <div style={{ width: "250px" }}>
+                      <SearchableFilter
+                        label=""
+                        value={huerfanasSeleccionadas[h.id] ? (empresas.find(e => e.id.toString() === huerfanasSeleccionadas[h.id])?.nombre || "") : ""}
+                        options={empresas.map(emp => emp.nombre)}
+                        onChange={(val) => {
+                          const found = empresas.find(e => e.nombre.toUpperCase() === (val || "").toUpperCase());
+                          setHuerfanasSeleccionadas(prev => ({
+                            ...prev,
+                            [h.id]: found ? found.id.toString() : ""
+                          }));
+                        }}
+                        placeholder="Buscar empresa..."
+                      />
+                    </div>
+                    <button 
+                      onClick={() => handleVincular(h.id, huerfanasSeleccionadas[h.id])}
+                      disabled={!huerfanasSeleccionadas[h.id]}
+                      style={{ 
+                        background: huerfanasSeleccionadas[h.id] ? "var(--primary-color)" : "#cbd5e1", 
+                        color: "white", 
+                        height: "42px", 
+                        padding: "0 22px", 
+                        border: "none", 
+                        borderRadius: "8px", 
+                        cursor: huerfanasSeleccionadas[h.id] ? "pointer" : "not-allowed", 
+                        fontWeight: "bold",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.2s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: huerfanasSeleccionadas[h.id] ? "0 2px 4px rgba(30, 41, 59, 0.1)" : "none"
+                      }}
+                      onMouseOver={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "brightness(1.1)"; }}
+                      onMouseOut={(e) => { e.currentTarget.style.filter = "none"; }}
+                    >
+                      Vincular
+                    </button>
+                    <button 
+                      onClick={() => handleDescartar(h.id)}
+                      style={{ 
+                        background: "white", 
+                        color: "#475569", 
+                        height: "42px", 
+                        padding: "0 20px", 
+                        border: "1.5px solid #cbd5e1", 
+                        borderRadius: "8px", 
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.2s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                      onMouseOver={(e) => { 
+                        e.currentTarget.style.background = "#f8fafc"; 
+                        e.currentTarget.style.borderColor = "#94a3b8";
+                      }}
+                      onMouseOut={(e) => { 
+                        e.currentTarget.style.background = "white"; 
+                        e.currentTarget.style.borderColor = "#cbd5e1";
+                      }}
+                    >
+                      No aplica empresa
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

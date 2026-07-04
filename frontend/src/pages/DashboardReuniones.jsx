@@ -405,12 +405,29 @@ export default function DashboardReuniones() {
       // Helper function to extract emails from string or JSON
       const extractEmails = (val) => {
         if (!val) return [];
+        if (Array.isArray(val)) {
+          return val.map(e => {
+            if (typeof e === 'string') return e.trim();
+            if (e && typeof e === 'object') return (e.email || '').trim();
+            return '';
+          }).filter(e => e.includes("@"));
+        }
+        if (typeof val === 'object') {
+          return val.email ? [val.email.trim()] : [];
+        }
         if (typeof val !== "string") return [];
-        if (val.trim().startsWith("[")) {
+        const trimmed = val.trim();
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
           try {
-            const parsed = JSON.parse(val);
+            const parsed = JSON.parse(trimmed);
             if (Array.isArray(parsed)) {
-              return parsed.map(e => String(e).trim()).filter(e => e.includes("@"));
+              return parsed.map(e => {
+                if (typeof e === 'string') return e.trim();
+                if (e && typeof e === 'object') return (e.email || '').trim();
+                return '';
+              }).filter(e => e.includes("@"));
+            } else if (parsed && typeof parsed === 'object') {
+              return parsed.email ? [parsed.email.trim()] : [];
             }
           } catch (e) {}
         }
@@ -420,16 +437,17 @@ export default function DashboardReuniones() {
 
       const emailsEnviadoA = extractEmails(r.enviado_a);
       const emailsCc = extractEmails(r.correos_cc);
-      const allEmails = [...emailsEnviadoA, ...emailsCc];
+      const emailsAsistentes = extractEmails(r.asistentes);
+      const allEmails = [...emailsEnviadoA, ...emailsCc, ...emailsAsistentes];
 
       // --- CLASIFICACIÓN PRINCIPAL ---
       const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
 
       // Excluida: estado raw del evento
-      const isExcluida = r.te_estado === 'excluida';
+      const isExcluida = r.estado_teams === 'excluida';
 
       // Proforma: TODOS los emails son de dominio Proforma
-      const isProforma = !isExcluida && (
+      const isProforma = (
         r.empresa_nombre === "PROFORMA INTERNA"
         || r.tipo_reu === "Reunión Interna Proforma"
         || (allEmails.length > 0 && allEmails.every(email =>
@@ -439,6 +457,13 @@ export default function DashboardReuniones() {
 
       r._isProforma = isProforma;
       r._isExcluida = isExcluida;
+
+      if (isProforma) {
+        r.is_huerfana = false;
+        if (r.estado_envio === "huerfana") {
+          r.estado_envio = "borrador";
+        }
+      }
 
       
       // Helper to get local date to avoid timezone shift
@@ -472,6 +497,7 @@ export default function DashboardReuniones() {
       // Tab filters logic
       if (activeTab === "internas" || activeTab === "proforma") {
         if (!isProforma) return false;
+        if (isExcluida) return false;
       }
       if (activeTab === "clientes") {
         if (isProforma || isExcluida) return false;
@@ -546,9 +572,22 @@ export default function DashboardReuniones() {
       }
     }
 
-    return Array.from(uniqueMeetingsMap.values()).sort(
-      (a, b) => new Date(b.fecha_reu) - new Date(a.fecha_reu),
-    );
+    return Array.from(uniqueMeetingsMap.values()).sort((a, b) => {
+      const getParsedDate = (item) => {
+        if (!item.fecha_reu) return new Date(0);
+        const datePart = typeof item.fecha_reu === "string" ? item.fecha_reu.substring(0, 10) : new Date(item.fecha_reu).toISOString().substring(0, 10);
+        const timePart = item.hora || "00:00:00";
+        return new Date(`${datePart}T${timePart}`);
+      };
+
+      const dateTimeA = getParsedDate(a);
+      const dateTimeB = getParsedDate(b);
+
+      if (activeTab === "proximas") {
+        return dateTimeA - dateTimeB; // Ascending: closest first
+      }
+      return dateTimeB - dateTimeA; // Descending: newest/most recent first
+    });
   }, [
     reuniones,
     filtroMacroZona,
@@ -667,7 +706,7 @@ export default function DashboardReuniones() {
       Empresa: r.empresa_nombre,
       "Usuario Creador": r.ejecutiva_nombre,
       "Jefatura Responsable": r.jefatura_nombre,
-      Modalidad: r.lugar,
+      Modalidad: r.lugar === "Presencial" || Number(r.es_online) === 0 ? "Presencial" : (r.lugar || "Online"),
       Participantes: r.participantes,
       "Estado Minuta": r.estado_envio,
     }));
@@ -958,7 +997,7 @@ export default function DashboardReuniones() {
           <KpiCard
             title="Reuniones Presenciales"
             value={
-              realizedReuniones.filter((r) => r.lugar === "Presencial").length
+              realizedReuniones.filter((r) => r.lugar === "Presencial" || Number(r.es_online) === 0).length
             }
             sub="Modalidad física"
             color="#0891b2" // Teal/Cyan
@@ -967,7 +1006,7 @@ export default function DashboardReuniones() {
           <KpiCard
             title="Reuniones Online"
             value={
-              realizedReuniones.filter((r) => r.lugar !== "Presencial").length
+              realizedReuniones.filter((r) => r.lugar !== "Presencial" && Number(r.es_online) !== 0).length
             }
             sub="Modalidad remota"
             color="#9333ea" // Purple
@@ -1473,27 +1512,23 @@ export default function DashboardReuniones() {
                             </div>
                           ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <div style={{
-                                color: "#6d28d9", fontWeight: "bold", fontSize: "12px",
-                                background: "#ede9fe", padding: "4px 8px", borderRadius: "4px",
-                                display: "inline-block", whiteSpace: "nowrap"
-                              }}>
-                                🚫 Excluida
-                              </div>
-                              <div
-                                onClick={() => navigate("/home", { state: { draft: r } })}
-                                style={{
-                                  color: "#6d28d9", fontWeight: "600", cursor: "pointer", fontSize: "11px",
-                                  textDecoration: "underline", padding: "2px 0"
+                              <span
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  const isTeOnly = !r.minuta_row_id;
+                                  handleMarcarNoAplica(r.id_reunion, isTeOnly, true); 
                                 }}
-                                title="Crear minuta para esta reunión"
+                                style={{
+                                  fontSize: "12px", color: "#3b82f6", cursor: "pointer", textDecoration: "underline",
+                                  fontWeight: "600", padding: "4px 8px", borderRadius: "4px", background: "#eff6ff"
+                                }}
                               >
-                                ✍️ Crear Minuta
-                              </div>
+                                Revertir
+                              </span>
                             </div>
 
                           ) : r.estado_envio === "borrador" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
+                            <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
                               <div
                                 onClick={() => navigate("/home", { state: { draft: r } })}
                                 style={{
@@ -1507,6 +1542,38 @@ export default function DashboardReuniones() {
                               >
                                 ✍️ Pendiente de Minuta
                               </div>
+                              <button
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  const isTeOnly = !r.minuta_row_id;
+                                  handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
+                                }}
+                                style={{
+                                  background: "#fee2e2",
+                                  color: "#ef4444",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  width: "24px",
+                                  height: "24px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  padding: 0,
+                                  transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#fca5a5";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "#fee2e2";
+                                }}
+                                title="No aplica enviar minuta"
+                              >
+                                ❌
+                              </button>
                             </div>
                           ) : r.estado_envio === "agendada" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>

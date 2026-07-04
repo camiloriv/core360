@@ -816,7 +816,13 @@ const vincularEmpresaAEvento = async (req, res) => {
 
         // Aprender dominios y contactos
         let attendeesList = [];
-        try { attendeesList = JSON.parse(evento.asistentes || '[]'); } catch (e) {}
+        if (evento.asistentes) {
+            if (typeof evento.asistentes === 'object') {
+                attendeesList = evento.asistentes;
+            } else {
+                try { attendeesList = JSON.parse(evento.asistentes); } catch (e) {}
+            }
+        }
 
         const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
 
@@ -826,15 +832,22 @@ const vincularEmpresaAEvento = async (req, res) => {
 
             if (email && email.includes('@')) {
                 const dom = '@' + email.split('@')[1];
-                if (!dominiosGenericos.includes(dom.substring(1))) {
-                    const shouldSaveDomain = !dominios || dominios.includes(dom);
-                    if (shouldSaveDomain) {
-                        await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
-                        const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                        if (existing.length === 0) {
-                            await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
-                        } else if (name && !existing[0].nombre) {
-                            await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                
+                // Evitar guardar correos internos de Proforma
+                if (dom !== '@proforma.cl' && dom !== '@oticproforma.cl') {
+                    // Guardar el contacto siempre (independiente de si su dominio es genérico o no)
+                    const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
+                    if (existing.length === 0) {
+                        await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
+                    } else if (name && !existing[0].nombre) {
+                        await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                    }
+
+                    // Guardar el dominio de la empresa solo si no es genérico
+                    if (!dominiosGenericos.includes(dom.substring(1))) {
+                        const shouldSaveDomain = !dominios || dominios.includes(dom);
+                        if (shouldSaveDomain) {
+                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
                         }
                     }
                 }
@@ -847,15 +860,26 @@ const vincularEmpresaAEvento = async (req, res) => {
         const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
         const knownEmails = new Set(contactosDocs.map(c => c.correo));
 
-        const [sinEmpresa] = await db.query(
-            "SELECT * FROM teams_eventos WHERE empresa_id IS NULL AND estado NOT IN ('cancelada', 'excluida') AND id != ?",
-            [id]
-        );
+        const [sinEmpresa] = await db.query(`
+            SELECT te.* 
+            FROM teams_eventos te
+            LEFT JOIN minutas m ON m.teams_evento_id = te.id
+            WHERE te.empresa_id IS NULL 
+              AND te.estado NOT IN ('cancelada', 'excluida') 
+              AND m.id IS NULL 
+              AND te.id != ?
+        `, [id]);
 
         let autoVinculados = 0;
         for (const evt of sinEmpresa) {
             let evtAttendees = [];
-            try { evtAttendees = JSON.parse(evt.asistentes || '[]'); } catch (e) {}
+            if (evt.asistentes) {
+                if (typeof evt.asistentes === 'object') {
+                    evtAttendees = evt.asistentes;
+                } else {
+                    try { evtAttendees = JSON.parse(evt.asistentes); } catch (e) {}
+                }
+            }
 
             const externalDomains = new Set();
             let matched = false;
@@ -863,16 +887,29 @@ const vincularEmpresaAEvento = async (req, res) => {
             for (const item of evtAttendees) {
                 const email = (typeof item === 'string' ? item : item.email || '').trim().toLowerCase();
                 if (!email) continue;
-                if (knownEmails.has(email)) { matched = true; break; }
+                
                 if (email.includes('@')) {
                     const dom = '@' + email.split('@')[1];
-                    if (!dominiosGenericos.includes(dom.substring(1))) {
-                        externalDomains.add(dom);
-                        if (knownDomains.has(dom)) matched = true;
+                    
+                    // Si no es un correo interno de Proforma
+                    if (dom !== '@proforma.cl' && dom !== '@oticproforma.cl') {
+                        // Coincidencia exacta por contacto/email registrado
+                        if (knownEmails.has(email)) {
+                            matched = true;
+                        }
+
+                        // Agregar a dominios externos y validar dominio corporativo registrado
+                        if (!dominiosGenericos.includes(dom.substring(1))) {
+                            externalDomains.add(dom);
+                            if (knownDomains.has(dom)) {
+                                matched = true;
+                            }
+                        }
                     }
                 }
             }
 
+            // Auto-vincular si coincide dominio o email, y hay como máximo 1 dominio corporativo externo (evita reuniones masivas)
             if (matched && externalDomains.size <= 1) {
                 await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, evt.id]);
                 autoVinculados++;

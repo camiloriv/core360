@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function KpiCard({ title, value, sub, color, trend, icon }) {
+export default function KpiCard({ title, value, sub, color, trend, icon, onClick, isSelected }) {
   const cardColor = color || "var(--primary-color)";
 
   // If the icon is an SVG element and we want it to be a bit larger/standardized, we can clone it.
@@ -15,27 +15,35 @@ export default function KpiCard({ title, value, sub, color, trend, icon }) {
 
   return (
     <div
-      className="kpi-card"
+      className={`kpi-card ${isSelected ? 'selected' : ''}`}
+      onClick={onClick}
       style={{
-        background: "#fff",
+        background: isSelected ? `${cardColor}08` : "#fff",
         padding: "12px 14px",
         borderRadius: "10px",
-        border: "1px solid #e2e8f0",
+        border: isSelected ? `2.5px solid ${cardColor}` : "1px solid #e2e8f0",
         display: "flex",
         alignItems: "center",
         gap: "14px",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease",
-        cursor: "default",
+        boxShadow: isSelected ? "0 8px 16px rgba(0,0,0,0.08)" : "0 2px 4px rgba(0,0,0,0.02)",
+        transition: "all 0.2s ease",
+        cursor: onClick ? "pointer" : "default",
         overflow: "hidden",
+        transform: isSelected ? "translateY(-3px)" : "translateY(0)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 8px 12px -3px rgba(0,0,0,0.08)";
+        if (!isSelected && onClick) {
+          e.currentTarget.style.transform = "translateY(-3px)";
+          e.currentTarget.style.boxShadow = "0 8px 12px -3px rgba(0,0,0,0.08)";
+          e.currentTarget.style.borderColor = cardColor;
+        }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
+        if (!isSelected) {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
+          e.currentTarget.style.borderColor = "#e2e8f0";
+        }
       }}
     >
       {icon && (

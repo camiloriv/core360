@@ -59,7 +59,7 @@ const TYPE_COLORS = {
 const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // Default gris claro
 
 export default function DashboardReuniones() {
-  const { user, reuniones, jefaturas, empresas, loading, refetch } = useDashboardData();
+  const { user, reuniones, jefaturas, empresas, usuarios, loading, refetch } = useDashboardData();
   const userRol = user?.permisos;
 
   // DEBUG TEMPORAL: log datos recibidos para diagnosticar problemas en entorno de desarrollo
@@ -392,7 +392,7 @@ export default function DashboardReuniones() {
     ...[...new Set(reuniones.map(r => r.tipo_reu).filter(Boolean))].sort()
   ], [reuniones]);
 
-  const filteredReuniones = useMemo(() => {
+  const baseFilteredReuniones = useMemo(() => {
     const result = reuniones.filter((r) => {
       const isHuerfana = Boolean(r.is_huerfana);
       // Para roles ejecutiva/jefatura el backend ya filtra por usuario_id, así que las reuniones
@@ -519,7 +519,21 @@ export default function DashboardReuniones() {
         if (isUpcoming) return false;
       }
 
-      const pasaMacroYJef = isProforma || isHuerfana || esReunionPropia || empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      const owner = (usuarios || []).find(u => Number(u.id) === Number(r.ejecutiva_id));
+      const ownerJefaturaId = owner?.jefatura_id || owner?.id; 
+
+      let pasaMacroYJef = false;
+      if (isProforma || esReunionPropia) {
+        pasaMacroYJef = true;
+      } else if (isHuerfana) {
+        if (filtroJefatura !== "") {
+          pasaMacroYJef = Number(ownerJefaturaId) === Number(filtroJefatura);
+        } else {
+          pasaMacroYJef = true;
+        }
+      } else {
+        pasaMacroYJef = empresasPorJefatura.some(emp => emp.id === r.empresa_id);
+      }
       const pasaEmpresa = filtroEmpresa === "Todas" || r.empresa_nombre === filtroEmpresa || (isHuerfana && filtroEmpresa === "Todas");
       const pasaTipo = filtroTipo === "Todas" || r.tipo_reu === filtroTipo || (isHuerfana && filtroTipo === "Todas");
 
@@ -599,8 +613,42 @@ export default function DashboardReuniones() {
     activeTab,
     userRol,
     user,
+    usuarios,
     empresasPorJefatura
   ]);
+
+  const [filtroKpi, setFiltroKpi] = useState(null); // null | 'presenciales' | 'online' | 'este_mes' | 'historico'
+
+  const filteredReuniones = useMemo(() => {
+    if (!filtroKpi) return baseFilteredReuniones;
+    return baseFilteredReuniones.filter(r => {
+      if (filtroKpi === 'presenciales') {
+        return r.lugar === "Presencial" || Number(r.es_online) === 0;
+      }
+      if (filtroKpi === 'online') {
+        return r.lugar !== "Presencial" && Number(r.es_online) !== 0;
+      }
+      if (filtroKpi === 'este_mes') {
+        const d = new Date(r.fecha_reu);
+        const now = new Date();
+        return (
+          d.getUTCMonth() === now.getMonth() &&
+          d.getUTCFullYear() === now.getFullYear() &&
+          r.estado_envio !== 'agendada' && 
+          r.estado_envio !== 'no_aplica' && 
+          r.estado_envio !== 'cancelada' &&
+          !r.is_huerfana
+        );
+      }
+      if (filtroKpi === 'historico') {
+        return r.estado_envio !== 'agendada' && 
+               r.estado_envio !== 'no_aplica' && 
+               r.estado_envio !== 'cancelada' &&
+               !r.is_huerfana;
+      }
+      return true;
+    });
+  }, [baseFilteredReuniones, filtroKpi]);
 
   const huerfanasCount = useMemo(() => {
     return reuniones.filter(r => {
@@ -617,21 +665,22 @@ export default function DashboardReuniones() {
       return;
     }
     setCurrentPage(1);
-  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo, filtroEstado]);
+    setFiltroKpi(null); // Reset KPI card filter when general filters change
+  }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroPeriodo, filtroEstado, activeTab]);
 
   // 🔹 CÁLCULO DE DATOS DE REUNIONES ÚNICAS
   const realizedReuniones = useMemo(() => {
-    return filteredReuniones.filter(r => 
+    return baseFilteredReuniones.filter(r => 
       r.estado_envio !== 'agendada' && 
       r.estado_envio !== 'no_aplica' && 
       r.estado_envio !== 'cancelada' &&
       !r.is_huerfana
     );
-  }, [filteredReuniones]);
+  }, [baseFilteredReuniones]);
 
   const excluidasOSinEmpresaCount = useMemo(() => {
-    return filteredReuniones.filter(r => r.estado_envio === 'no_aplica' || r.is_huerfana).length;
-  }, [filteredReuniones]);
+    return baseFilteredReuniones.filter(r => r.estado_envio === 'no_aplica' || r.is_huerfana).length;
+  }, [baseFilteredReuniones]);
 
   const minutasEnviadasCount = useMemo(() => {
     return realizedReuniones.filter(r => r.estado_envio === 'enviado').length;
@@ -879,7 +928,7 @@ export default function DashboardReuniones() {
             {mostrarFiltroJefatura && (
               <div style={{ minWidth: "200px", flex: "1 1 200px" }}>
                 <SearchableFilter 
-                  label="Seleccionar Jefatura / Ejecutiva"
+                  label="Agenda / Cartera (Jefatura)"
                   value={
                     filtroJefatura
                       ? (jefaturas.find(j => j.id.toString() === filtroJefatura)?.nombre?.toUpperCase() || "TODAS")
@@ -986,6 +1035,8 @@ export default function DashboardReuniones() {
             sub="Reuniones filtradas"
             color="#4338ca" // Deep Indigo
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>}
+            onClick={() => { setCurrentPage(1); setFiltroKpi(prev => prev === 'historico' ? null : 'historico'); }}
+            isSelected={filtroKpi === 'historico'}
           />
           <KpiCard
             title="Empresas Únicas"
@@ -1002,6 +1053,8 @@ export default function DashboardReuniones() {
             sub="Modalidad física"
             color="#0891b2" // Teal/Cyan
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>}
+            onClick={() => { setCurrentPage(1); setFiltroKpi(prev => prev === 'presenciales' ? null : 'presenciales'); }}
+            isSelected={filtroKpi === 'presenciales'}
           />
           <KpiCard
             title="Reuniones Online"
@@ -1011,6 +1064,8 @@ export default function DashboardReuniones() {
             sub="Modalidad remota"
             color="#9333ea" // Purple
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><circle cx="12" cy="12" r="10"/></svg>}
+            onClick={() => { setCurrentPage(1); setFiltroKpi(prev => prev === 'online' ? null : 'online'); }}
+            isSelected={filtroKpi === 'online'}
           />
           <KpiCard
             title="Este Mes (Total)"
@@ -1018,6 +1073,8 @@ export default function DashboardReuniones() {
             sub="Actividad mensual"
             color="#e11d48" // Rose/Pink
             icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+            onClick={() => { setCurrentPage(1); setFiltroKpi(prev => prev === 'este_mes' ? null : 'este_mes'); }}
+            isSelected={filtroKpi === 'este_mes'}
           />
           <KpiCard
             title="Este Mes (Únicas)"
@@ -1401,6 +1458,7 @@ export default function DashboardReuniones() {
             <table style={styles.table}>
               <thead>
                 <tr style={styles.th}>
+                  <th style={styles.thCell}>AGENDA</th>
                   <th style={styles.thCell}>FECHA / ID</th>
                   <th style={styles.thCell}>EMPRESA</th>
                   <th style={styles.thCell}>TIPO / MOTIVO</th>
@@ -1415,8 +1473,17 @@ export default function DashboardReuniones() {
                   const adjuntos = r.archivos_nombres
                     ? JSON.parse(r.archivos_nombres)
                     : [];
+                  
+                  const rowOwner = (usuarios || []).find(u => Number(u.id) === Number(r.ejecutiva_id));
+                  const rowJefaturaName = rowOwner?.jefatura_nombre || (rowOwner?.permisos === 'jefatura' || rowOwner?.permisos === 'gerencia' ? rowOwner?.nombre : "Sin equipo");
+
                   return (
                     <tr key={r.id_reunion} style={styles.tr}>
+                      <td style={styles.tdCell}>
+                        <div style={{ fontSize: "12px", fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Equipo: ${rowJefaturaName}`}>
+                          👥 {rowJefaturaName}
+                        </div>
+                      </td>
                       <td style={styles.tdCell}>
                         <div style={styles.companyName}>
                           {new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })}

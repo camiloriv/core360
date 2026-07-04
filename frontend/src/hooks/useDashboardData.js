@@ -11,7 +11,7 @@ export const clearDashboardCache = () => {
 };
 
 export const useDashboardData = (forceRefresh = false) => {
-  const [data, setData] = useState(globalCache || { jefaturas: [], empresas: [], reuniones: [] });
+  const [data, setData] = useState(globalCache || { jefaturas: [], empresas: [], reuniones: [], usuarios: [] });
   const [loading, setLoading] = useState(!globalCache || forceRefresh);
   const [error, setError] = useState(null);
 
@@ -53,6 +53,7 @@ export const useDashboardData = (forceRefresh = false) => {
         let jefaturasUrl = "/jefaturas";
         let empresasUrl = "/empresas";
         let reunionesUrl = "/reuniones";
+        const usuariosUrl = "/usuarios";
 
         if (rol === "gerencia" && id) {
           jefaturasUrl = `/jefaturas?gerencia_id=${id}`;
@@ -71,15 +72,18 @@ export const useDashboardData = (forceRefresh = false) => {
           reunionesUrl = `/reuniones?usuario_id=${id}&rol=ejecutiva`;
         }
 
-        const [resJ, resE, resR] = await Promise.all([
+        const [resJ, resE, resR, resU] = await Promise.all([
           api.get(jefaturasUrl),
           api.get(empresasUrl),
           api.get(reunionesUrl),
+          api.get(usuariosUrl),
         ]);
 
         let filteredJefaturas = resJ.data || [];
 
         let filteredEmpresas = resE.data || [];
+        
+        let allUsuarios = resU.data || [];
 
         if (rol === "jefatura" && id) {
           filteredJefaturas = filteredJefaturas.filter((j) => j.id === id);
@@ -94,7 +98,8 @@ export const useDashboardData = (forceRefresh = false) => {
         const newData = {
           jefaturas: filteredJefaturas,
           empresas: filteredEmpresas,
-          reuniones: filteredReunionesList
+          reuniones: filteredReunionesList,
+          usuarios: allUsuarios
         };
 
         globalCache = newData;

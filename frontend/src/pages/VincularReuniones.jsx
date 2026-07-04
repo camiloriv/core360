@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDashboardData, clearDashboardCache } from "../hooks/useDashboardData";
-import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, marcarExcluida } from "../services/agendamientoService";
+import { syncEventosPasados, getSyncStatus, obtenerHuerfanas, vincularHuerfana, marcarExcluida, marcarProforma } from "../services/agendamientoService";
 import SearchableFilter from "../components/form/fields/SearchableFilter";
 import Swal from "sweetalert2";
 import "../styles/core360-theme.css";
@@ -110,6 +110,23 @@ export default function VincularReuniones() {
       fetchHuerfanas();
     } catch (e) {
       Swal.fire("Error", "No se pudo descartar", "error");
+    }
+  };
+
+  const handleProforma = async (idHuerfana) => {
+    try {
+      await marcarProforma(idHuerfana);
+      clearDashboardCache();
+      Swal.fire({
+        title: "Clasificada",
+        text: "La reunión ha sido marcada como Interna Proforma.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false
+      });
+      fetchHuerfanas();
+    } catch (e) {
+      Swal.fire("Error", "No se pudo marcar como proforma", "error");
     }
   };
 
@@ -302,17 +319,49 @@ export default function VincularReuniones() {
                         boxShadow: huerfanasSeleccionadas[h.id] ? "0 2px 4px rgba(30, 41, 59, 0.1)" : "none"
                       }}
                       onMouseOver={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "brightness(1.1)"; }}
-                      onMouseOut={(e) => { e.currentTarget.style.filter = "none"; }}
+                      onMouseOut={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "none"; }}
                     >
                       Vincular
                     </button>
+
+                    <button 
+                      onClick={() => handleProforma(h.id)}
+                      style={{ 
+                        background: "white", 
+                        color: "#0284c7", 
+                        height: "42px", 
+                        padding: "0 16px", 
+                        border: "1.5px solid #bae6fd", 
+                        borderRadius: "8px", 
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.2s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                      onMouseOver={(e) => { 
+                        e.currentTarget.style.background = "#f0f9ff"; 
+                        e.currentTarget.style.borderColor = "#7dd3fc";
+                      }}
+                      onMouseOut={(e) => { 
+                        e.currentTarget.style.background = "white"; 
+                        e.currentTarget.style.borderColor = "#bae6fd";
+                      }}
+                      title="Marcar como reunión interna de Proforma"
+                    >
+                      🏢 Proforma
+                    </button>
+
                     <button 
                       onClick={() => handleDescartar(h.id)}
                       style={{ 
                         background: "white", 
                         color: "#475569", 
                         height: "42px", 
-                        padding: "0 20px", 
+                        padding: "0 16px", 
                         border: "1.5px solid #cbd5e1", 
                         borderRadius: "8px", 
                         cursor: "pointer",
@@ -332,8 +381,9 @@ export default function VincularReuniones() {
                         e.currentTarget.style.background = "white"; 
                         e.currentTarget.style.borderColor = "#cbd5e1";
                       }}
+                      title="Excluir o marcar que no aplica para minuta"
                     >
-                      No aplica empresa
+                      🚫 No aplica
                     </button>
                   </div>
                 </div>

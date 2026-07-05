@@ -244,6 +244,76 @@ export default function DashboardReuniones() {
     });
   };
 
+  const handleVerDetalleProforma = (reunion) => {
+    // Parsear asistentes
+    let asistentesList = [];
+    try {
+      const parsed = typeof reunion.asistentes === 'string' ? JSON.parse(reunion.asistentes) : reunion.asistentes;
+      if (Array.isArray(parsed)) {
+        asistentesList = parsed;
+      }
+    } catch (e) {}
+
+    // Parsear organizador
+    let orgName = reunion.organizador_nombre || '';
+    let orgEmail = '';
+    if (reunion.organizador) {
+      try {
+        const parsedOrg = typeof reunion.organizador === 'string' ? JSON.parse(reunion.organizador) : reunion.organizador;
+        orgName = parsedOrg?.name || orgName;
+        orgEmail = parsedOrg?.email || '';
+      } catch (e) {}
+    }
+
+    const rowOwner = (usuarios || []).find(u => Number(u.id) === Number(reunion.ejecutiva_id));
+
+    const asistentesHtml = asistentesList.length > 0 
+      ? `<ul style="margin: 4px 0 0 0; padding-left: 20px; text-align: left; font-size: 13px;">
+          ${asistentesList.map(a => `
+            <li style="margin-bottom: 4px;">
+              <strong>${a.name || a.email}</strong> ${a.email && a.name ? `(${a.email})` : ''} 
+              <span style="font-size: 11px; padding: 2px 6px; border-radius: 10px; margin-left: 6px; background: ${
+                a.response === 'accepted' ? '#dcfce7; color: #166534;' :
+                a.response === 'declined' ? '#fee2e2; color: #991b1b;' :
+                '#f1f5f9; color: #475569;'
+              }">
+                ${a.response === 'accepted' ? 'Aceptado' : a.response === 'declined' ? 'Rechazado' : 'Sin respuesta'}
+              </span>
+            </li>
+          `).join('')}
+         </ul>`
+      : '<span style="color: #94a3b8; font-style: italic;">Sin asistentes detectados</span>';
+
+    Swal.fire({
+      title: reunion.asunto_teams || reunion.motivo_reu || 'Detalle de Reunión Interna',
+      html: `
+        <div style="text-align: left; max-height: 65vh; overflow-y: auto; padding: 12px; font-size: 13px; line-height: 1.6; color: #1e293b; font-family: sans-serif;">
+          <div style="margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+            <div style="margin-bottom: 6px;"><strong>Fecha:</strong> ${new Date(reunion.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })}</div>
+            <div style="margin-bottom: 6px;"><strong>Hora:</strong> ${reunion.hora ? reunion.hora.substring(0, 5) : 'No especificada'}</div>
+            <div style="margin-bottom: 6px;"><strong>Ejecutivo Responsable:</strong> ${rowOwner?.nombre || 'No asignado'}</div>
+            <div style="margin-bottom: 6px;"><strong>Organizador Teams:</strong> ${orgName || 'Desconocido'} ${orgEmail ? `(${orgEmail})` : ''}</div>
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <strong style="display: block; margin-bottom: 6px; font-size: 14px; color: #334155;">Asistentes de la reunión:</strong>
+            ${asistentesHtml}
+          </div>
+
+          ${reunion.body_preview ? `
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;">
+              <strong style="display: block; margin-bottom: 6px; color: #334155;">Descripción/Preview:</strong>
+              <div style="white-space: pre-wrap; font-size: 12.5px; color: #475569;">${reunion.body_preview}</div>
+            </div>
+          ` : ''}
+        </div>
+      `,
+      width: '650px',
+      confirmButtonText: 'Cerrar',
+      confirmButtonColor: '#1e293b',
+    });
+  };
+
   const handleAsignarEmpresa = async () => {
     if (clasificacion === 'empresa' && !selectedEmpresaId) {
       Swal.fire("Atención", "Debes seleccionar una empresa o elegir otra clasificación.", "warning");
@@ -1483,6 +1553,11 @@ export default function DashboardReuniones() {
                         <div style={{ fontSize: "12px", fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Equipo: ${rowJefaturaName}`}>
                           👥 {rowJefaturaName}
                         </div>
+                        {rowOwner?.nombre && (
+                          <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Ejecutivo: ${rowOwner.nombre}`}>
+                            👤 {rowOwner.nombre}
+                          </div>
+                        )}
                       </td>
                       <td style={styles.tdCell}>
                         <div style={styles.companyName}>
@@ -1576,6 +1651,22 @@ export default function DashboardReuniones() {
                           {r.estado_envio === "huerfana" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span style={{ color: "var(--text-muted)" }}>-</span>
+                            </div>
+                          ) : r._isProforma ? (
+                            <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
+                              <div
+                                onClick={() => handleVerDetalleProforma(r)}
+                                style={{
+                                  color: "#1e293b", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
+                                  background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
+                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#cbd5e1")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "#e2e8f0")}
+                                title="Ver Detalle de Reunión Interna"
+                              >
+                                🔍 Ver Detalle
+                              </div>
                             </div>
                           ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>

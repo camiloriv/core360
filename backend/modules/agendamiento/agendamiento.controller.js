@@ -479,6 +479,10 @@ const syncEventosPasados = async (req, res) => {
         // Cargar dominios conocidos para matching
         const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
 
+        // Obtener ID de PROFORMA INTERNA
+        const [proformaEmp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA' LIMIT 1");
+        const proformaEmpId = proformaEmp.length > 0 ? proformaEmp[0].id : null;
+
         const todayStr = now.toISOString().split('T')[0];
         let procesados = 0;
 
@@ -603,6 +607,19 @@ const syncEventosPasados = async (req, res) => {
                             }
                         }
                     }
+                }
+
+                // Si todos los asistentes y el organizador son internos (proforma.cl o oticproforma.cl), es una reunión Proforma Interna
+                const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
+                const allEmailsForProformaCheck = [...emails];
+                if (organizerEmail) allEmailsForProformaCheck.push(organizerEmail);
+
+                const isPurelyProforma = allEmailsForProformaCheck.length > 0 && allEmailsForProformaCheck.every(email => 
+                    PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d))
+                );
+
+                if (isPurelyProforma && proformaEmpId) {
+                    matchedEmpresaId = proformaEmpId;
                 }
 
                 const estado = isEventPast ? 'pasada' : 'agendada';

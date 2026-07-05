@@ -16,8 +16,42 @@ export default function VincularReuniones() {
   const fetchHuerfanas = async () => {
     try {
       const { data } = await obtenerHuerfanas();
-      // Filtrar solo las que no tienen empresa asignada
-      const sinEmpresa = (data || []).filter(e => e.empresa_id === null);
+      const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
+
+      // Filtrar solo las que no tienen empresa asignada y no son puramente internas de Proforma
+      const sinEmpresa = (data || []).filter(e => {
+        if (e.empresa_id !== null) return false;
+
+        // Extraer asistentes
+        let invitados = [];
+        if (e.asistentes) {
+          try {
+            const parsed = typeof e.asistentes === 'string' ? JSON.parse(e.asistentes) : e.asistentes;
+            if (Array.isArray(parsed)) {
+              invitados = parsed.map(item => typeof item === 'string' ? item : item.email).filter(Boolean);
+            }
+          } catch (err) {}
+        }
+
+        // Extraer organizador
+        let orgEmail = '';
+        if (e.organizador) {
+          try {
+            const parsedOrg = typeof e.organizador === 'string' ? JSON.parse(e.organizador) : e.organizador;
+            orgEmail = parsedOrg?.email || '';
+          } catch (err) {}
+        }
+
+        const allEmails = [...invitados];
+        if (orgEmail) allEmails.push(orgEmail);
+
+        const isProforma = allEmails.length > 0 && allEmails.every(email => 
+          PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d))
+        );
+
+        return !isProforma;
+      });
+
       setHuerfanas(sinEmpresa);
     } catch (e) {
       console.error(e);
@@ -261,7 +295,17 @@ export default function VincularReuniones() {
                         <span>📅 {new Date(h.fecha).toLocaleDateString()} a las {h.hora}</span>
                         <span style={{ color: "#94a3b8" }}>•</span>
                         <span style={{ fontWeight: "500", color: "#334155", background: "#f1f5f9", padding: "2px 8px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                          👤 Org: {h.usuario_nombre || h.organizador || "Desconocido"}
+                          👤 Org: {(() => {
+                            if (h.usuario_nombre) return h.usuario_nombre;
+                            if (!h.organizador) return "Desconocido";
+                            try {
+                              const orgObj = typeof h.organizador === "string" ? JSON.parse(h.organizador) : h.organizador;
+                              if (orgObj && typeof orgObj === "object") {
+                                return orgObj.name || orgObj.email || "Desconocido";
+                              }
+                            } catch (err) {}
+                            return String(h.organizador);
+                          })()}
                         </span>
                       </div>
                     </div>

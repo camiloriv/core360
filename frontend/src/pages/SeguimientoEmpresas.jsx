@@ -52,6 +52,7 @@ export default function SeguimientoEmpresas() {
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState(getPeriodoActual());
   const [viewMode, setViewMode] = useState("split");
+  const [invertedSplit, setInvertedSplit] = useState(false);
   const [loading, setLoading] = useState(true);
   
   const periodoOptions = useMemo(() => buildPeriodoOptions(), []);
@@ -1178,9 +1179,27 @@ export default function SeguimientoEmpresas() {
 
         {/* VISTA DIVIDIDA (LISTA) */}
         {viewMode === "split" && (
-          <div className="responsive-grid-2">
+          <>
+            {/* TABS PARA MOBILE */}
+            <div className="cobertura-mobile-tabs" style={{ display: 'none' }}>
+              <div 
+                className={`cobertura-mobile-tab ${!invertedSplit ? 'active-pendientes' : ''}`}
+                onClick={() => setInvertedSplit(false)}
+              >
+                Pendientes ({empresasFiltradas.filter(e => getEstadoTemporal(e.id) !== "gestionada").length})
+              </div>
+              <div 
+                className={`cobertura-mobile-tab ${invertedSplit ? 'active-gestionadas' : ''}`}
+                onClick={() => setInvertedSplit(true)}
+              >
+                Gestionadas ({empresasFiltradas.filter(e => getEstadoTemporal(e.id) === "gestionada").length})
+              </div>
+            </div>
+
+            <div className={`responsive-grid-2 cobertura-split-container ${invertedSplit ? "inverted" : ""}`}>
             {/* PENDIENTES */}
             <div
+              className="cobertura-pendiente-col"
               style={{
                 background: "white",
                 padding: "20px",
@@ -1250,6 +1269,7 @@ export default function SeguimientoEmpresas() {
                     return (
                       <li
                         key={emp.id}
+                        className="cobertura-empresa-item"
                         onClick={() => handleEstadoClick(emp)}
                         style={{
                           padding: "12px 10px",
@@ -1362,6 +1382,7 @@ export default function SeguimientoEmpresas() {
 
             {/* GESTIONADAS */}
             <div
+              className="cobertura-gestionada-col"
               style={{
                 background: "white",
                 padding: "20px",
@@ -1410,6 +1431,7 @@ export default function SeguimientoEmpresas() {
                     return (
                       <li
                         key={emp.id}
+                        className="cobertura-empresa-item"
                         onClick={() => handleEstadoClick(emp)}
                         style={{
                           padding: "12px 10px",
@@ -1477,9 +1499,10 @@ export default function SeguimientoEmpresas() {
               </ul>
             </div>
           </div>
+          </>
         )}
 
-        {/* VISTA DETALLE (TABLA) */}
+        {/* VISTA KANBAN (TABLERO) */}
         {viewMode === "detail" && (
           <div
             style={{

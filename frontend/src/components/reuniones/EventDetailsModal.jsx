@@ -63,31 +63,38 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) =
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.4)',
       display: 'flex', justifyContent: 'center', alignItems: 'center',
-      zIndex: 9999, backdropFilter: 'blur(3px)'
+      zIndex: 9999, backdropFilter: 'blur(3px)',
+      padding: '10px',
     }}>
-      <div style={{
-        background: '#fff',
-        width: '950px',
-        maxWidth: '95vw',
-        height: '650px',
-        maxHeight: '90vh',
-        borderRadius: '8px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-      }}>
+      <div
+        className="event-details-modal-wrapper"
+        style={{
+          background: '#fff',
+          width: '950px',
+          maxWidth: '95vw',
+          height: '650px',
+          maxHeight: '90vh',
+          borderRadius: '8px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        }}
+      >
         {/* Header / Barra de Título */}
-        <div style={{
-          padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          backgroundColor: '#f9fafb'
-        }}>
-          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: 0 }}>
+        <div
+          className="event-details-header"
+          style={{
+            padding: '12px 16px', borderBottom: '1px solid #e5e7eb',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            backgroundColor: '#f9fafb', flexWrap: 'wrap', gap: '8px',
+          }}
+        >
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: 0, flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {event.asunto || event.title || "Evento de Teams"}
           </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
             <button 
               onClick={() => onReschedule(event)}
               style={{
@@ -141,10 +148,10 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) =
         </div>
 
         {/* Cuerpo (2 Columnas) */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="event-details-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           
           {/* Columna Izquierda (Principal) */}
-          <div style={{ flex: 1, borderRight: '1px solid #e5e7eb', padding: '24px', overflowY: 'auto' }}>
+          <div className="event-details-left-col" style={{ flex: 1, borderRight: '1px solid #e5e7eb', padding: '20px', overflowY: 'auto' }}>
             
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '24px' }}>
               <div style={{ 
@@ -165,7 +172,7 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) =
                 
                 {/* Asistentes (Pills) */}
                 {asistentes.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                  <div className="event-details-pills" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
                     {asistentes.map((a, i) => {
                       const colors = getPillColor(a.response);
                       return (
@@ -237,7 +244,7 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) =
           </div>
 
           {/* Columna Derecha (Tracking / Seguimiento) */}
-          <div style={{ width: '280px', padding: '24px', backgroundColor: '#fcfcfc', overflowY: 'auto' }}>
+          <div className="event-details-right-col" style={{ width: '270px', minWidth: '200px', padding: '20px', backgroundColor: '#fcfcfc', overflowY: 'auto' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', margin: '0 0 20px 0' }}>Seguimiento</h3>
             
             {/* Organizador */}

@@ -173,7 +173,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
       fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif", background: '#f3f4f6'
     }}>
       {/* Barra de Menú Superior */}
-      <div style={{
+      <div className="teams-header-bar" style={{
         padding: '10px 20px', background: '#fff', borderBottom: '1px solid #e5e7eb',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center'
       }}>
@@ -214,7 +214,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
         {/* Columna Izquierda: Formulario (Teams-like fields) */}
-        <div style={{ flex: 1, padding: '24px 36px', overflowY: 'auto', background: '#ffffff' }}>
+        <div className="teams-form-col" style={{ flex: 1, padding: '24px 36px', overflowY: 'auto', background: '#ffffff' }}>
           
           {/* Campo Empresa (sin el label doble superior) */}
           <div style={{ marginBottom: '20px' }}>
@@ -279,7 +279,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
           </div>
 
           {/* Fila de Fecha y Hora */}
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '24px' }}>
+          <div className="teams-date-row" style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '24px' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>FECHA</label>
               <input 
@@ -388,7 +388,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
         </div>
 
         {/* Columna Derecha: Calendario del Día (Tope de agenda + Ocupado / Disponible) */}
-        <div style={{ width: '280px', padding: '24px', backgroundColor: '#fcfcfc', borderLeft: '1px solid #e5e7eb', overflowY: 'auto' }}>
+        <div className="teams-schedule-col" style={{ width: '280px', padding: '24px', backgroundColor: '#fcfcfc', borderLeft: '1px solid #e5e7eb', overflowY: 'auto' }}>
           <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0' }}>Horario del Día</h3>
           <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0' }}>Comprueba si tienes topes de agenda</p>
           

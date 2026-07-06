@@ -9,6 +9,8 @@ export default function VincularReuniones() {
   const { user, empresas } = useDashboardData();
   const [huerfanas, setHuerfanas] = useState([]);
   const [huerfanasSeleccionadas, setHuerfanasSeleccionadas] = useState({});
+  const [expandedCards, setExpandedCards] = useState({});
+  const [showParticipants, setShowParticipants] = useState({});
   const [loadingSync, setLoadingSync] = useState(true);
   const [syncingNow, setSyncingNow] = useState(false);
   const [ultimaSincronizacion, setUltimaSincronizacion] = useState(null);
@@ -166,14 +168,14 @@ export default function VincularReuniones() {
 
   return (
     <div className="container fade">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
+      <div className="vincular-header-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h1 style={{ fontSize: "24px", color: "var(--primary-color)", fontWeight: "600", display: "inline-block", marginBottom: "8px" }}>
             Vincular Reuniones
           </h1>
           <p className="page-subtitle">CLASIFICACIÓN DE REUNIONES COMERCIALES PASADAS</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+        <div className="vincular-sync-area" style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           {ultimaSincronizacion && (
             <div style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: "500", background: "white", padding: "8px 12px", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               Última sincronización: <span style={{ fontWeight: "bold", color: "var(--primary-color)" }}>
@@ -255,8 +257,23 @@ export default function VincularReuniones() {
             Se detectaron eventos comerciales en tu calendario de Teams/Outlook con dominios no reconocidos. Por favor, selecciona la empresa correspondiente para cada reunión para crear su minuta borrador, o descártala si no corresponde.
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {[...huerfanas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map(h => {
+              const isExpanded = expandedCards[h.id];
+              const showParts = showParticipants[h.id];
+
+              const organizadorNombre = (() => {
+                if (h.usuario_nombre) return h.usuario_nombre;
+                if (!h.organizador) return "Desconocido";
+                try {
+                  const orgObj = typeof h.organizador === "string" ? JSON.parse(h.organizador) : h.organizador;
+                  if (orgObj && typeof orgObj === "object") {
+                    return orgObj.name || orgObj.email || "Desconocido";
+                  }
+                } catch (err) {}
+                return String(h.organizador);
+              })();
+
               const asistentesList = (() => {
                 if (!h.asistentes) return "Ninguno";
                 try {
@@ -277,159 +294,141 @@ export default function VincularReuniones() {
               return (
                 <div key={h.id} style={{
                   background: "white",
-                  padding: "20px",
                   borderRadius: "10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
                   border: "1px solid #ffe4e6",
-                  boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)"
+                  boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)",
+                  overflow: "hidden",
+                  transition: "box-shadow 0.2s ease",
                 }}>
-                  {/* Fila 1: Título de la reunión, fecha y organizador */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
-                    <div style={{ flex: "1 1 300px" }}>
-                      <strong style={{ color: "#1e293b", fontSize: "16px", display: "block", marginBottom: "6px" }}>
+                  {/* Header de la tarjeta: SIEMPRE visible, clic para expandir */}
+                  <div
+                    onClick={() => setExpandedCards(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
+                    style={{
+                      padding: "14px 18px",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      userSelect: "none",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ color: "#1e293b", fontSize: "15px", display: "block", marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {h.asunto}
                       </strong>
-                      <div style={{ fontSize: "13px", color: "#64748b", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                        <span>📅 {new Date(h.fecha).toLocaleDateString()} a las {h.hora}</span>
-                        <span style={{ color: "#94a3b8" }}>•</span>
-                        <span style={{ fontWeight: "500", color: "#334155", background: "#f1f5f9", padding: "2px 8px", borderRadius: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                          👤 Org: {(() => {
-                            if (h.usuario_nombre) return h.usuario_nombre;
-                            if (!h.organizador) return "Desconocido";
-                            try {
-                              const orgObj = typeof h.organizador === "string" ? JSON.parse(h.organizador) : h.organizador;
-                              if (orgObj && typeof orgObj === "object") {
-                                return orgObj.name || orgObj.email || "Desconocido";
-                              }
-                            } catch (err) {}
-                            return String(h.organizador);
-                          })()}
+                      <div style={{ fontSize: "12px", color: "#64748b", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                        <span>📅 {new Date(h.fecha).toLocaleDateString()} · {h.hora}</span>
+                        <span style={{ fontWeight: "600", color: "#334155", background: "#f1f5f9", padding: "1px 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          👤 {organizadorNombre}
                         </span>
                       </div>
                     </div>
+                    {/* Chevron indicador */}
+                    <span style={{ fontSize: "16px", color: "#94a3b8", flexShrink: 0, transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "none" }}>▾</span>
                   </div>
 
-                  {/* Fila 2: Asistentes ocupando todo el ancho de la tarjeta */}
-                  <div style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", background: "#fafafa", padding: "10px 12px", borderRadius: "6px", border: "1px solid #f1f5f9" }}>
-                    <span style={{ fontWeight: "600", color: "#64748b" }}>Asistentes:</span> {asistentesList}
-                  </div>
+                  {/* Cuerpo expandible */}
+                  {isExpanded && (
+                    <div style={{ padding: "0 18px 16px 18px", borderTop: "1px solid #fff1f2" }}>
 
-                  {/* Fila 3: Acciones de vinculación alineadas al final */}
-                  <div style={{
-                    display: "flex",
-                    gap: "12px",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    flexWrap: "wrap",
-                    borderTop: "1px solid #f1f5f9",
-                    paddingTop: "12px",
-                    marginTop: "4px"
-                  }}>
-                    <div style={{ width: "250px" }}>
-                      <SearchableFilter
-                        label=""
-                        value={huerfanasSeleccionadas[h.id] ? (empresas.find(e => e.id.toString() === huerfanasSeleccionadas[h.id])?.nombre || "") : ""}
-                        options={empresas.map(emp => emp.nombre)}
-                        onChange={(val) => {
-                          const found = empresas.find(e => e.nombre.toUpperCase() === (val || "").toUpperCase());
-                          setHuerfanasSeleccionadas(prev => ({
-                            ...prev,
-                            [h.id]: found ? found.id.toString() : ""
-                          }));
-                        }}
-                        placeholder="Buscar empresa..."
-                      />
+                      {/* Sección participantes (colapsable) */}
+                      <div style={{ marginBottom: "12px" }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowParticipants(prev => ({ ...prev, [h.id]: !prev[h.id] }));
+                          }}
+                          style={{
+                            background: "none", border: "none", color: "#6366f1", fontSize: "12px",
+                            fontWeight: "600", cursor: "pointer", padding: "8px 0", display: "flex",
+                            alignItems: "center", gap: "4px", minWidth: "auto",
+                          }}
+                        >
+                          👥 Participantes {showParts ? "▲" : "▼"}
+                        </button>
+                        {showParts && (
+                          <div style={{ fontSize: "12px", color: "#475569", lineHeight: "1.5", background: "#fafafa", padding: "10px 12px", borderRadius: "6px", border: "1px solid #f1f5f9", wordBreak: "break-word" }}>
+                            {asistentesList}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Acciones de vinculación */}
+                      <div style={{
+                        display: "flex",
+                        gap: "10px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        borderTop: "1px solid #f1f5f9",
+                        paddingTop: "12px",
+                      }}>
+                        <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
+                          <SearchableFilter
+                            label=""
+                            value={huerfanasSeleccionadas[h.id] ? (empresas.find(e => e.id.toString() === huerfanasSeleccionadas[h.id])?.nombre || "") : ""}
+                            options={empresas.map(emp => emp.nombre)}
+                            onChange={(val) => {
+                              const found = empresas.find(e => e.nombre.toUpperCase() === (val || "").toUpperCase());
+                              setHuerfanasSeleccionadas(prev => ({
+                                ...prev,
+                                [h.id]: found ? found.id.toString() : ""
+                              }));
+                            }}
+                            placeholder="Buscar empresa..."
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleVincular(h.id, huerfanasSeleccionadas[h.id])}
+                          disabled={!huerfanasSeleccionadas[h.id]}
+                          style={{
+                            background: huerfanasSeleccionadas[h.id] ? "var(--primary-color)" : "#cbd5e1",
+                            color: "white",
+                            height: "40px",
+                            padding: "0 18px",
+                            border: "none",
+                            borderRadius: "8px",
+                            cursor: huerfanasSeleccionadas[h.id] ? "pointer" : "not-allowed",
+                            fontWeight: "bold",
+                            fontSize: "13px",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.2s ease",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          Vincular
+                        </button>
+                        <button
+                          onClick={() => handleProforma(h.id)}
+                          style={{
+                            background: "white", color: "#0284c7", height: "40px",
+                            padding: "0 14px", border: "1.5px solid #bae6fd", borderRadius: "8px",
+                            cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                            whiteSpace: "nowrap", transition: "all 0.2s ease",
+                            display: "inline-flex", alignItems: "center", justifyContent: "center"
+                          }}
+                          title="Marcar como reunión interna de Proforma"
+                        >
+                          🏢 Proforma
+                        </button>
+                        <button
+                          onClick={() => handleDescartar(h.id)}
+                          style={{
+                            background: "white", color: "#475569", height: "40px",
+                            padding: "0 14px", border: "1.5px solid #cbd5e1", borderRadius: "8px",
+                            cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                            whiteSpace: "nowrap", transition: "all 0.2s ease",
+                            display: "inline-flex", alignItems: "center", justifyContent: "center"
+                          }}
+                          title="Excluir o marcar que no aplica para minuta"
+                        >
+                          🚫 No aplica
+                        </button>
+                      </div>
                     </div>
-                    <button 
-                      onClick={() => handleVincular(h.id, huerfanasSeleccionadas[h.id])}
-                      disabled={!huerfanasSeleccionadas[h.id]}
-                      style={{ 
-                        background: huerfanasSeleccionadas[h.id] ? "var(--primary-color)" : "#cbd5e1", 
-                        color: "white", 
-                        height: "42px", 
-                        padding: "0 22px", 
-                        border: "none", 
-                        borderRadius: "8px", 
-                        cursor: huerfanasSeleccionadas[h.id] ? "pointer" : "not-allowed", 
-                        fontWeight: "bold",
-                        fontSize: "13px",
-                        whiteSpace: "nowrap",
-                        transition: "all 0.2s ease",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: huerfanasSeleccionadas[h.id] ? "0 2px 4px rgba(30, 41, 59, 0.1)" : "none"
-                      }}
-                      onMouseOver={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "brightness(1.1)"; }}
-                      onMouseOut={(e) => { if (huerfanasSeleccionadas[h.id]) e.currentTarget.style.filter = "none"; }}
-                    >
-                      Vincular
-                    </button>
-
-                    <button 
-                      onClick={() => handleProforma(h.id)}
-                      style={{ 
-                        background: "white", 
-                        color: "#0284c7", 
-                        height: "42px", 
-                        padding: "0 16px", 
-                        border: "1.5px solid #bae6fd", 
-                        borderRadius: "8px", 
-                        cursor: "pointer",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                        whiteSpace: "nowrap",
-                        transition: "all 0.2s ease",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                      onMouseOver={(e) => { 
-                        e.currentTarget.style.background = "#f0f9ff"; 
-                        e.currentTarget.style.borderColor = "#7dd3fc";
-                      }}
-                      onMouseOut={(e) => { 
-                        e.currentTarget.style.background = "white"; 
-                        e.currentTarget.style.borderColor = "#bae6fd";
-                      }}
-                      title="Marcar como reunión interna de Proforma"
-                    >
-                      🏢 Proforma
-                    </button>
-
-                    <button 
-                      onClick={() => handleDescartar(h.id)}
-                      style={{ 
-                        background: "white", 
-                        color: "#475569", 
-                        height: "42px", 
-                        padding: "0 16px", 
-                        border: "1.5px solid #cbd5e1", 
-                        borderRadius: "8px", 
-                        cursor: "pointer",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                        whiteSpace: "nowrap",
-                        transition: "all 0.2s ease",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                      onMouseOver={(e) => { 
-                        e.currentTarget.style.background = "#f8fafc"; 
-                        e.currentTarget.style.borderColor = "#94a3b8";
-                      }}
-                      onMouseOut={(e) => { 
-                        e.currentTarget.style.background = "white"; 
-                        e.currentTarget.style.borderColor = "#cbd5e1";
-                      }}
-                      title="Excluir o marcar que no aplica para minuta"
-                    >
-                      🚫 No aplica
-                    </button>
-                  </div>
+                  )}
                 </div>
               );
             })}

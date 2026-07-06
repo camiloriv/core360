@@ -62,6 +62,8 @@ export default function DashboardReuniones() {
   const { user, reuniones, jefaturas, empresas, usuarios, loading, refetch } = useDashboardData();
   const userRol = user?.permisos;
 
+  const [activeMobileChart, setActiveMobileChart] = useState("pie"); // 'pie', 'bar', 'line'
+
   // DEBUG TEMPORAL: log datos recibidos para diagnosticar problemas en entorno de desarrollo
   useEffect(() => {
     if (!loading) {
@@ -1169,9 +1171,32 @@ export default function DashboardReuniones() {
           />
         </div>
 
+        {/* TABS PARA GRAFICOS EN MOBILE */}
+        <div className="charts-mobile-tabs" style={{ display: 'none' }}>
+          <div 
+            className={`chart-mobile-tab ${activeMobileChart === 'pie' ? 'active-tab' : ''}`}
+            onClick={() => setActiveMobileChart('pie')}
+          >
+            Tipos
+          </div>
+          <div 
+            className={`chart-mobile-tab ${activeMobileChart === 'bar' ? 'active-tab' : ''}`}
+            onClick={() => setActiveMobileChart('bar')}
+          >
+            Empresas
+          </div>
+          <div 
+            className={`chart-mobile-tab ${activeMobileChart === 'line' ? 'active-tab' : ''}`}
+            onClick={() => setActiveMobileChart('line')}
+          >
+            Evolución
+          </div>
+        </div>
+
         {/* --- CHARTS (SIDE BY SIDE SEGÚN MOCKUP) --- */}
-        <div className="responsive-grid-2" style={{ marginBottom: "30px" }}>
-          <div
+        <div className={`dashboard-charts-container mobile-active-${activeMobileChart}`}>
+          <div className="responsive-grid-2 chart-grid-top" style={{ marginBottom: "30px" }}>
+            <div className="chart-wrapper chart-pie"
             style={{
               ...styles.chartBox,
               padding: 0,
@@ -1278,7 +1303,7 @@ export default function DashboardReuniones() {
             </div>
           </div>
 
-          <div style={{ ...styles.chartBox, padding: 0, overflow: "hidden" }}>
+          <div className="chart-wrapper chart-bar" style={{ ...styles.chartBox, padding: 0, overflow: "hidden" }}>
             <div
               style={{
                 background: "var(--text-light)",
@@ -1332,7 +1357,7 @@ export default function DashboardReuniones() {
         </div>
 
         {/* --- LINE CHART: EVOLUCIÓN EN EL TIEMPO --- */}
-        <div style={{ ...styles.chartBox, padding: 0, overflow: "hidden", marginBottom: "30px", border: "1px solid #e2e8f0" }}>
+        <div className="chart-wrapper chart-line" style={{ ...styles.chartBox, padding: 0, overflow: "hidden", marginBottom: "30px", border: "1px solid #e2e8f0" }}>
           <div
             style={{
               background: "var(--text-light)",
@@ -1394,6 +1419,7 @@ export default function DashboardReuniones() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </div>
         </div>
 
         {/* --- HISTORIAL (TABLA AL FINAL) --- */}

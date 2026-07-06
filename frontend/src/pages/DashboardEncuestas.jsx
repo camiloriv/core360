@@ -149,6 +149,8 @@ export default function DashboardEncuestas() {
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  
+  const [activeMobileChart, setActiveMobileChart] = useState("radar"); // 'radar', 'bar'
 
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
@@ -648,8 +650,24 @@ export default function DashboardEncuestas() {
           <p>Cargando datos...</p>
         ) : (
           <>
-            <div style={styles.chartsGrid}>
-              <div style={{ ...styles.chartBox, overflow: "hidden" }}>
+            {/* TABS PARA GRAFICOS EN MOBILE */}
+            <div className="charts-mobile-tabs" style={{ display: 'none' }}>
+              <div 
+                className={`chart-mobile-tab ${activeMobileChart === 'radar' ? 'active-tab' : ''}`}
+                onClick={() => setActiveMobileChart('radar')}
+              >
+                Desempeño (DB)
+              </div>
+              <div 
+                className={`chart-mobile-tab ${activeMobileChart === 'bar' ? 'active-tab' : ''}`}
+                onClick={() => setActiveMobileChart('bar')}
+              >
+                Ranking NPS
+              </div>
+            </div>
+
+            <div className={`dashboard-charts-container mobile-active-${activeMobileChart}`} style={styles.chartsGrid}>
+              <div className="chart-wrapper chart-radar" style={{ ...styles.chartBox, overflow: "hidden" }}>
                 <h3 style={styles.sectionTitle}>
                   Desempeño por Dimensión (DB)
                 </h3>
@@ -687,7 +705,7 @@ export default function DashboardEncuestas() {
                 </ResponsiveContainer>
               </div>
 
-              <div style={{ ...styles.chartBox, overflow: "hidden" }}>
+              <div className="chart-wrapper chart-bar" style={{ ...styles.chartBox, overflow: "hidden" }}>
                 <h3 style={styles.sectionTitle}>Ranking NPS por Jefatura</h3>
                 <ResponsiveContainer width="99%" height={320} minWidth={1} minHeight={1}>
                   <BarChart

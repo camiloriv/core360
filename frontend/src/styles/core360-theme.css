@@ -3,6 +3,29 @@
   box-sizing: border-box;
 }
 
+/* Global Custom Scrollbar (Sleek UI) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .encuesta-page {
   font-family: var(--font-main);
   background-color: var(--bg-body);

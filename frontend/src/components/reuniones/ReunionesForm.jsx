@@ -96,28 +96,47 @@ function ReunionesForm({ onSuccess }) {
       setField("participantes", draft.participantes || "");
       
       let filteredEnviadoA = "";
+      let ccEmails = [];
       try {
-        const correos = JSON.parse(draft.enviado_a);
-        if (Array.isArray(correos)) {
-          filteredEnviadoA = correos
-            .map(email => email.trim())
-            .filter(email => !email.toLowerCase().endsWith("@proforma.cl"))
-            .join(", ");
-        } else {
-          filteredEnviadoA = String(draft.enviado_a || "")
-            .split(/[\s,;]+/)
-            .map(email => email.trim())
-            .filter(email => email && !email.toLowerCase().endsWith("@proforma.cl"))
-            .join(", ");
+        let correos = [];
+        const sourceData = draft.enviado_a || draft.asistentes;
+        if (sourceData) {
+          try {
+            const parsed = typeof sourceData === 'string' ? JSON.parse(sourceData) : sourceData;
+            if (Array.isArray(parsed)) {
+              if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].email) {
+                correos = parsed.map(p => p.email);
+              } else {
+                correos = parsed;
+              }
+            } else {
+              correos = String(sourceData).split(/[\s,;]+/);
+            }
+          } catch (e) {
+            correos = String(sourceData).split(/[\s,;]+/);
+          }
         }
-      } catch (e) {
-        filteredEnviadoA = String(draft.enviado_a || "")
-          .split(/[\s,;]+/)
-          .map(email => email.trim())
-          .filter(email => email && !email.toLowerCase().endsWith("@proforma.cl"))
+        
+        const validCorreos = correos.map(e => typeof e === 'string' ? e.trim() : "").filter(Boolean);
+        
+        filteredEnviadoA = validCorreos
+          .filter(email => !email.toLowerCase().endsWith("@proforma.cl"))
           .join(", ");
+          
+        ccEmails = validCorreos
+          .filter(email => email.toLowerCase().endsWith("@proforma.cl") && email.toLowerCase() !== user.correo?.toLowerCase());
+          
+      } catch (e) {
+        console.error("Error procesando correos del draft", e);
       }
+
       setField("enviado_a", filteredEnviadoA);
+      if (ccEmails.length > 0) {
+        setField("correos_cc", ccEmails.join(", "));
+        setIsCcEditable(true);
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       
       setField("lugar", draft.lugar || "");
       // Limpiamos el state para que si el usuario recarga no se vuelva a sobreescribir si ya hizo cambios

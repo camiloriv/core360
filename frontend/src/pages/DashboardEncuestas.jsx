@@ -794,14 +794,14 @@ export default function DashboardEncuestas() {
                 </button>
               </div>
               <div className="table-responsive">
-                <table style={styles.table}>
+                <table style={{ ...styles.table, tableLayout: "fixed", minWidth: "900px" }}>
                   <thead>
                     <tr style={styles.th}>
-                      <th style={styles.thCell}>ID / Tipo</th>
-                      <th style={styles.thCell}>Fechas (Envío / Resp)</th>
-                      <th style={styles.thCell}>Empresa / Ejecutiva</th>
-                      <th style={styles.thCell}>Estado</th>
-                      <th style={styles.thCell}>Respuestas</th>
+                      <th style={{ ...styles.thCell, width: "12%" }}>ID / Tipo</th>
+                      <th style={{ ...styles.thCell, width: "18%" }}>Fechas (Envío / Resp)</th>
+                      <th style={{ ...styles.thCell, width: "30%" }}>Empresa / Ejecutiva</th>
+                      <th style={{ ...styles.thCell, width: "15%" }}>Estado</th>
+                      <th style={{ ...styles.thCell, width: "25%" }}>Respuestas</th>
                     </tr>
                   </thead>
                   <tbody>

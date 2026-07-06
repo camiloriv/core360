@@ -1551,16 +1551,16 @@ export default function DashboardReuniones() {
             </button>
           </div>
           <div className="table-responsive">
-            <table style={styles.table}>
+            <table style={{ ...styles.table, tableLayout: "fixed", minWidth: "1100px" }}>
               <thead>
                 <tr style={styles.th}>
-                  <th style={styles.thCell}>AGENDA</th>
-                  <th style={styles.thCell}>FECHA / ID</th>
-                  <th style={styles.thCell}>EMPRESA</th>
-                  <th style={styles.thCell}>TIPO / MOTIVO</th>
-                  <th style={{...styles.thCell, textAlign: "center"}}>MINUTA</th>
-                  <th style={styles.thCell}>FECHA DE ENVÍO</th>
-                  <th style={styles.thCell}>ADJUNTOS</th>
+                  <th style={{...styles.thCell, width: "13%"}}>AGENDA</th>
+                  <th style={{...styles.thCell, width: "9%"}}>FECHA / ID</th>
+                  <th style={{...styles.thCell, width: "20%"}}>EMPRESA</th>
+                  <th style={{...styles.thCell, width: "24%"}}>TIPO / MOTIVO</th>
+                  <th style={{...styles.thCell, width: "17%", textAlign: "center"}}>MINUTA</th>
+                  <th style={{...styles.thCell, width: "9%"}}>FECHA DE ENVÍO</th>
+                  <th style={{...styles.thCell, width: "8%"}}>ADJUNTOS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1586,7 +1586,7 @@ export default function DashboardReuniones() {
                         )}
                       </td>
                       <td style={styles.tdCell}>
-                        <div style={styles.companyName}>
+                        <div style={{ ...styles.companyName, whiteSpace: "nowrap" }}>
                           {new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" })}
                         </div>
                         <div style={{ ...styles.meetingIdText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={r.id_reunion}>

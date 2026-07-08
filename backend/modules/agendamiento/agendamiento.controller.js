@@ -675,8 +675,14 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
     const joinUrl = event.onlineMeeting?.joinUrl || null;
     const es_online = isPresencial ? 0 : 1;
 
-    // Verificar si ya existe
-    const [existing] = await db.query("SELECT id, estado FROM teams_eventos WHERE event_id = ?", [event.id]);
+    // Verificar si ya existe (por ical_uid para evitar duplicados entre usuarios, o por event_id)
+    let existing = [];
+    if (event.iCalUId) {
+        [existing] = await db.query("SELECT id, estado, event_id FROM teams_eventos WHERE ical_uid = ? LIMIT 1", [event.iCalUId]);
+    }
+    if (existing.length === 0) {
+        [existing] = await db.query("SELECT id, estado, event_id FROM teams_eventos WHERE event_id = ? LIMIT 1", [event.id]);
+    }
 
     if (existing.length > 0) {
         // Ya existe → actualizar fecha/hora/estado si cambió
@@ -685,7 +691,7 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
         const nuevoEstado = (existingEstado === 'cancelada') ? 'cancelada' : estado;
 
         // Detectar reagendamiento: si la fecha cambió y tiene empresa
-        const [prevData] = await db.query("SELECT fecha, empresa_id, asunto FROM teams_eventos WHERE event_id = ?", [event.id]);
+        const [prevData] = await db.query("SELECT fecha, empresa_id, asunto FROM teams_eventos WHERE id = ?", [existing[0].id]);
         if (prevData.length > 0 && prevData[0].fecha) {
             const oldFecha = new Date(prevData[0].fecha).toISOString().split('T')[0];
             const newFecha = fecha;
@@ -700,8 +706,8 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
         await db.query(`
             UPDATE teams_eventos 
             SET fecha = ?, hora = ?, hora_fin = ?, asistentes = ?, join_url = ?, es_online = ?, ultima_sync = NOW(), estado = ?, organizador = ?, body_preview = ?
-            WHERE event_id = ?
-        `, [fecha, hora, horaFin, asistentesJson, joinUrl, es_online, nuevoEstado, organizadorJson, bodyPreview, event.id]);
+            WHERE id = ?
+        `, [fecha, hora, horaFin, asistentesJson, joinUrl, es_online, nuevoEstado, organizadorJson, bodyPreview, existing[0].id]);
 
         // Detectar reunión concretada: pasó de agendada a pasada
         if (existingEstado === 'agendada' && nuevoEstado === 'pasada') {
@@ -714,7 +720,7 @@ const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empre
                 if (existingConcretada.length === 0) {
                     await db.query(
                         "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'concretada', ?, ?, ?, ?)",
-                        [resolvedEmpresaId, fecha, usuarioId, event.id, prevData?.[0]?.asunto || event.subject || 'Reunión concretada']
+                        [resolvedEmpresaId, fecha, usuarioId, existing[0].event_id, prevData?.[0]?.asunto || event.subject || 'Reunión concretada']
                     );
                     await db.query(
                         "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",

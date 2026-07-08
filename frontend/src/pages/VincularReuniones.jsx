@@ -261,17 +261,20 @@ export default function VincularReuniones() {
             {[...huerfanas].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map(h => {
               const isExpanded = expandedCards[h.id];
               const showParts = showParticipants[h.id];
+              const fechaParts = h.fecha.split('T')[0].split('-');
+              const formattedDate = `${fechaParts[2]}/${fechaParts[1]}/${fechaParts[0]}`;
 
               const organizadorNombre = (() => {
+                if (h.organizador) {
+                  try {
+                    const orgObj = typeof h.organizador === "string" ? JSON.parse(h.organizador) : h.organizador;
+                    if (orgObj && typeof orgObj === "object" && (orgObj.name || orgObj.email)) {
+                      return orgObj.name || orgObj.email;
+                    }
+                  } catch (err) {}
+                }
                 if (h.usuario_nombre) return h.usuario_nombre;
-                if (!h.organizador) return "Desconocido";
-                try {
-                  const orgObj = typeof h.organizador === "string" ? JSON.parse(h.organizador) : h.organizador;
-                  if (orgObj && typeof orgObj === "object") {
-                    return orgObj.name || orgObj.email || "Desconocido";
-                  }
-                } catch (err) {}
-                return String(h.organizador);
+                return String(h.organizador || "Desconocido");
               })();
 
               const asistentesList = (() => {
@@ -318,7 +321,7 @@ export default function VincularReuniones() {
                         {h.asunto}
                       </strong>
                       <div style={{ fontSize: "12px", color: "#64748b", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                        <span>📅 {new Date(h.fecha).toLocaleDateString()} · {h.hora}</span>
+                        <span>📅 {formattedDate} · {h.hora}</span>
                         <span style={{ fontWeight: "600", color: "#334155", background: "#f1f5f9", padding: "1px 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                           👤 {organizadorNombre}
                         </span>

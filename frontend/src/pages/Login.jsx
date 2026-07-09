@@ -176,14 +176,13 @@ const Login = () => {
     });
   };
 
-  const handleHelpClick = () => {
-    Swal.fire({
-      title:
-        '<div style="font-size: 20px; font-weight: 800; color: #1f2937;">Soporte CORE 360</div>',
+  const handleHelpClick = async () => {
+    const result = await Swal.fire({
+      title: '<div style="font-size: 20px; font-weight: 800; color: #1f2937;">Soporte CORE 360</div>',
       html: `
         <div style="font-size: 14px; text-align: left; line-height: 1.6; color: #4b5563; padding: 5px 0;">
           <p style="margin-bottom: 12px;">Si tienes problemas para ingresar al portal o necesitas restablecer tus credenciales, ponte en contacto con el administrador de sistemas:</p>
-          <div style="background: #f9fafb; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; color: #1f2937;">
+          <div style="background: #f9fafb; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; color: #1f2937; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
               <span>📧 <strong>Correo:</strong></span>
               <span><strong>minutas@proforma.cl</strong></span>
@@ -197,16 +196,59 @@ const Login = () => {
               <span><strong>Lun - Vie / 09:30 - 19:00</strong></span>
             </div>
           </div>
+          <p style="margin-bottom: 8px; font-weight: 600; color: #1f2937;">O solicita una clave temporal aquí:</p>
+          <input type="email" id="swal-recover-email" class="swal2-input" placeholder="Tu correo electrónico" style="width: 100%; box-sizing: border-box; margin: 0; font-size: 14px;" />
         </div>
       `,
-      icon: "info",
-      confirmButtonText: "Entendido",
+      showCancelButton: true,
+      confirmButtonText: "Solicitar Clave",
+      cancelButtonText: "Cerrar",
       confirmButtonColor: "var(--primary-color)",
-      width: "400px",
-      customClass: {
-        popup: "swal2-popup",
-      },
+      cancelButtonColor: "#6b7280",
+      width: "450px",
+      preConfirm: () => {
+        const email = document.getElementById("swal-recover-email").value;
+        if (!email) {
+          Swal.showValidationMessage("Por favor, ingresa tu correo electrónico");
+          return false;
+        }
+        // Validación básica de email
+        if (!/^\S+@\S+\.\S+$/.test(email)) {
+          Swal.showValidationMessage("Por favor, ingresa un correo válido");
+          return false;
+        }
+        return email;
+      }
     });
+
+    if (result.isConfirmed && result.value) {
+      const email = result.value;
+      Swal.fire({
+        title: "Enviando...",
+        text: "Por favor espera",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      try {
+        const { data } = await axios.post(`${API_URL}/auth/forgot-password`, { correo: email });
+        Swal.fire({
+          icon: "success",
+          title: "¡Enviado!",
+          text: data.message || "Si el correo está registrado, se han enviado las instrucciones.",
+          confirmButtonColor: "var(--primary-color)"
+        });
+      } catch (err) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.response?.data?.error || "Error al procesar la solicitud",
+          confirmButtonColor: "var(--primary-color)"
+        });
+      }
+    }
   };
 
   const techLines = [
@@ -287,12 +329,7 @@ const Login = () => {
 
       <div style={styles.card}>
         <div style={styles.logoContainer}>
-          <div style={styles.logoIcon}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px', color: 'var(--primary-color)' }}>
-              <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z" />
-            </svg>
-          </div>
-          <h1 style={styles.title}>CORE 360</h1>
+          <img src="/logo_texto_sin_fondo.PNG" alt="CORE 360" style={{ maxWidth: '200px', height: 'auto', marginBottom: '8px' }} />
         </div>
 
         <form onSubmit={handleLogin} style={styles.form}>
@@ -379,19 +416,7 @@ const styles = {
     gap: "12px",
     marginBottom: "32px",
   },
-  logoIcon: {
-    background: "rgba(18, 72, 66, 0.1)",
-    padding: "8px",
-    borderRadius: "10px",
-    display: "flex",
-  },
-  title: {
-    fontSize: "24px",
-    fontWeight: "700",
-    color: "#111827",
-    margin: 0,
-    letterSpacing: "-0.5px",
-  },
+
   form: {
     display: "flex",
     flexDirection: "column",

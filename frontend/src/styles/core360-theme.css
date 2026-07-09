@@ -1097,20 +1097,500 @@ html.swal2-height-auto {
 .editor-sidebar {
   min-height: 600px;
 }
-
-.editor-main {
-  min-height: 600px;
+.responsive-editor-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+}
+.flex-wrap-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
+.swal-responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+/* Tablet Breakpoint */
+@media (max-width: 1024px) {
+  .responsive-grid-8,
+  .responsive-grid-6,
+  .responsive-grid-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .responsive-editor-layout {
+    grid-template-columns: 220px 1fr;
+  }
+}
+
+/* Mobile Breakpoint */
 @media (max-width: 768px) {
+  .responsive-grid-8,
+  .responsive-grid-6,
+  .responsive-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .responsive-grid-2,
+  .swal-responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .responsive-editor-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .close-sidebar-btn {
+    display: block;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+
+  .container {
+    margin: 20px auto;
+    padding: 20px;
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field.full {
+    grid-column: span 1;
+  }
+
+  .core360-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .cek-logo {
+    text-align: left;
+  }
+
+  .nav-buttons {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .nav-buttons button {
+    width: 100%;
+  }
+  
   .editor-sidebar {
     min-height: unset !important;
     margin-bottom: 20px;
   }
+  
   .editor-main {
     min-height: unset !important;
   }
 }
 
+/* Small Mobile Breakpoint */
+@media (max-width: 480px) {
+  .responsive-grid-6 {
+    grid-template-columns: 1fr;
+  }
+}
 
+/* =============================================================================
+   📊 KPI CARDS & GRID RESPONSIVENESS (Dashboard)
+   ============================================================================= */
+.kpi-grid-container {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 20px !important;
+  margin-bottom: 40px !important;
+}
 
+@media (max-width: 1024px) {
+  .kpi-grid-container {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 15px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 25px !important;
+  }
+  .kpi-grid-container > div:last-child {
+    grid-column: span 2 !important;
+  }
+
+  /* Minimalist and smaller KPI Card styles on mobile */
+  .kpi-card {
+    padding: 12px 10px !important;
+    border-radius: 8px !important;
+  }
+  .kpi-card-header {
+    margin-bottom: 8px !important;
+  }
+  .kpi-card-title {
+    font-size: 9px !important;
+    letter-spacing: 0.2px !important;
+  }
+  .kpi-card-icon {
+    padding: 4px !important;
+    border-radius: 6px !important;
+  }
+  .kpi-card-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .kpi-card-value {
+    font-size: 20px !important;
+  }
+  .kpi-card-sub {
+    font-size: 9px !important;
+    margin-top: 4px !important;
+  }
+  .kpi-card-trend {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid-container {
+    gap: 8px !important;
+  }
+  .kpi-card {
+    padding: 10px 8px !important;
+  }
+}
+
+.editor-sidebar {
+  min-height: 600px;
+}
+
+.editor-main {
+  min-height: 600px;
+}
+
+/* Responsive Table para Dashboard Reuniones */
+.reuniones-table {
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+@media (max-width: 768px) {
+  .reuniones-table {
+    min-width: 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: table !important;
+    border-collapse: collapse !important;
+  }
+  .reuniones-table thead {
+    display: table-header-group !important;
+  }
+  .reuniones-table tbody {
+    display: table-row-group !important;
+  }
+  .reuniones-table tr {
+    display: table-row !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .reuniones-table td {
+    display: table-cell !important;
+    text-align: left !important;
+    padding: 6px 4px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    width: auto !important;
+  }
+  .reuniones-table td::before {
+    display: none !important;
+  }
+  .reuniones-table td > div {
+    display: block !important;
+    text-align: left !important;
+  }
+  
+  /* Hide columns on mobile to keep it super compact */
+  .reuniones-table th:nth-child(1),
+  .reuniones-table td[data-label="AGENDA"] {
+    display: none !important;
+  }
+  .reuniones-table th:nth-child(6),
+  .reuniones-table td[data-label="FECHA DE ENVÍO"] {
+    display: none !important;
+  }
+  .reuniones-table th:nth-child(7),
+  .reuniones-table td[data-label="ADJUNTOS"] {
+    display: none !important;
+  }
+
+  /* Specific column widths for mobile to prevent scroll */
+  .reuniones-table th:nth-child(2),
+  .reuniones-table td[data-label="FECHA / ID"] {
+    width: 45px !important;
+    max-width: 45px !important;
+    padding: 6px 2px !important;
+  }
+  .reuniones-table th:nth-child(3),
+  .reuniones-table td[data-label="EMPRESA"] {
+    width: 30px !important;
+    max-width: 30px !important;
+    text-align: center !important;
+  }
+  .reuniones-table th:nth-child(4),
+  .reuniones-table td[data-label="TIPO / MOTIVO"] {
+    width: auto !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .reuniones-table th:nth-child(5),
+  .reuniones-table td[data-label="MINUTA"] {
+    width: 30px !important;
+    max-width: 30px !important;
+    text-align: center !important;
+  }
+}
+
+/* Responsive Table Header (Tabs & Title) */
+.table-header-responsive {
+  display: flex !important;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 15px 20px;
+}
+
+.table-header-content {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.table-header-tabs {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+  .table-header-responsive {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 15px !important;
+  }
+  .table-header-content {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .table-header-tabs {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+  .table-header-tabs button {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 6px 8px !important;
+  }
+  /* make the "Todas" button span full width if odd number of tabs */
+  .table-header-tabs button:last-child {
+    grid-column: span 2;
+  }
+}
+
+/* Mobile Meeting Cards Styles */
+.mobile-only-block {
+  display: none;
+}
+.desktop-only-block {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only-block {
+    display: block !important;
+  }
+  .desktop-only-block {
+    display: none !important;
+  }
+
+  .meeting-mobile-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    padding: 12px 14px !important;
+    margin-bottom: 10px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease, background-color 0.15s ease !important;
+  }
+
+  .meeting-mobile-card:active {
+    transform: scale(0.98) !important;
+    background-color: #f8fafc !important;
+  }
+
+  .meeting-mobile-card .card-left {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+  }
+
+  .meeting-mobile-card .card-top-line {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .meeting-mobile-card .card-date {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #3b82f6 !important;
+    background: #eff6ff !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+  }
+
+  .meeting-mobile-card .card-company {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .meeting-mobile-card .card-bottom-line {
+    font-size: 12px !important;
+    color: #64748b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .meeting-mobile-card .card-right {
+    margin-left: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Color squares for status */
+  .color-square {
+    display: inline-block !important;
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+    vertical-align: middle !important;
+  }
+  .red-square {
+    background-color: #ef4444 !important;
+    border: 1px solid #dc2626 !important;
+  }
+  .blue-square {
+    background-color: #3b82f6 !important;
+    border: 1px solid #2563eb !important;
+  }
+  .gray-square {
+    background-color: #94a3b8 !important;
+    border: 1px solid #64748b !important;
+  }
+  .green-square {
+    background-color: #10b981 !important;
+    border: 1px solid #059669 !important;
+  }
+  .yellow-square {
+    background-color: #f59e0b !important;
+    border: 1px solid #d97706 !important;
+  }
+}
+
+/* Helper display classes for responsive text formats */
+.mobile-only-inline {
+  display: none;
+}
+.desktop-only-inline {
+  display: inline;
+}
+.desktop-only-block {
+  display: block;
+}
+.mobile-empresa-status-collapsed {
+  display: none;
+}
+.empresa-actions-full {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only-inline {
+    display: inline !important;
+  }
+  .desktop-only-inline {
+    display: none !important;
+  }
+  .desktop-only-block {
+    display: none !important;
+  }
+  .mobile-empresa-status-collapsed {
+    display: inline-block !important;
+  }
+  .empresa-actions-full {
+    display: none !important;
+  }
+}

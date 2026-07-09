@@ -341,6 +341,19 @@ export default function DashboardReuniones() {
           createBtn('🔍 Ver Minuta', '#f1f5f9', 'var(--secondary-color)', () => handleVerMinuta(reunion));
           createBtn('Desvincular', '#ffe4e6', '#be123c', () => handleDesvincular(reunion));
         }
+
+        // Add Change Company button if already linked and not a Proforma internal meeting
+        if (!reunion.is_huerfana && reunion.estado_envio !== "huerfana" && !reunion._isProforma) {
+          createBtn('🏢 Cambiar Empresa', '#e0f2fe', '#0369a1', () => {
+            setSelectedOrphanId(reunion.id_reunion);
+            setSelectedOrphan(reunion);
+            setSearchEmpresa("");
+            setSelectedEmpresaId(reunion.empresa_id ? String(reunion.empresa_id) : "");
+            setShowEmpresaDropdown(false);
+            setNoAplicaEmpresa(false);
+            setIsAssignModalOpen(true);
+          });
+        }
       }
     });
   };

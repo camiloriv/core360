@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import useSubmitReunion from "../../hooks/reuniones/useSubmitReunion";
-import { getDefaultCc } from "../../services/reunionesService";
+import { getDefaultCc, getReunionPorId } from "../../services/reunionesService";
 
 import FormSection from "../form/core/FormSection";
 import FormActions from "../form/core/FormActions";
@@ -81,68 +81,82 @@ function ReunionesForm({ onSuccess }) {
     }
   }, [form.empresa_id, form.ejecutiva_id, user.correo, user.id, isCcEditable]);
 
-  // Si abrimos la pantalla con un borrador, precargarlo
-  useEffect(() => {
-    if (location.state && location.state.draft) {
-      const draft = location.state.draft;
-      setField("id_reunion", draft.id_reunion);
-      setField("empresa_id", draft.empresa_id || "");
-      if (!draft.empresa_id) {
-        setField("asunto_correo", draft.asunto_teams || draft.motivo_reu || "");
-      }
-      setField("fecha_reu", new Date(draft.fecha_reu).toISOString().split('T')[0]);
-      setField("hora", draft.hora);
-      setField("tipo_reu", ""); // Dejar vacío para que el usuario seleccione
-      setField("participantes", draft.participantes || "");
-      
-      let filteredEnviadoA = "";
-      let ccEmails = [];
-      try {
-        let correos = [];
-        const sourceData = draft.enviado_a || draft.asistentes;
-        if (sourceData) {
-          try {
-            const parsed = typeof sourceData === 'string' ? JSON.parse(sourceData) : sourceData;
-            if (Array.isArray(parsed)) {
-              if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].email) {
-                correos = parsed.map(p => p.email);
-              } else {
-                correos = parsed;
-              }
+  const { id_reunion } = useParams();
+
+  const populateFromDraft = (draft) => {
+    setField("id_reunion", draft.id_reunion);
+    setField("empresa_id", draft.empresa_id || "");
+    if (!draft.empresa_id) {
+      setField("asunto_correo", draft.asunto_teams || draft.motivo_reu || "");
+    }
+    setField("fecha_reu", new Date(draft.fecha_reu).toISOString().split('T')[0]);
+    setField("hora", draft.hora);
+    setField("tipo_reu", ""); // Dejar vacío para que el usuario seleccione
+    setField("participantes", draft.participantes || "");
+    
+    let filteredEnviadoA = "";
+    let ccEmails = [];
+    try {
+      let correos = [];
+      const sourceData = draft.enviado_a || draft.asistentes;
+      if (sourceData) {
+        try {
+          const parsed = typeof sourceData === 'string' ? JSON.parse(sourceData) : sourceData;
+          if (Array.isArray(parsed)) {
+            if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0].email) {
+              correos = parsed.map(p => p.email);
             } else {
-              correos = String(sourceData).split(/[\s,;]+/);
+              correos = parsed;
             }
-          } catch (e) {
+          } else {
             correos = String(sourceData).split(/[\s,;]+/);
           }
+        } catch (e) {
+          correos = String(sourceData).split(/[\s,;]+/);
         }
-        
-        const validCorreos = correos.map(e => typeof e === 'string' ? e.trim() : "").filter(Boolean);
-        
-        filteredEnviadoA = validCorreos
-          .filter(email => !email.toLowerCase().endsWith("@proforma.cl"))
-          .join(", ");
-          
-        ccEmails = validCorreos
-          .filter(email => email.toLowerCase().endsWith("@proforma.cl") && email.toLowerCase() !== user.correo?.toLowerCase());
-          
-      } catch (e) {
-        console.error("Error procesando correos del draft", e);
-      }
-
-      setField("enviado_a", filteredEnviadoA);
-      if (ccEmails.length > 0) {
-        setField("correos_cc", ccEmails.join(", "));
-        setIsCcEditable(true);
       }
       
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const validCorreos = correos.map(e => typeof e === 'string' ? e.trim() : "").filter(Boolean);
       
-      setField("lugar", draft.lugar || "");
-      // Limpiamos el state para que si el usuario recarga no se vuelva a sobreescribir si ya hizo cambios
-      window.history.replaceState({}, document.title);
+      filteredEnviadoA = validCorreos
+        .filter(email => !email.toLowerCase().endsWith("@proforma.cl"))
+        .join(", ");
+        
+      ccEmails = validCorreos
+        .filter(email => email.toLowerCase().endsWith("@proforma.cl") && email.toLowerCase() !== user.correo?.toLowerCase());
+        
+    } catch (e) {
+      console.error("Error procesando correos del draft", e);
     }
-  }, []);
+
+    setField("enviado_a", filteredEnviadoA);
+    if (ccEmails.length > 0) {
+      setField("correos_cc", ccEmails.join(", "));
+      setIsCcEditable(true);
+    }
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setField("lugar", draft.lugar || "");
+  };
+
+  // Si abrimos la pantalla con un borrador o un ID en la URL, precargarlo
+  useEffect(() => {
+    if (location.state && location.state.draft) {
+      populateFromDraft(location.state.draft);
+      window.history.replaceState({}, document.title);
+    } else if (id_reunion) {
+      getReunionPorId(id_reunion)
+        .then((res) => {
+          if (res.data) {
+            populateFromDraft(res.data);
+          }
+        })
+        .catch((err) => {
+          console.error("Error al obtener la reunión:", err);
+          Swal.fire("Error", "No se pudo cargar la información de la reunión.", "error");
+        });
+    }
+  }, [id_reunion]);
 
   const { submit, loading } = useSubmitReunion({
     form,
@@ -153,7 +167,7 @@ function ReunionesForm({ onSuccess }) {
     },
   });
 
-  const isSinEmpresa = location.state?.draft && !location.state.draft.empresa_id && location.state.draft.id_reunion;
+  const isSinEmpresa = !!(form.id_reunion && !form.empresa_id);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -331,7 +331,7 @@ export default function DashboardReuniones() {
           });
         } else if (reunion.estado_envio === "borrador") {
           createBtn('✍️ Redactar Minuta', '#fef08a', '#854d0e', () => {
-            navigate("/home", { state: { draft: reunion } });
+            navigate(`/minuta/${reunion.id_reunion}`);
           });
           createBtn('Marcar No Aplica', '#fee2e2', '#ef4444', () => {
             const isTeOnly = !reunion.minuta_row_id;
@@ -2258,7 +2258,7 @@ export default function DashboardReuniones() {
                                 ) : r.estado_envio === "borrador" ? (
                                   <div style={{ display: "flex", gap: "8px" }}>
                                     <div
-                                      onClick={() => navigate("/home", { state: { draft: r } })}
+                                      onClick={() => navigate(`/minuta/${r.id_reunion}`)}
                                       style={{
                                         color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
                                         background: "#fef08a", padding: "4px 8px", borderRadius: "4px"

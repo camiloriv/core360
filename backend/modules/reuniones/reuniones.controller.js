@@ -650,3 +650,88 @@ exports.marcarNoAplica = async (req, res) => {
         res.status(500).json({ error: "Error interno" });
     }
 };
+
+// ============================================================
+// GET /reuniones/detail/:id_reunion — Obtener una reunión por id_reunion
+// ============================================================
+exports.obtenerReunionPorId = async (req, res) => {
+    const { id_reunion } = req.params;
+
+    const sql = `
+        SELECT
+            te.id                           AS teams_evento_id,
+            te.event_id,
+            te.ical_uid,
+            te.asunto                       AS asunto_teams,
+            te.fecha                        AS fecha_reu,
+            te.hora,
+            te.hora_fin,
+            te.estado                       AS estado_teams,
+            te.es_online,
+            te.asistentes,
+            te.join_url,
+            te.empresa_id,
+            te.usuario_id                   AS ejecutiva_id,
+            te.ultima_sync,
+            emp.nombre                      AS empresa_nombre,
+            u.nombre                        AS ejecutiva_nombre,
+            j.nombre                        AS jefatura_nombre,
+
+            -- Datos de la minuta (NULL si no tiene)
+            m.id                            AS minuta_row_id,
+            COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
+            m.tipo_reu,
+            m.enviado_a,
+            m.enviado_por,
+            m.participantes,
+            m.motivo_reu,
+            m.minuta,
+            m.form_f,
+            m.lugar,
+            m.estado_envio                  AS minuta_estado,
+            m.archivos_nombres,
+            m.programar_encuesta,
+            m.encuesta_tipo,
+            m.encuesta_programada_para,
+            m.encuesta_estado_envio,
+            m.encuesta_relacionada,
+            m.encuesta_destinatario,
+            m.created_at,
+
+            -- Estado consolidado para el dashboard
+            CASE
+                WHEN te.estado = 'cancelada'                        THEN 'cancelada'
+                WHEN te.estado = 'excluida'                         THEN 'excluida'
+                WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
+                WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
+                WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
+                WHEN te.empresa_id IS NULL                          THEN 'huerfana'
+                WHEN te.estado = 'pasada'                           THEN 'borrador'
+                ELSE te.estado
+            END                             AS estado_envio,
+
+            te.estado                       AS te_estado,
+            (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
+            (m.id IS NOT NULL)              AS tiene_minuta,
+            (te.empresa_id IS NOT NULL)     AS tiene_empresa
+
+        FROM teams_eventos te
+        LEFT JOIN empresas emp ON te.empresa_id = emp.id
+        LEFT JOIN usuarios u ON te.usuario_id = u.id
+        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+        LEFT JOIN minutas m ON m.teams_evento_id = te.id
+        WHERE m.id_minuta = ? OR CAST(te.id AS CHAR) = ?
+        LIMIT 1
+    `;
+
+    try {
+        const [result] = await db.query(sql, [id_reunion, id_reunion]);
+        if (result.length === 0) {
+            return res.status(404).json({ error: "Reunión no encontrada" });
+        }
+        res.json(result[0]);
+    } catch (err) {
+        console.error("Error en obtenerReunionPorId:", err);
+        return res.status(500).json({ error: "Error en la BD" });
+    }
+};

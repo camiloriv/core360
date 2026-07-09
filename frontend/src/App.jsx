@@ -97,6 +97,7 @@ const MainLayout = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<ProtectedRoute path="/home"><Home /></ProtectedRoute>} />
+            <Route path="/minuta/:id_reunion" element={<ProtectedRoute path="/home"><Home /></ProtectedRoute>} />
             <Route path="/registrar-reunion" element={<ProtectedRoute path="/registrar-reunion"><Home /></ProtectedRoute>} />
             <Route path="/crear-encuesta" element={<ProtectedRoute path="/crear-encuesta"><CrearEncuesta /></ProtectedRoute>} />
             <Route path="/agendar" element={<ProtectedRoute path="/agendar"><AgendarReunion /></ProtectedRoute>} />

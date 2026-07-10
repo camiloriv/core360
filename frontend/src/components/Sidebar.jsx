@@ -45,9 +45,9 @@ const Sidebar = ({ isOpen, onClose }) => {
       ),
     },
     {
-      path: "/crear-encuesta",
+      path: "/generar-encuesta",
       label: "Evaluación",
-      title: "Crear Encuesta",
+      title: "Generar Encuesta",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"

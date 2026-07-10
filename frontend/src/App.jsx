@@ -14,7 +14,7 @@ import { useInactivityLogout } from "./hooks/useInactivityLogout";
 // Lazy Loaded Pages para Code Splitting
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
-const CrearEncuesta = lazy(() => import("./pages/CrearEncuesta"));
+const GenerarEncuesta = lazy(() => import("./pages/GenerarEncuesta"));
 const ResponderEncuesta = lazy(() => import("./pages/ResponderEncuesta"));
 const DashboardReuniones = lazy(() => import("./pages/DashboardReuniones"));
 const DashboardEncuestas = lazy(() => import("./pages/DashboardEncuestas"));
@@ -99,7 +99,7 @@ const MainLayout = () => {
             <Route path="/home" element={<ProtectedRoute path="/home"><Home /></ProtectedRoute>} />
             <Route path="/minuta/:id_reunion" element={<ProtectedRoute path="/home"><Home /></ProtectedRoute>} />
             <Route path="/registrar-reunion" element={<ProtectedRoute path="/registrar-reunion"><Home /></ProtectedRoute>} />
-            <Route path="/crear-encuesta" element={<ProtectedRoute path="/crear-encuesta"><CrearEncuesta /></ProtectedRoute>} />
+            <Route path="/generar-encuesta" element={<ProtectedRoute path="/generar-encuesta"><GenerarEncuesta /></ProtectedRoute>} />
             <Route path="/agendar" element={<ProtectedRoute path="/agendar"><AgendarReunion /></ProtectedRoute>} />
             <Route path="/dashboard-reuniones" element={<ProtectedRoute path="/dashboard-reuniones"><DashboardReuniones /></ProtectedRoute>} />
             <Route path="/vincular-reuniones" element={<ProtectedRoute path="/vincular-reuniones"><VincularReuniones /></ProtectedRoute>} />

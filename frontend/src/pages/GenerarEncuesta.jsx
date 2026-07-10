@@ -10,7 +10,7 @@ import {
 import SelectEmpresa from "../components/form/fields/SelectEmpresa";
 import "../styles/core360-theme.css";
 
-function CrearEncuesta() {
+function GenerarEncuesta() {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
 
   const [empresas, setEmpresas] = useState([]);
@@ -31,7 +31,7 @@ function CrearEncuesta() {
 
   // 🔹 Cargar datos iniciales
   useEffect(() => {
-    document.title = "CORE 360 - Crear Encuesta";
+    document.title = "CORE 360 - Generar Encuesta";
     obtenerTemplates().then(setTemplates);
 
     if (user.permisos === "admin") {
@@ -109,7 +109,7 @@ function CrearEncuesta() {
               marginBottom: "8px",
             }}
           >
-            Crear Encuesta
+            Generar Encuesta
           </h1>
           <p className="page-subtitle">SELECCIONA LA EMPRESA Y EL TIPO DE ENCUESTA</p>
         </div>
@@ -242,4 +242,4 @@ function CrearEncuesta() {
   );
 }
 
-export default CrearEncuesta;
+export default GenerarEncuesta;

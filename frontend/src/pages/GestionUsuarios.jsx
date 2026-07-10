@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const ALL_VIEWS = [
   { path: "/home", label: "Home" },
-  { path: "/crear-encuesta", label: "Crear Encuesta" },
+  { path: "/generar-encuesta", label: "Generar Encuesta" },
   { path: "/agendar", label: "Agendar" },
   { path: "/dashboard-reuniones", label: "Mis reuniones" },
   { path: "/dashboard-encuestas", label: "Mis encuestas" },
@@ -21,7 +21,7 @@ const getDefaultViewsForRole = (role) => {
     case "admin":
       return [
         "/home",
-        "/crear-encuesta",
+        "/generar-encuesta",
         "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
@@ -33,7 +33,7 @@ const getDefaultViewsForRole = (role) => {
     case "gerencia":
       return [
         "/home",
-        "/crear-encuesta",
+        "/generar-encuesta",
         "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
@@ -43,7 +43,7 @@ const getDefaultViewsForRole = (role) => {
     case "ejecutiva":
       return [
         "/home",
-        "/crear-encuesta",
+        "/generar-encuesta",
         "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
@@ -53,7 +53,7 @@ const getDefaultViewsForRole = (role) => {
     default:
       return [
         "/home",
-        "/crear-encuesta",
+        "/generar-encuesta",
         "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",

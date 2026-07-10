@@ -10,7 +10,15 @@ import Swal from "sweetalert2";
 
 import AgendarForm from "../components/agendar/AgendarForm";
 import EventDetailsModal from "../components/reuniones/EventDetailsModal";
-import { obtenerEventosCalendario, anularReunionTeams, marcarReagendada } from "../services/agendamientoService";
+import { 
+  obtenerEventosCalendario, 
+  anularReunionTeams, 
+  marcarReagendada, 
+  vincularHuerfana, 
+  marcarExcluida, 
+  marcarProforma 
+} from "../services/agendamientoService";
+import useReunionesData from "../hooks/reuniones/useReunionesData";
 
 const locales = {
   "es": esLocale,
@@ -53,6 +61,9 @@ const AgendarReunion = () => {
   const [selectedRange, setSelectedRange] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [mobileViewMode, setMobileViewMode] = useState("day");
+  
+  const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+  const { empresas } = useReunionesData(user);
 
   // Detección de responsive para el layout móvil
   useEffect(() => {
@@ -327,6 +338,61 @@ const AgendarReunion = () => {
       } catch (err) {
         Swal.fire('Atención', err.response?.data?.error || 'No se pudo registrar el motivo.', 'error');
       }
+    }
+  };
+
+  const handleLinkCompany = async (eventId, empresaId) => {
+    try {
+      Swal.fire({
+        title: "Vinculando...",
+        text: "Asociando la reunión a la empresa seleccionada",
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+      await vincularHuerfana(eventId, empresaId);
+      Swal.fire("Vinculada", "La reunión ha sido vinculada correctamente.", "success");
+      const emp = empresas.find(e => String(e.id) === String(empresaId));
+      setSelectedEventDetails(prev => prev ? { ...prev, empresa_id: empresaId, empresa_nombre: emp ? emp.nombre : "" } : null);
+      fetchEvents();
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "No se pudo vincular la reunión", "error");
+    }
+  };
+
+  const handleMarkProforma = async (eventId) => {
+    try {
+      Swal.fire({
+        title: "Clasificando...",
+        text: "Marcando reunión como Proforma",
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+      await marcarProforma(eventId);
+      Swal.fire("Clasificada", "La reunión ha sido marcada como Proforma.", "success");
+      setSelectedEventDetails(prev => prev ? { ...prev, empresa_id: "proforma", empresa_nombre: "PROFORMA INTERNA" } : null);
+      fetchEvents();
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "No se pudo clasificar como Proforma", "error");
+    }
+  };
+
+  const handleMarkNoAplica = async (eventId) => {
+    try {
+      Swal.fire({
+        title: "Actualizando...",
+        text: "Excluyendo reunión",
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+      await marcarExcluida(eventId);
+      Swal.fire("Excluida", "La reunión ha sido marcada como no aplica.", "success");
+      setSelectedEventDetails(null);
+      fetchEvents();
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "No se pudo excluir la reunión", "error");
     }
   };
 
@@ -1561,6 +1627,10 @@ const AgendarReunion = () => {
           onJoin={handleJoinMeeting}
           onCancel={handleCancelMeeting}
           onReschedule={handleRescheduleMeeting}
+          empresas={empresas}
+          onLinkCompany={handleLinkCompany}
+          onMarkProforma={handleMarkProforma}
+          onMarkNoAplica={handleMarkNoAplica}
         />
       )}
     </div>

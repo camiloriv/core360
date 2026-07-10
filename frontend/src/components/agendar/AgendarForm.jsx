@@ -179,9 +179,6 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     
-    if (!form.empresa_id) {
-      return Swal.fire("Empresa Requerida", "Por favor selecciona una Empresa", "warning");
-    }
     if (!form.asunto) {
       return Swal.fire("Título Requerido", "Por favor ingresa un título para la reunión", "warning");
     }

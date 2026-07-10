@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) => {
+const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule, empresas = [], onLinkCompany, onMarkProforma, onMarkNoAplica }) => {
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   // Configuración de tecla ESC
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -246,6 +247,114 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule }) =
           {/* Columna Derecha (Tracking / Seguimiento) */}
           <div className="event-details-right-col" style={{ width: '270px', minWidth: '200px', padding: '20px', backgroundColor: '#fcfcfc', overflowY: 'auto' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', margin: '0 0 20px 0' }}>Seguimiento</h3>
+            
+            {/* Empresa Section */}
+            {event.empresa_id || event.empresa_nombre ? (
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>Empresa Vinculada</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '18px' }}>🏢</span>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {event.empresa_nombre}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>Vincular Empresa</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <div style={{ fontSize: '12px', color: '#b45309', fontWeight: '500' }}>⚠️ Sin empresa vinculada</div>
+                  
+                  <div>
+                    <select 
+                      value={selectedCompanyId} 
+                      onChange={(e) => setSelectedCompanyId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '13px',
+                        backgroundColor: '#fff',
+                        color: '#334155',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="">-- Seleccionar Empresa --</option>
+                      {empresas.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button 
+                      onClick={() => {
+                        if (onLinkCompany && selectedCompanyId) {
+                          onLinkCompany(event.db_id || event.id, selectedCompanyId);
+                        }
+                      }}
+                      disabled={!selectedCompanyId}
+                      style={{
+                        flex: 1,
+                        background: selectedCompanyId ? '#10b981' : '#cbd5e1',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: selectedCompanyId ? 'pointer' : 'not-allowed',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      Vincular
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                    <button 
+                      onClick={() => {
+                        if (onMarkProforma) onMarkProforma(event.db_id || event.id);
+                      }}
+                      style={{
+                        flex: 1,
+                        background: '#fff',
+                        color: '#0284c7',
+                        border: '1.5px solid #bae6fd',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      🏢 Proforma
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (onMarkNoAplica) onMarkNoAplica(event.db_id || event.id);
+                      }}
+                      style={{
+                        flex: 1,
+                        background: '#fff',
+                        color: '#475569',
+                        border: '1.5px solid #cbd5e1',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      🚫 No Aplica
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Organizador */}
             <div style={{ marginBottom: '24px' }}>

@@ -369,6 +369,25 @@ const obtenerEventosCalendario = async (req, res) => {
         }
 
         const data = await response.json();
+        const eventIds = data.value.map(item => item.id);
+
+        let dbEventsMap = {};
+        if (eventIds.length > 0) {
+            try {
+                const [dbRows] = await db.query(`
+                    SELECT te.id AS db_id, te.event_id, te.empresa_id, emp.nombre AS empresa_nombre, te.estado
+                    FROM teams_eventos te
+                    LEFT JOIN empresas emp ON te.empresa_id = emp.id
+                    WHERE te.event_id IN (?)
+                `, [eventIds]);
+                dbRows.forEach(row => {
+                    dbEventsMap[row.event_id] = row;
+                });
+            } catch (dbErr) {
+                console.error("Error querying db in obtenerEventosCalendario:", dbErr);
+            }
+        }
+
         const events = data.value.map(item => {
             const attendees = item.attendees || [];
             const parsedAttendees = attendees.map(a => {
@@ -381,8 +400,11 @@ const obtenerEventosCalendario = async (req, res) => {
             const organizerName = item.organizer?.emailAddress?.name || '';
             const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
+            const dbEvt = dbEventsMap[item.id] || {};
+
             return {
                 id: item.id,
+                db_id: dbEvt.db_id || null,
                 title: item.subject,
                 start: item.start.dateTime + "Z",
                 end: item.end.dateTime + "Z",
@@ -390,7 +412,10 @@ const obtenerEventosCalendario = async (req, res) => {
                 joinUrl: item.onlineMeeting?.joinUrl,
                 asistentes: parsedAttendees,
                 organizador: organizador,
-                bodyPreview: item.bodyPreview || ''
+                bodyPreview: item.bodyPreview || '',
+                empresa_id: dbEvt.empresa_id || null,
+                empresa_nombre: dbEvt.empresa_nombre || null,
+                estado_db: dbEvt.estado || null
             };
         });
 
@@ -829,13 +854,13 @@ const vincularEmpresaAEvento = async (req, res) => {
         if (!empresa_id) return res.status(400).json({ error: "empresa_id es requerido." });
 
         // Obtener el evento
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
         if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
         const evento = rows[0];
 
         // Actualizar empresa en teams_eventos
-        await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, id]);
+        await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, evento.id]);
 
         // Aprender dominios y contactos
         let attendeesList = [];
@@ -891,7 +916,7 @@ const vincularEmpresaAEvento = async (req, res) => {
               AND te.estado NOT IN ('cancelada', 'excluida') 
               AND m.id IS NULL 
               AND te.id != ?
-        `, [id]);
+        `, [evento.id]);
 
         let autoVinculados = 0;
         for (const evt of sinEmpresa) {
@@ -969,10 +994,11 @@ const desvincularEmpresaDeEvento = async (req, res) => {
         const { id } = req.params;
         const { dominios } = req.body;
 
-        const [rows] = await db.query("SELECT empresa_id FROM teams_eventos WHERE id = ?", [id]);
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
         if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
-        const empresa_id = rows[0].empresa_id;
+        const evento = rows[0];
+        const empresa_id = evento.empresa_id;
 
         // Eliminar dominios si se indicaron
         if (dominios && Array.isArray(dominios) && empresa_id) {
@@ -982,10 +1008,10 @@ const desvincularEmpresaDeEvento = async (req, res) => {
         }
 
         // Si hay una minuta borrador vinculada, eliminarla
-        await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [id]);
+        await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [evento.id]);
 
         // Quitar empresa del evento
-        await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [id]);
+        await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [evento.id]);
 
         res.json({ success: true, message: "Empresa desvinculada del evento." });
     } catch (error) {
@@ -1021,13 +1047,13 @@ const marcarExcluida = async (req, res) => {
         const { id } = req.params;
 
         // Obtener datos del evento antes de actualizar
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
         if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
         const evento = rows[0];
 
         // Actualizar a excluida (sin filtrar por usuario → efecto global)
-        await db.query("UPDATE teams_eventos SET estado = 'excluida' WHERE id = ?", [id]);
+        await db.query("UPDATE teams_eventos SET estado = 'excluida' WHERE id = ?", [evento.id]);
 
         // Si tenía empresa, registrar en log
         if (evento.empresa_id) {
@@ -1060,11 +1086,13 @@ const marcarProforma = async (req, res) => {
         const proformaId = proformaRows[0].id;
 
         // Verificar que el evento existe
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ?", [id]);
+        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
         if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
 
+        const evento = rows[0];
+
         // Actualizar empresa_id a PROFORMA INTERNA (sin filtrar por usuario → efecto global)
-        await db.query("UPDATE teams_eventos SET empresa_id = ?, estado = 'pasada' WHERE id = ?", [proformaId, id]);
+        await db.query("UPDATE teams_eventos SET empresa_id = ?, estado = 'pasada' WHERE id = ?", [proformaId, evento.id]);
 
         res.json({ success: true, message: "Reunión asignada a Proforma Interna.", proforma_id: proformaId });
     } catch (error) {

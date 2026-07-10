@@ -1706,9 +1706,8 @@ export default function DashboardReuniones() {
                   return (
                     <React.Fragment key={r.id_reunion}>
                       <tr 
-                        className={`meeting-row ${isExpanded ? 'is-expanded' : ''}`}
+                        className="meeting-row"
                         style={styles.tr}
-                        onClick={() => setExpandedMeetingId(isExpanded ? null : r.id_reunion)}
                       >
                       <td style={styles.tdCell} data-label="AGENDA">
                         <div>

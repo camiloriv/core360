@@ -30,6 +30,24 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
     const htmlMinuta = data.minuta || "";
 
     // 🔹 5. Reemplazo variables
+    let videoHtml = "";
+    if (data.link_video) {
+      videoHtml = `
+        <p style="font-weight:bold; color:#8b5cf6; text-transform:uppercase; font-size:12px; margin: 0 0 8px 0; letter-spacing: 1px;">
+          Grabación de la Reunión (Teams):
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0; border-radius: 4px; margin-bottom: 25px; background-color: #f5f3ff;">
+          <tr>
+            <td style="padding: 15px 20px; font-size: 14px;">
+              <a href="${data.link_video}" target="_blank" style="display: inline-block; background-color: #8b5cf6; color: #ffffff; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);">
+                ▶ Ver Grabación de la Reunión
+              </a>
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
     html = html
       .replace(/{{id}}/g, data.id_reunion || "")
       .replace(/{{participantes}}/g, data.participantes || "")
@@ -40,6 +58,8 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
       .replace(/{{lugar}}/g, data.lugar || "")
       .replace(/{{motivo}}/g, data.motivo_reu || "")
       .replace(/{{documentos_adjuntos}}/g, data.documentos_adjuntos || "")
+      .replace(/{{texto_previo}}/g, data.texto_previo || "")
+      .replace(/{{link_video_section}}/g, videoHtml)
       .replace(/{{minuta}}/g, htmlMinuta);
 
     // 🔹 6. Imágenes base

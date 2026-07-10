@@ -295,7 +295,9 @@ exports.crearReunion = async (req, res) => {
         motivo_reu, minuta, form_f, empresa_id,
         programar_encuesta, encuesta_tipo, encuesta_programada_para, encuesta_destinatario,
         teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
-        asunto_correo     // Asunto personalizado para minutas sin empresa (excluidas/proforma)
+        asunto_correo,    // Asunto personalizado para minutas sin empresa (excluidas/proforma)
+        texto_previo,
+        link_video
     } = req.body;
 
     const archivos = req.files || [];
@@ -333,8 +335,9 @@ exports.crearReunion = async (req, res) => {
                 fecha_reu, hora, lugar, documentos_adjuntos,
                 estado_envio, archivos_nombres,
                 programar_encuesta, encuesta_tipo, encuesta_programada_para,
-                encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, ?, ?, ?, ?, ?)
+                encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario,
+                texto_previo, link_video
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -348,7 +351,9 @@ exports.crearReunion = async (req, res) => {
             isSurveyProgrammed ? encuesta_programada_para : null,
             isSurveyProgrammed ? 'pendiente' : 'enviado',
             req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
-            isSurveyProgrammed ? encuesta_destinatario : null
+            isSurveyProgrammed ? encuesta_destinatario : null,
+            texto_previo || null,
+            link_video || null
         ];
 
         await db.query(sql, values);
@@ -433,7 +438,7 @@ exports.crearReunion = async (req, res) => {
                 const asuntoCorreo = asunto_correo
                     ? asunto_correo
                     : (data.empresa_nombre
-                        ? `Reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
+                        ? `Minuta ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
                         : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
                 enviarCorreo({
@@ -452,7 +457,9 @@ exports.crearReunion = async (req, res) => {
                         motivo_reu: data.motivo_reu,
                         minuta: data.minuta,
                         enviado_por: data.enviado_por,
-                        documentos_adjuntos: data.documentos_adjuntos
+                        documentos_adjuntos: data.documentos_adjuntos,
+                        texto_previo: data.texto_previo,
+                        link_video: data.link_video
                     },
                     attachments
                 }).catch(error => {
@@ -696,6 +703,8 @@ exports.obtenerReunionPorId = async (req, res) => {
             m.encuesta_estado_envio,
             m.encuesta_relacionada,
             m.encuesta_destinatario,
+            m.texto_previo,
+            m.link_video,
             m.created_at,
 
             -- Estado consolidado para el dashboard

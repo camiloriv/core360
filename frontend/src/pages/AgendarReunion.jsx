@@ -61,6 +61,9 @@ const AgendarReunion = () => {
   const [selectedRange, setSelectedRange] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [mobileViewMode, setMobileViewMode] = useState("day");
+  const [calendarTheme, setCalendarTheme] = useState(() => {
+    return localStorage.getItem("calendar_theme") || "blue";
+  });
   
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
   const { empresas } = useReunionesData(user);
@@ -607,7 +610,7 @@ const AgendarReunion = () => {
   };
 
   return (
-    <div className="encuesta-page agendar-page-wrapper">
+    <div className={`encuesta-page agendar-page-wrapper theme-${calendarTheme}`}>
       
       <div className="agendar-header-container">
         <div>
@@ -621,13 +624,45 @@ const AgendarReunion = () => {
             )}
           </p>
         </div>
-        <button 
-          className="btn btn-primary btn-nueva-reunion" 
-          onClick={() => { setSelectedDate(currentDate || new Date()); setIsModalOpen(true); }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
-          Nueva Reunión
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div className="theme-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '4px 8px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Tema:</span>
+            {[
+              { id: 'blue', color: '#3b82f6', label: 'Azul' },
+              { id: 'green', color: '#10b981', label: 'Verde' },
+              { id: 'purple', color: '#8b5cf6', label: 'Morado' },
+              { id: 'pink', color: '#ec4899', label: 'Rosado' },
+              { id: 'orange', color: '#f97316', label: 'Naranja' }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setCalendarTheme(t.id);
+                  localStorage.setItem("calendar_theme", t.id);
+                }}
+                title={t.label}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: t.color,
+                  border: calendarTheme === t.id ? '2px solid #0f172a' : '2px solid transparent',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'all 0.2s',
+                  boxShadow: calendarTheme === t.id ? '0 0 4px rgba(0,0,0,0.3)' : 'none'
+                }}
+              />
+            ))}
+          </div>
+          <button 
+            className="btn btn-primary btn-nueva-reunion" 
+            onClick={() => { setSelectedDate(currentDate || new Date()); setIsModalOpen(true); }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
+            Nueva Reunión
+          </button>
+        </div>
       </div>
 
       <div className="agendar-body-wrapper">
@@ -790,7 +825,48 @@ const AgendarReunion = () => {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
+          
+          /* Variables por defecto: azul acero / corporativo */
+          --primary-color: #3b82f6;
+          --primary-hover: #dbeafe;
+          --primary-bg: #eff6ff;
+          --primary-border: #bfdbfe;
+          --primary-text: #1d4ed8;
+          --selection-bg: #71717a;
         }
+
+        .theme-green .rbc-calendar {
+          --primary-color: #10b981;
+          --primary-hover: #d1fae5;
+          --primary-bg: #ecfdf5;
+          --primary-border: #a7f3d0;
+          --primary-text: #047857;
+        }
+
+        .theme-purple .rbc-calendar {
+          --primary-color: #8b5cf6;
+          --primary-hover: #ede9fe;
+          --primary-bg: #f5f3ff;
+          --primary-border: #ddd6fe;
+          --primary-text: #6d28d9;
+        }
+
+        .theme-pink .rbc-calendar {
+          --primary-color: #ec4899;
+          --primary-hover: #fce7f3;
+          --primary-bg: #fdf2f8;
+          --primary-border: #fbcfe8;
+          --primary-text: #be185d;
+        }
+
+        .theme-orange .rbc-calendar {
+          --primary-color: #f97316;
+          --primary-hover: #ffedd5;
+          --primary-bg: #fff7ed;
+          --primary-border: #fed7aa;
+          --primary-text: #c2410c;
+        }
+
         .rbc-time-view {
           width: 100% !important;
           min-width: 0 !important;
@@ -958,10 +1034,10 @@ const AgendarReunion = () => {
           border-color: #cbd5e1;
         }
         .rbc-toolbar button.rbc-active {
-          background: #3b82f6 !important;
+          background: var(--primary-color) !important;
           color: white !important;
-          border-color: #3b82f6 !important;
-          box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3) !important;
+          border-color: var(--primary-color) !important;
+          box-shadow: 0 4px 6px -1px var(--primary-hover) !important;
         }
 
         /* Casillas de Días */
@@ -1073,10 +1149,10 @@ const AgendarReunion = () => {
 
         /* Tarjetas de Eventos */
         .rbc-event {
-          background-color: #eff6ff !important;
-          color: #1d4ed8 !important;
-          border: 1px solid #bfdbfe !important;
-          border-left: 4px solid #3b82f6 !important;
+          background-color: var(--primary-bg) !important;
+          color: var(--primary-text) !important;
+          border: 1px solid var(--primary-border) !important;
+          border-left: 4px solid var(--primary-color) !important;
           border-radius: 4px !important;
           padding: 3px 6px !important;
           margin-bottom: 1px;
@@ -1088,7 +1164,7 @@ const AgendarReunion = () => {
           transition: all 0.2s ease;
         }
         .rbc-event:hover {
-          background-color: #dbeafe !important;
+          background-color: var(--primary-hover) !important;
           transform: translateY(-1px);
           box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
           z-index: 5;

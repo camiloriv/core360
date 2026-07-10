@@ -25,7 +25,9 @@ const initialState = {
   encuesta_relacionada: false,
   encuesta_destinatario: "",
   teams_evento_id: "",
-  event_id: ""
+  event_id: "",
+  texto_previo: "",
+  link_video: ""
 };
 
 export default function useReunionesForm() {

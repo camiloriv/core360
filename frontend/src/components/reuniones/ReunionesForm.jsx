@@ -139,6 +139,22 @@ function ReunionesForm({ onSuccess }) {
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setField("lugar", draft.lugar || "");
+
+    const fechaFormatStr = draft.fecha_reu 
+      ? new Date(draft.fecha_reu).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })
+      : "";
+    const defaultTextoPrevio = `Estimados,\n\nJunto con saludar, comparto la minuta de la reunión coordinada${fechaFormatStr ? ` para el día ${fechaFormatStr}` : ""}.`;
+    setField("texto_previo", draft.texto_previo || defaultTextoPrevio);
+
+    let extractedVideoLink = draft.link_video || "";
+    if (!extractedVideoLink && draft.body_preview) {
+      const match = draft.body_preview.match(/https:\/\/[^\s"']+(?:sharepoint|onedrive)[^\s"']+(?:grabacion|recording|video|play)[^\s"']*/i) ||
+                    draft.body_preview.match(/https:\/\/[^\s"']+\/personal\/[^\s"']+\.mp4[^\s"']*/i);
+      if (match) {
+        extractedVideoLink = match[0];
+      }
+    }
+    setField("link_video", extractedVideoLink);
   };
 
   // Si abrimos la pantalla con un borrador o un ID en la URL, precargarlo
@@ -559,6 +575,33 @@ function ReunionesForm({ onSuccess }) {
             form={form}
             setField={setField}
           />
+
+          <FormSection label="LINK DE GRABACIÓN / VIDEO DE REUNIÓN (OPCIONAL)" full={false}>
+            <input
+              value={form.link_video || ""}
+              onChange={(e) => setField("link_video", e.target.value)}
+              placeholder="Ej: https://web.microsoftstream.com/... o enlace de OneDrive"
+            />
+          </FormSection>
+
+          <FormSection label="TEXTO PREVIO / INTRODUCCIÓN AL CORREO (SALUDO)" full={true}>
+            <textarea
+              value={form.texto_previo || ""}
+              onChange={(e) => setField("texto_previo", e.target.value)}
+              placeholder="Escribe el saludo o introducción para el correo..."
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "6px",
+                border: "1px solid var(--border-color)",
+                fontSize: "14px",
+                fontFamily: "Inter, sans-serif",
+                resize: "vertical"
+              }}
+            />
+          </FormSection>
+
           <MinutaEditor form={form} setForm={setField} />
           <FileUpload archivos={form.archivos} setFiles={setFiles} />
 

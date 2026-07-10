@@ -215,8 +215,6 @@ function ReunionesForm({ onSuccess }) {
       });
     }
 
-    console.log("Submitting meeting form payload:", form);
-
     try {
       const res = await submit();
       Swal.fire({

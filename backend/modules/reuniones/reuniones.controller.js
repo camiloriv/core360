@@ -40,87 +40,81 @@ const buildRoleWhereClause = (usuario_id, rol) => {
 };
 
 // ============================================================
+// BASE SQL — Reutilizada por listarReuniones y obtenerReunionPorId
+// ============================================================
+const BASE_REUNION_SQL = `
+    SELECT
+        te.id                           AS teams_evento_id,
+        te.event_id,
+        te.ical_uid,
+        te.asunto                       AS asunto_teams,
+        te.fecha                        AS fecha_reu,
+        te.hora,
+        te.hora_fin,
+        te.estado                       AS estado_teams,
+        te.es_online,
+        te.asistentes,
+        te.join_url,
+        te.empresa_id,
+        te.usuario_id                   AS ejecutiva_id,
+        te.ultima_sync,
+        emp.nombre                      AS empresa_nombre,
+        u.nombre                        AS ejecutiva_nombre,
+        j.nombre                        AS jefatura_nombre,
+
+        m.id                            AS minuta_row_id,
+        COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
+        m.tipo_reu,
+        m.enviado_a,
+        m.enviado_por,
+        m.participantes,
+        m.motivo_reu,
+        m.minuta,
+        m.form_f,
+        m.lugar,
+        m.estado_envio                  AS minuta_estado,
+        m.archivos_nombres,
+        m.programar_encuesta,
+        m.encuesta_tipo,
+        m.encuesta_programada_para,
+        m.encuesta_estado_envio,
+        m.encuesta_relacionada,
+        m.encuesta_destinatario,
+        m.texto_previo,
+        m.link_video,
+        m.created_at,
+
+        CASE
+            WHEN te.estado = 'cancelada'  THEN 'cancelada'
+            WHEN te.estado = 'excluida'   THEN 'excluida'
+            WHEN m.estado_envio = 'enviado'   THEN 'enviado'
+            WHEN m.estado_envio = 'no_aplica' THEN 'no_aplica'
+            WHEN m.estado_envio = 'borrador'  THEN 'borrador'
+            WHEN te.empresa_id IS NULL        THEN 'huerfana'
+            WHEN te.estado = 'pasada'         THEN 'borrador'
+            ELSE te.estado
+        END                             AS estado_envio,
+
+        te.estado                       AS te_estado,
+        (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
+        (m.id IS NOT NULL)              AS tiene_minuta,
+        (te.empresa_id IS NOT NULL)     AS tiene_empresa
+
+    FROM teams_eventos te
+    LEFT JOIN empresas emp ON te.empresa_id = emp.id
+    LEFT JOIN usuarios u ON te.usuario_id = u.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    LEFT JOIN minutas m ON m.teams_evento_id = te.id
+`;
+
+// ============================================================
 // GET /reuniones — Listar reuniones (teams_eventos + minutas)
 // ============================================================
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
 
-    const sql = `
-        SELECT
-            te.id                           AS teams_evento_id,
-            te.event_id,
-            te.ical_uid,
-            te.asunto                       AS asunto_teams,
-            te.fecha                        AS fecha_reu,
-            te.hora,
-            te.hora_fin,
-            te.estado                       AS estado_teams,
-            te.es_online,
-            te.asistentes,
-            te.join_url,
-            te.empresa_id,
-            te.usuario_id                   AS ejecutiva_id,
-            te.ultima_sync,
-            emp.nombre                      AS empresa_nombre,
-            u.nombre                        AS ejecutiva_nombre,
-            j.nombre                        AS jefatura_nombre,
-
-            -- Datos de la minuta (NULL si no tiene)
-            m.id                            AS minuta_row_id,
-            COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
-            m.tipo_reu,
-            m.enviado_a,
-            m.enviado_por,
-            m.participantes,
-            m.motivo_reu,
-            m.minuta,
-            m.form_f,
-            m.lugar,
-            m.estado_envio                  AS minuta_estado,
-            m.archivos_nombres,
-            m.programar_encuesta,
-            m.encuesta_tipo,
-            m.encuesta_programada_para,
-            m.encuesta_estado_envio,
-            m.encuesta_relacionada,
-            m.encuesta_destinatario,
-            m.created_at,
-
-            -- Estado consolidado para el dashboard
-            CASE
-                WHEN te.estado = 'cancelada'                        THEN 'cancelada'
-                WHEN te.estado = 'excluida'                         THEN 'excluida'
-                WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
-                WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
-                WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
-                WHEN te.empresa_id IS NULL                          THEN 'huerfana'
-                WHEN te.estado = 'pasada'                           THEN 'borrador'
-                ELSE te.estado
-            END                             AS estado_envio,
-
-            -- Estado raw del evento Teams (para clasificación de tabs en frontend)
-            te.estado                       AS te_estado,
-
-            -- ¿Es huérfana? (no tiene empresa Y no está excluida)
-            (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
-
-            -- ¿Tiene minuta?
-            (m.id IS NOT NULL)              AS tiene_minuta,
-
-            -- ¿Está vinculada a empresa?
-            (te.empresa_id IS NOT NULL)     AS tiene_empresa
-
-        FROM teams_eventos te
-        LEFT JOIN empresas emp ON te.empresa_id = emp.id
-        LEFT JOIN usuarios u ON te.usuario_id = u.id
-        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
-        LEFT JOIN minutas m ON m.teams_evento_id = te.id
-
-        ${whereClause}
-
-        ORDER BY te.fecha DESC, te.hora DESC
-    `;
+    const sql = `${BASE_REUNION_SQL} ${whereClause} ORDER BY te.fecha DESC, te.hora DESC`;
 
     try {
         const [result] = await db.query(sql, params);
@@ -241,11 +235,11 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
     let userPermisos = 'ejecutiva';
     let loggedInUser = null;
 
-    if (enviado_por_id) {
-        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE id = ? LIMIT 1", [enviado_por_id]);
-        if (userRows.length > 0) { loggedInUser = userRows[0]; userPermisos = loggedInUser.permisos || 'ejecutiva'; }
-    } else if (enviado_por_correo) {
-        const [userRows] = await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ? LIMIT 1", [enviado_por_correo]);
+    // Unifica la búsqueda del usuario logueado en una sola query (id tiene prioridad sobre correo)
+    if (enviado_por_id || enviado_por_correo) {
+        const [userRows] = enviado_por_id
+            ? await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE id = ? LIMIT 1", [enviado_por_id])
+            : await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ? LIMIT 1", [enviado_por_correo]);
         if (userRows.length > 0) { loggedInUser = userRows[0]; userPermisos = loggedInUser.permisos || 'ejecutiva'; }
     }
 
@@ -664,74 +658,9 @@ exports.marcarNoAplica = async (req, res) => {
 exports.obtenerReunionPorId = async (req, res) => {
     const { id_reunion } = req.params;
 
-    const sql = `
-        SELECT
-            te.id                           AS teams_evento_id,
-            te.event_id,
-            te.ical_uid,
-            te.asunto                       AS asunto_teams,
-            te.fecha                        AS fecha_reu,
-            te.hora,
-            te.hora_fin,
-            te.estado                       AS estado_teams,
-            te.es_online,
-            te.asistentes,
-            te.join_url,
-            te.empresa_id,
-            te.usuario_id                   AS ejecutiva_id,
-            te.ultima_sync,
-            emp.nombre                      AS empresa_nombre,
-            u.nombre                        AS ejecutiva_nombre,
-            j.nombre                        AS jefatura_nombre,
-
-            -- Datos de la minuta (NULL si no tiene)
-            m.id                            AS minuta_row_id,
-            COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
-            m.tipo_reu,
-            m.enviado_a,
-            m.enviado_por,
-            m.participantes,
-            m.motivo_reu,
-            m.minuta,
-            m.form_f,
-            m.lugar,
-            m.estado_envio                  AS minuta_estado,
-            m.archivos_nombres,
-            m.programar_encuesta,
-            m.encuesta_tipo,
-            m.encuesta_programada_para,
-            m.encuesta_estado_envio,
-            m.encuesta_relacionada,
-            m.encuesta_destinatario,
-            m.texto_previo,
-            m.link_video,
-            m.created_at,
-
-            -- Estado consolidado para el dashboard
-            CASE
-                WHEN te.estado = 'cancelada'                        THEN 'cancelada'
-                WHEN te.estado = 'excluida'                         THEN 'excluida'
-                WHEN m.estado_envio = 'enviado'                     THEN 'enviado'
-                WHEN m.estado_envio = 'no_aplica'                   THEN 'no_aplica'
-                WHEN m.estado_envio = 'borrador'                    THEN 'borrador'
-                WHEN te.empresa_id IS NULL                          THEN 'huerfana'
-                WHEN te.estado = 'pasada'                           THEN 'borrador'
-                ELSE te.estado
-            END                             AS estado_envio,
-
-            te.estado                       AS te_estado,
-            (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
-            (m.id IS NOT NULL)              AS tiene_minuta,
-            (te.empresa_id IS NOT NULL)     AS tiene_empresa
-
-        FROM teams_eventos te
-        LEFT JOIN empresas emp ON te.empresa_id = emp.id
-        LEFT JOIN usuarios u ON te.usuario_id = u.id
-        LEFT JOIN usuarios j ON emp.jefatura_id = j.id
-        LEFT JOIN minutas m ON m.teams_evento_id = te.id
+    const sql = `${BASE_REUNION_SQL}
         WHERE m.id_minuta = ? OR CAST(te.id AS CHAR) = ?
-        LIMIT 1
-    `;
+        LIMIT 1`;
 
     try {
         const [result] = await db.query(sql, [id_reunion, id_reunion]);

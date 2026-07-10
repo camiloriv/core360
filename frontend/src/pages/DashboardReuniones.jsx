@@ -64,20 +64,6 @@ export default function DashboardReuniones() {
 
   const [activeMobileChart, setActiveMobileChart] = useState("pie"); // 'pie', 'bar', 'line'
 
-  // DEBUG TEMPORAL: log datos recibidos para diagnosticar problemas en entorno de desarrollo
-  useEffect(() => {
-    if (!loading) {
-      console.group('[DEBUG DashboardReuniones]');
-      console.log('user:', user);
-      console.log('userRol:', userRol);
-      console.log('reuniones total:', reuniones.length, reuniones);
-      console.log('empresas total:', empresas.length, empresas);
-      console.log('jefaturas total:', jefaturas.length, jefaturas);
-      const muestra = reuniones.slice(0, 3);
-      muestra.forEach(r => console.log(`  reunion ejecutiva_id=${r.ejecutiva_id} (${typeof r.ejecutiva_id}), user.id=${user?.id} (${typeof user?.id}), empresa_id=${r.empresa_id}, is_huerfana=${r.is_huerfana}`));
-      console.groupEnd();
-    }
-  }, [loading, reuniones.length]);
   const navigate = useNavigate();
 
   const [loadingSync, setLoadingSync] = useState(true);

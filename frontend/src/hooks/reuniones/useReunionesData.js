@@ -3,19 +3,20 @@ import { getDestinatarios, getTiposReunion } from "../../services/reunionesServi
 import { obtenerTemplates } from "../../services/encuestaService";
 import { getEmpresas, getEmpresasByJefatura, getEjecutivas, getEmpresasByGerencia, getUsuariosPorEmpresa } from "../../services/dataService";
 
+const DEFAULT_TIPOS = ["Periódica", "Inducción", "Resolver dudas", "Informática"];
+
 export default function useReunionesData(user, empresa_id) {
   const [empresas, setEmpresas] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [destinatarios, setDestinatarios] = useState([]);
   const [ejecutivas, setEjecutivas] = useState([]);
-  const [tiposReunion, setTiposReunion] = useState(["Periódica", "Inducción", "Resolver dudas", "Informática"]);
+  const [tiposReunion, setTiposReunion] = useState(DEFAULT_TIPOS);
 
   useEffect(() => {
     obtenerTemplates().then(setTemplates);
     getTiposReunion()
       .then(res => {
-        const defaults = ["Periódica", "Inducción", "Resolver dudas", "Informática"];
-        const combined = Array.from(new Set([...defaults, ...(res.data || [])]));
+        const combined = Array.from(new Set([...DEFAULT_TIPOS, ...(res.data || [])]));
         setTiposReunion(combined);
       })
       .catch(err => {

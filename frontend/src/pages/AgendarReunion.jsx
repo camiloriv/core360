@@ -584,8 +584,13 @@ const AgendarReunion = () => {
                     const rangeStart = selectedRange.start.getTime();
                     const rangeEnd = selectedRange.end.getTime();
                     if (time >= rangeStart && time < rangeEnd) {
+                      const isFirst = time === rangeStart;
+                      const formatT = (d) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                      const label = `"${formatT(selectedRange.start)} - ${formatT(selectedRange.end)}"`;
+                      
                       return {
-                        className: "selected-calendar-slot"
+                        className: `selected-calendar-slot ${isFirst ? 'selected-slot-first' : ''}`,
+                        style: isFirst ? { '--selection-label': label } : {}
                       };
                     }
                   }
@@ -920,12 +925,24 @@ const AgendarReunion = () => {
           color: #0f172a !important;
           text-decoration: none;
         }
-        .rbc-today {
-          background-color: #f0fdfa !important;
+        /* En la vista de Mes, el fondo de 'hoy' es azul claro */
+        .rbc-month-view .rbc-today {
+          background-color: #bfdbfe !important; 
+        }
+
+        /* En las vistas de Día/Semana, usamos un fondo tenue para que la cuadrícula se vea limpia */
+        .rbc-time-view .rbc-today {
+          background-color: #f8fafc !important; 
         }
         .rbc-month-view .rbc-today .rbc-button-link {
-          background-color: #14b8a6 !important;
+          background-color: #0284c7 !important; /* Azul oscuro para el texto del día */
           color: white !important;
+          border-radius: 50% !important;
+          width: 24px;
+          height: 24px;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
         }
         .rbc-off-range-bg {
           background-color: #f8fafc;
@@ -935,6 +952,23 @@ const AgendarReunion = () => {
           font-weight: 500;
         }
 
+        /* Indicador de hora actual (Vista de día) */
+        .rbc-current-time-indicator {
+          background-color: #ef4444 !important;
+          height: 2px !important;
+          z-index: 3;
+        }
+        .rbc-current-time-indicator::before {
+          content: "";
+          position: absolute;
+          left: -4px;
+          top: -3px;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background-color: #ef4444;
+        }
+
         /* Hover sobre casillas vacías y día completo */
         .rbc-day-bg:hover, .rbc-time-slot:hover {
           background-color: #e2e8f0 !important;
@@ -942,9 +976,23 @@ const AgendarReunion = () => {
         }
 
         /* Estilos para la celda horaria seleccionada */
-        .selected-calendar-slot {
-          background-color: #dbeafe !important;
-          border-left: 3px solid #3b82f6 !important;
+        .rbc-day-slot .selected-calendar-slot {
+          background-color: #71717a !important; /* Fondo gris neutro oscuro */
+          border: none !important;
+          box-shadow: 0 -1px 0 0 #71717a, 0 1px 0 0 #71717a !important; /* Cubrir bordes de la grilla */
+          position: relative;
+          z-index: 5 !important;
+        }
+        .rbc-day-slot .selected-slot-first::before {
+          content: var(--selection-label);
+          position: absolute;
+          top: 4px;
+          left: 6px;
+          font-size: 11px;
+          font-weight: 500;
+          color: #ffffff;
+          white-space: nowrap;
+          z-index: 10;
         }
 
         /* En la vista de mes, desactivamos eventos de puntero en todo lo que no sea el fondo (.rbc-row-bg)

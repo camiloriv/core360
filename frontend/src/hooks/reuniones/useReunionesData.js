@@ -8,13 +8,13 @@ export default function useReunionesData(user, empresa_id) {
   const [templates, setTemplates] = useState([]);
   const [destinatarios, setDestinatarios] = useState([]);
   const [ejecutivas, setEjecutivas] = useState([]);
-  const [tiposReunion, setTiposReunion] = useState(["Inducción", "Implementación TI"]);
+  const [tiposReunion, setTiposReunion] = useState(["Periódica", "Inducción", "Resolver dudas", "Informática"]);
 
   useEffect(() => {
     obtenerTemplates().then(setTemplates);
     getTiposReunion()
       .then(res => {
-        const defaults = ["Inducción", "Implementación TI"];
+        const defaults = ["Periódica", "Inducción", "Resolver dudas", "Informática"];
         const combined = Array.from(new Set([...defaults, ...(res.data || [])]));
         setTiposReunion(combined);
       })

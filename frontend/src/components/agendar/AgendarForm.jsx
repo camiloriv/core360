@@ -1,10 +1,111 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import { crearReunionTeams } from "../../services/agendamientoService";
 import SelectEmpresa from "../form/fields/SelectEmpresa";
 import AutocompleteInput from "../form/fields/AutocompleteInput";
+
+const CustomTimePicker = ({ value, onChange, name, required }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const [hour, min] = (value || "").split(":");
+
+  const handleHourSelect = (h) => {
+    onChange({ target: { name, value: `${h}:${min || '00'}` } });
+  };
+  
+  const handleMinSelect = (m) => {
+    onChange({ target: { name, value: `${hour || '09'}:${m}` } });
+    setIsOpen(false);
+  };
+
+  const handleManualTyping = (e) => {
+    let val = e.target.value.replace(/[^0-9:]/g, '');
+    onChange({ target: { name, value: val } });
+  };
+
+  const hours = Array.from({length: 24}, (_, i) => {
+    const h = i + 1;
+    return h === 24 ? "00" : String(h).padStart(2, "0");
+  });
+  const mins = ["00", "30"];
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }} ref={wrapperRef}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+        <input 
+          type="text" 
+          value={value} 
+          onChange={handleManualTyping} 
+          onClick={() => setIsOpen(true)}
+          placeholder="HH:MM"
+          maxLength={5}
+          style={{ padding: '8px 12px', paddingRight: '28px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px', width: '100%', boxSizing: 'border-box' }}
+          required={required}
+        />
+        <svg onClick={() => setIsOpen(!isOpen)} style={{ position: 'absolute', right: '8px', cursor: 'pointer', color: '#6b7280' }} viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+      </div>
+      
+      {isOpen && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: '4px',
+          background: 'white', border: '1px solid #d1d5db', borderRadius: '6px',
+          display: 'flex', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', zIndex: 50,
+          height: '180px', overflow: 'hidden'
+        }}>
+          <div style={{ overflowY: 'auto', borderRight: '1px solid #e5e7eb', padding: '4px', width: '60px' }}>
+            <div style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', paddingBottom: '4px', fontWeight: 'bold' }}>Hora</div>
+            {hours.map(h => (
+              <div 
+                key={h} 
+                onClick={() => handleHourSelect(h)}
+                style={{
+                  padding: '6px', cursor: 'pointer', textAlign: 'center', fontSize: '13px',
+                  background: hour === h ? '#3b82f6' : 'transparent',
+                  color: hour === h ? 'white' : '#374151',
+                  borderRadius: '4px', marginBottom: '2px'
+                }}
+              >
+                {h}
+              </div>
+            ))}
+          </div>
+          <div style={{ overflowY: 'auto', padding: '4px', width: '60px' }}>
+            <div style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', paddingBottom: '4px', fontWeight: 'bold' }}>Min</div>
+            {mins.map(m => (
+              <div 
+                key={m} 
+                onClick={() => handleMinSelect(m)}
+                style={{
+                  padding: '6px', cursor: 'pointer', textAlign: 'center', fontSize: '13px',
+                  background: min === m ? '#3b82f6' : 'transparent',
+                  color: min === m ? 'white' : '#374151',
+                  borderRadius: '4px', marginBottom: '2px'
+                }}
+              >
+                {m}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClose, dayEvents = [] }) => {
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
@@ -15,7 +116,7 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
     asistentes_internos: "", // Para contactos internos (jefaturas/ejecutivas)
     fecha: "",
     hora: "",
-    duracion: "30",
+    hora_fin: "",
     asunto: "",
     detalle: "",
     modalidad: "Teams",
@@ -36,17 +137,16 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
       const fecha = localDate.toISOString().split("T")[0];
       const hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
       
-      let duracion = "30"; // Default
+      let hora_fin = "";
       if (selectedEndDate) {
-        const startMs = d.getTime();
-        const endMs = new Date(selectedEndDate).getTime();
-        const diffMinutes = Math.round((endMs - startMs) / 60000);
-        if (diffMinutes > 0) {
-          duracion = String(diffMinutes);
-        }
+        const dEnd = new Date(selectedEndDate);
+        hora_fin = String(dEnd.getHours()).padStart(2, "0") + ":" + String(dEnd.getMinutes()).padStart(2, "0");
+      } else {
+        const dEnd = new Date(d.getTime() + 30 * 60000);
+        hora_fin = String(dEnd.getHours()).padStart(2, "0") + ":" + String(dEnd.getMinutes()).padStart(2, "0");
       }
       
-      setForm(prev => ({ ...prev, fecha, hora, duracion }));
+      setForm(prev => ({ ...prev, fecha, hora, hora_fin }));
     }
   }, [selectedDate, selectedEndDate]);
 
@@ -59,6 +159,23 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const getDuracionTexto = () => {
+    if (!form.hora || !form.hora_fin || !form.hora.includes(':') || !form.hora_fin.includes(':')) return "";
+    const [hInicio, mInicio] = form.hora.split(":").map(Number);
+    const [hFin, mFin] = form.hora_fin.split(":").map(Number);
+    
+    if (isNaN(hInicio) || isNaN(mInicio) || isNaN(hFin) || isNaN(mFin)) return "";
+
+    let diff = (hFin * 60 + mFin) - (hInicio * 60 + mInicio);
+    if (diff <= 0) return "Horas inválidas";
+    
+    const horas = Math.floor(diff / 60);
+    const mins = diff % 60;
+    if (horas > 0 && mins > 0) return `${horas}h ${mins}m`;
+    if (horas > 0) return `${horas}h`;
+    return `${mins} min`;
+  };
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     
@@ -68,13 +185,19 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
     if (!form.asunto) {
       return Swal.fire("Título Requerido", "Por favor ingresa un título para la reunión", "warning");
     }
-    if (!form.fecha || !form.hora) {
-      return Swal.fire("Fecha y Hora Requeridas", "Por favor ingresa la fecha y hora de la reunión", "warning");
+    if (!form.fecha || !form.hora || !form.hora_fin) {
+      return Swal.fire("Fechas Requeridas", "Por favor ingresa la fecha, hora de inicio y hora de fin", "warning");
     }
 
     setLoading(true);
     try {
-      const res = await crearReunionTeams(form);
+      const [hInicio, mInicio] = form.hora.split(":").map(Number);
+      const [hFin, mFin] = form.hora_fin.split(":").map(Number);
+      let duracionCalculada = (hFin * 60 + mFin) - (hInicio * 60 + mInicio);
+      if (duracionCalculada <= 0) duracionCalculada = 30; // Fallback por defecto si ingresan horas invertidas
+
+      const payload = { ...form, duracion: String(duracionCalculada) };
+      const res = await crearReunionTeams(payload);
       if (res.data.success) {
         Swal.fire({
           icon: "success",
@@ -279,45 +402,44 @@ const AgendarForm = ({ selectedDate, selectedEndDate, onFormSubmitSuccess, onClo
           </div>
 
           {/* Fila de Fecha y Hora */}
-          <div className="teams-date-row" style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="teams-date-row" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>FECHA</label>
               <input 
                 type="date" 
                 name="fecha" 
                 value={form.fecha} 
                 onChange={handleChange} 
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px' }}
-                required 
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>HORA</label>
-              <input 
-                type="time" 
-                name="hora" 
-                value={form.hora} 
-                onChange={handleChange} 
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px' }}
+                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px', width: '100%', boxSizing: 'border-box' }}
                 required 
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>DURACIÓN</label>
-              <select 
-                name="duracion" 
-                value={form.duracion} 
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>DE (INICIO)</label>
+              <CustomTimePicker 
+                name="hora" 
+                value={form.hora} 
                 onChange={handleChange} 
-                style={{ padding: '9px 12px', borderRadius: '4px', border: '1px solid #d1d5db', outline: 'none', fontSize: '13px', background: 'white' }}
-                required
-              >
-                <option value="15">15 minutos</option>
-                <option value="30">30 minutos</option>
-                <option value="45">45 minutos</option>
-                <option value="60">1 hora</option>
-                <option value="90">1.5 horas</option>
-                <option value="120">2 horas</option>
-              </select>
+                required 
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', marginBottom: '4px' }}>HASTA (FIN)</label>
+              <CustomTimePicker 
+                name="hora_fin" 
+                value={form.hora_fin} 
+                onChange={handleChange} 
+                required 
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', height: '37px' }}>
+              {getDuracionTexto() ? (
+                <span style={{ display: 'inline-block', width: '85px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#4338ca', backgroundColor: '#e0e7ff', padding: '6px 0', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                  ⏳ {getDuracionTexto()}
+                </span>
+              ) : (
+                <span style={{ display: 'inline-block', width: '85px' }}></span>
+              )}
             </div>
           </div>
 

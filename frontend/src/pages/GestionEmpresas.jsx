@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Swal from "sweetalert2";
 import api from "../services/api";
 import * as XLSX from "xlsx";
+import { clearDashboardCache } from "../hooks/useDashboardData";
 import "../styles/core360-theme.css";
 
 /* eslint-disable no-unused-vars */
@@ -382,6 +383,7 @@ export default function GestionEmpresas() {
 
       setIsVincModalOpen(false);
       setEditingVinc(null);
+      clearDashboardCache();
       Swal.fire("Éxito", "Vinculaciones actualizadas correctamente", "success");
       await fetchDatos();
     } catch (err) {

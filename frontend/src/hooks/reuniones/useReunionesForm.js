@@ -23,7 +23,9 @@ const initialState = {
   encuesta_tipo: "",
   encuesta_programada_para: "",
   encuesta_relacionada: false,
-  encuesta_destinatario: ""
+  encuesta_destinatario: "",
+  teams_evento_id: "",
+  event_id: ""
 };
 
 export default function useReunionesForm() {

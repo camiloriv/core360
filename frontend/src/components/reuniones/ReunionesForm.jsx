@@ -85,6 +85,8 @@ function ReunionesForm({ onSuccess }) {
 
   const populateFromDraft = (draft) => {
     setField("id_reunion", draft.id_reunion);
+    setField("teams_evento_id", draft.teams_evento_id || "");
+    setField("event_id", draft.event_id || "");
     setField("empresa_id", draft.empresa_id || "");
     if (!draft.empresa_id) {
       setField("asunto_correo", draft.asunto_teams || draft.motivo_reu || "");

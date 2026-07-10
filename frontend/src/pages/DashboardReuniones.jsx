@@ -1890,7 +1890,7 @@ export default function DashboardReuniones() {
                           ) : r.estado_envio === "borrador" ? (
                             <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
                               <div
-                                onClick={() => navigate("/home", { state: { draft: r } })}
+                                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
                                 style={{
                                   color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
                                   background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
@@ -1938,7 +1938,7 @@ export default function DashboardReuniones() {
                           ) : r.estado_envio === "agendada" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <div
-                                onClick={() => navigate("/home", { state: { draft: r } })}
+                                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
                                 style={{
                                   color: "#1e40af", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
                                   background: "#dbeafe", padding: "4px 8px", borderRadius: "4px",
@@ -2258,7 +2258,7 @@ export default function DashboardReuniones() {
                                 ) : r.estado_envio === "borrador" ? (
                                   <div style={{ display: "flex", gap: "8px" }}>
                                     <div
-                                      onClick={() => navigate(`/minuta/${r.id_reunion}`)}
+                                      onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
                                       style={{
                                         color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
                                         background: "#fef08a", padding: "4px 8px", borderRadius: "4px"

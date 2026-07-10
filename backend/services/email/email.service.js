@@ -187,9 +187,9 @@ const enviarCorreoEncuesta = async (to, url, bcc, user_nombre, userEmail) => {
         path: finalFirmaPath,
         cid: "firma"
       });
-      firmaHtml = `<div style="margin-top: 20px;"><img src="cid:firma" style="display:block; border:0; max-width: 300px; height:auto;"></div>`;
+      firmaHtml = `<div style="margin-top: 20px;"><img src="cid:firma" style="display:block; border:0; max-width: 480px; height:auto;"></div>`;
     }
-
+ 
     const html = `
 <!DOCTYPE html>
 <html>
@@ -210,14 +210,14 @@ const enviarCorreoEncuesta = async (to, url, bcc, user_nombre, userEmail) => {
               <img src="cid:banner-header" width="800" style="display:block; border:0; width:100%; max-width:800px; height:auto;">
             </td>
           </tr>
-
+ 
           <!-- CONTENIDO -->
           <tr>
             <td style="padding: 40px 50px;">
               <p style="color:#334155; font-size:16px; margin-bottom:20px;">Estimadas/os,</p>
               <p style="color:#334155; font-size:16px; margin-bottom:20px;">Esperamos que se encuentren muy bien.</p>
               <p style="color:#334155; font-size:16px; margin-bottom:20px;">
-                Con el objetivo de mejorar continuamente la calidad de nuestros servicios, les solicitamos cordialmente responder la siguiente <b>encuesta de fidelización</b>.
+                Con el objetivo de mejorar continuamente la calidad de nuestros servicios, les solicitamos cordialmente responder la siguiente <b>encuesta</b>.
               </p>
               <p style="color:#334155; font-size:16px; margin-bottom:40px;">
                 Su opinión es muy importante para nosotros y nos permitirá seguir fortaleciendo nuestra relación y mejorar nuestros procesos de atención.

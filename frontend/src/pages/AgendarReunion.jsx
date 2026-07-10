@@ -1133,6 +1133,9 @@ const AgendarReunion = () => {
         }
 
         /* Modal */
+        .swal2-container {
+          z-index: 100000 !important;
+        }
         .modal-overlay {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
           background: rgba(15, 23, 42, 0.6);

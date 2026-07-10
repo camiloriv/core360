@@ -436,6 +436,74 @@ exports.actualizarVinculaciones = async (req, res) => {
       }
     }
 
+    // 4. Buscar y vincular masivamente reuniones huérfanas que coincidan con estos dominios/correos
+    const allowedDomains = new Set();
+    const allowedEmails = new Set();
+
+    if (Array.isArray(dominios)) {
+      dominios
+        .map(d => d.trim().toLowerCase())
+        .filter(d => d.length > 0)
+        .forEach(d => allowedDomains.add(d.startsWith('@') ? d : '@' + d));
+    }
+    if (Array.isArray(contactos)) {
+      contactos
+        .map(c => c.correo ? c.correo.trim().toLowerCase() : '')
+        .filter(email => email.includes('@'))
+        .forEach(email => allowedEmails.add(email));
+    }
+
+    if (allowedDomains.size > 0 || allowedEmails.size > 0) {
+      const [meetings] = await connection.query(`
+        SELECT id, asistentes
+        FROM teams_eventos
+        WHERE empresa_id IS NULL AND estado NOT IN ('cancelada', 'excluida')
+      `);
+
+      const proformaDomains = ['@proforma.cl', '@oticproforma.cl'];
+
+      for (const meeting of meetings) {
+        let attendeesList = [];
+        try {
+          attendeesList = typeof meeting.asistentes === 'string' ? JSON.parse(meeting.asistentes) : (meeting.asistentes || []);
+        } catch (e) {
+          continue;
+        }
+
+        if (!Array.isArray(attendeesList) || attendeesList.length === 0) continue;
+
+        let hasTargetCompanyAttendee = false;
+        let hasInvalidExternalAttendee = false;
+
+        for (const att of attendeesList) {
+          const email = (att.email || '').trim().toLowerCase();
+          if (!email) continue;
+
+          // Check if it's proforma
+          const isProforma = proformaDomains.some(d => email.endsWith(d));
+          if (isProforma) continue;
+
+          // Check if it matches allowed domains or emails
+          const emailDomain = '@' + email.split('@')[1];
+          const matchesDomain = allowedDomains.has(emailDomain);
+          const matchesEmail = allowedEmails.has(email);
+
+          if (matchesDomain || matchesEmail) {
+            hasTargetCompanyAttendee = true;
+          } else {
+            // There is an attendee from a different external domain/email
+            hasInvalidExternalAttendee = true;
+            break;
+          }
+        }
+
+        // If it contains target company attendees, and no other third-party company attendees
+        if (hasTargetCompanyAttendee && !hasInvalidExternalAttendee) {
+          await connection.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [id, meeting.id]);
+        }
+      }
+    }
+
     await connection.commit();
     res.json({ success: true, message: "Vinculaciones actualizadas con éxito" });
   } catch (err) {

@@ -262,7 +262,7 @@ function ReunionesForm({ onSuccess }) {
             </svg>
           </div>
           <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a", marginBottom: "8px", fontFamily: "Outfit, sans-serif" }}>
-            Registro de Minutas Exclusivo para Teams
+            Registro de Minutas y Reuniones para Teams
           </h2>
           <p style={{ fontSize: "13.5px", color: "#64748b", lineHeight: "1.5", marginBottom: "20px", fontFamily: "Inter, sans-serif" }}>
             Para garantizar la limpieza e integridad del proyecto, todas las minutas registradas deben estar vinculadas a una reunión comercial agendada a través de <b>Microsoft Teams</b>.

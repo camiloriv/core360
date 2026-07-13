@@ -1594,3 +1594,8 @@ html.swal2-height-auto {
     display: none !important;
   }
 }
+
+/* Forzar que las alertas/loading de SweetAlert2 siempre estén por encima de cualquier modal de React */
+.swal2-container {
+  z-index: 100000 !important;
+}

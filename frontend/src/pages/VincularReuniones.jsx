@@ -300,7 +300,9 @@ export default function VincularReuniones() {
                   borderRadius: "10px",
                   border: "1px solid #ffe4e6",
                   boxShadow: "0 2px 8px rgba(225, 29, 72, 0.04)",
-                  overflow: "hidden",
+                  overflow: "visible",
+                  position: "relative",
+                  zIndex: isExpanded ? 10 : 1,
                   transition: "box-shadow 0.2s ease",
                 }}>
                   {/* Header de la tarjeta: SIEMPRE visible, clic para expandir */}

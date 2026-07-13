@@ -38,7 +38,14 @@ exports.login = async (req, res) => {
         cargos: usuario.cargos,
         jefatura_id: usuario.jefatura_id,
         vistas_permitidas: usuario.vistas_permitidas,
-        requiere_cambio_clave: usuario.requiere_cambio_clave === 1
+        requiere_cambio_clave: usuario.requiere_cambio_clave === 1,
+        preferencias: (() => {
+          try {
+            return typeof usuario.preferencias === 'string'
+              ? JSON.parse(usuario.preferencias)
+              : (usuario.preferencias || {});
+          } catch { return {}; }
+        })()
       }
     });
   } catch (err) {

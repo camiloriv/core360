@@ -574,31 +574,43 @@ function ReunionesForm({ onSuccess }) {
             setField={setField}
           />
 
-          <FormSection label="LINK DE GRABACIÓN / VIDEO DE REUNIÓN (OPCIONAL)" full={false}>
-            <input
-              value={form.link_video || ""}
-              onChange={(e) => setField("link_video", e.target.value)}
-              placeholder="Ej: https://web.microsoftstream.com/... o enlace de OneDrive"
-            />
-          </FormSection>
+          {form.link_video && form.link_video.trim() !== "" && (
+            <FormSection label="LINK DE GRABACIÓN / VIDEO DE REUNIÓN" full={false}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <input
+                  style={{ flex: 1 }}
+                  value={form.link_video}
+                  onChange={(e) => setField("link_video", e.target.value)}
+                  placeholder="Ej: https://web.microsoftstream.com/..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setField("link_video", "")}
+                  style={{
+                    padding: "10px 15px",
+                    background: "#fee2e2",
+                    color: "#ef4444",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                  title="Quitar video de la minuta"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  Quitar Link
+                </button>
+              </div>
+            </FormSection>
+          )}
 
-          <FormSection label="TEXTO PREVIO / INTRODUCCIÓN AL CORREO (SALUDO)" full={true}>
-            <textarea
-              value={form.texto_previo || ""}
-              onChange={(e) => setField("texto_previo", e.target.value)}
-              placeholder="Escribe el saludo o introducción para el correo..."
-              rows={3}
-              style={{
-                width: "100%",
-                padding: "10px",
-                borderRadius: "6px",
-                border: "1px solid var(--border-color)",
-                fontSize: "14px",
-                fontFamily: "Inter, sans-serif",
-                resize: "vertical"
-              }}
-            />
-          </FormSection>
 
           <MinutaEditor form={form} setForm={setField} />
           <FileUpload archivos={form.archivos} setFiles={setFiles} />

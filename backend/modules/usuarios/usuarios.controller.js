@@ -192,3 +192,35 @@ exports.cambiarContrasena = async (req, res) => {
   }
 };
 
+exports.actualizarPreferencias = async (req, res) => {
+  const { id } = req.params;
+  const { preferencias } = req.body;
+
+  if (!id || !preferencias) {
+    return res.status(400).json({ error: "Faltan datos" });
+  }
+
+  try {
+    // Leer preferencias actuales y combinar (merge) con las nuevas
+    const [rows] = await db.query("SELECT preferencias FROM usuarios WHERE id = ?", [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    let current = {};
+    try {
+      current = typeof rows[0].preferencias === 'string'
+        ? JSON.parse(rows[0].preferencias)
+        : (rows[0].preferencias || {});
+    } catch { current = {}; }
+
+    const merged = { ...current, ...preferencias };
+
+    await db.query("UPDATE usuarios SET preferencias = ? WHERE id = ?", [JSON.stringify(merged), id]);
+
+    res.json({ msg: "Preferencias actualizadas", preferencias: merged });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al actualizar preferencias" });
+  }
+};

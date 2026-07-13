@@ -5,6 +5,7 @@ const usuariosController = require("./usuarios.controller");
 router.get("/", usuariosController.obtenerUsuarios);
 router.post("/", usuariosController.crearUsuario);
 router.post("/cambiar-contrasena", usuariosController.cambiarContrasena);
+router.patch("/:id/preferencias", usuariosController.actualizarPreferencias);
 router.put("/:id", usuariosController.actualizarUsuario);
 router.delete("/:id", usuariosController.eliminarUsuario);
 

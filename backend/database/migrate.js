@@ -49,6 +49,7 @@ async function runMigrations() {
     await addColIfMissing('usuarios', 'requiere_cambio_clave', 'TINYINT(1) DEFAULT 0');
     await addColIfMissing('usuarios', 'sync_delta_token', 'TEXT NULL');
     await addColIfMissing('usuarios', 'ultima_sincronizacion', 'DATETIME NULL');
+    await addColIfMissing('usuarios', 'preferencias', 'JSON NULL');
 
     // Insertar PROFORMA INTERNA si no existe
     const [empProforma] = await connection.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");

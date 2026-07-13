@@ -11,6 +11,10 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { FontFamily } from "@tiptap/extension-font-family";
 import { Extension } from "@tiptap/core";
 import Swal from "sweetalert2";
+import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
 import {
   Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikeIcon,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
@@ -689,6 +693,70 @@ const MenuBar = ({ editor }) => {
   );
 };
 
+const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) => {
+  const [name, setName] = useState(initialName || "");
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      CustomTableHeader,
+      CustomTableCell,
+      TextStyle,
+      Color,
+      FontFamily,
+      FontSize,
+      TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
+    ],
+    content: initialContent || "",
+  });
+
+  const handleSave = () => {
+    if (!name.trim() || !editor) {
+      Swal.fire('Error', 'El nombre y el contenido son obligatorios.', 'error');
+      return;
+    }
+    const html = editor.getHTML();
+    if (html === "<p></p>" || html.trim() === "") {
+      Swal.fire('Error', 'El contenido no puede estar vacío.', 'error');
+      return;
+    }
+    onSave(name, html);
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+      <div style={{ background: 'white', width: '100%', maxWidth: '1000px', maxHeight: '95vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{initialName ? "Editar:" : "Nuevo Botón:"}</h3>
+            <input 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              placeholder="Ej: Mi Saludo" 
+              style={{ flex: 1, maxWidth: '350px', boxSizing: 'border-box', height: '34px', padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px' }} 
+            />
+          </div>
+          <button type="button" onClick={onClose} style={{ background: 'var(--danger-color)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+        </div>
+        <div style={{ padding: '15px 24px', overflowY: 'auto', background: 'var(--bg-muted)', flex: 1 }}>
+          <div className="tiptap-modal-container" style={{ background: 'white', width: '100%', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '100%', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', borderTopLeftRadius: '12px', borderTopRightRadius: '12px', position: 'sticky', top: 0, zIndex: 10 }}>
+              <MenuBar editor={editor} />
+            </div>
+            <div style={{ minHeight: '300px', padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+              <EditorContent editor={editor} />
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" onClick={handleSave} style={{ background: '#3085d6', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function MinutaEditor({ form, setForm }) {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const editor = useEditor({
@@ -714,6 +782,91 @@ function MinutaEditor({ form, setForm }) {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
     if (editor && form.minuta !== editor.getHTML()) { editor.commands.setContent(form.minuta || ""); }
   }, [form.minuta, editor]);
+
+  const [customTemplates, setCustomTemplates] = useState([]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+    if (user?.preferencias?.custom_templates) {
+      setCustomTemplates(user.preferencias.custom_templates);
+    }
+  }, []);
+
+  const [modalState, setModalState] = useState({ isOpen: false, template: null });
+
+  const handleAddCustomTemplate = (e) => {
+    e.preventDefault();
+    setModalState({ isOpen: true, template: null });
+  };
+
+  const handleSaveModal = async (name, content) => {
+    // Capturar el template ANTES de cerrar el modal (evita condición de carrera con setState)
+    const editingTemplate = modalState.template;
+    setModalState({ isOpen: false, template: null });
+    
+    let updatedTemplates;
+    if (editingTemplate) {
+      // Edit
+      updatedTemplates = customTemplates.map(t => t.id === editingTemplate.id ? { ...t, name, content } : t);
+    } else {
+      // Add
+      const newTemplate = { id: Date.now().toString(), name, content };
+      updatedTemplates = [...customTemplates, newTemplate];
+    }
+    await saveCustomTemplates(updatedTemplates);
+  };
+
+  const handleEditCustomTemplate = async (e, template) => {
+    e.preventDefault(); // Evitar menú contextual del navegador
+    const result = await Swal.fire({
+      title: 'Opciones de Predefinido',
+      text: `¿Qué deseas hacer con el botón "${template.name}"?`,
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Editar',
+      denyButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#3085d6',
+      denyButtonColor: '#d33',
+    });
+
+    if (result.isConfirmed) {
+      // Editar
+      setModalState({ isOpen: true, template });
+    } else if (result.isDenied) {
+      // Eliminar
+      const confirmDelete = await Swal.fire({
+        title: '¿Estás seguro?',
+        text: "Este texto predefinido se eliminará.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar'
+      });
+      if (confirmDelete.isConfirmed) {
+        const updatedTemplates = customTemplates.filter(t => t.id !== template.id);
+        await saveCustomTemplates(updatedTemplates);
+      }
+    }
+  };
+
+  const saveCustomTemplates = async (updatedTemplates) => {
+    setCustomTemplates(updatedTemplates);
+    try {
+      const u = JSON.parse(localStorage.getItem("usuario") || "{}");
+      if (u?.id) {
+        const { data } = await axios.patch(`${API_URL}/usuarios/${u.id}/preferencias`, {
+          preferencias: { custom_templates: updatedTemplates },
+        });
+        const updatedUser = { ...u, preferencias: data.preferencias };
+        localStorage.setItem("usuario", JSON.stringify(updatedUser));
+      }
+    } catch (err) {
+      console.error("Error al guardar templates:", err);
+      Swal.fire('Error', 'No se pudieron guardar los cambios', 'error');
+    }
+  };
 
   const insertTemplate = (e, templateText) => {
     e.preventDefault();
@@ -837,6 +990,7 @@ function MinutaEditor({ form, setForm }) {
       <style dangerouslySetInnerHTML={{
         __html: `
         .tiptap-editor-container .ProseMirror { min-height: 800px; padding: 40px 60px; outline: none; font-size: 15px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
+        .tiptap-modal-container .ProseMirror { min-height: 250px; padding: 20px; outline: none; font-size: 14px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         .tiptap p { margin: 0 0 10px 0; text-align: inherit; width: 100%; }
         .tiptap table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin: 15px 0; border: 1px solid #000000; }
         .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; }
@@ -878,9 +1032,26 @@ function MinutaEditor({ form, setForm }) {
         <div className="flex-wrap-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
           <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>borrar</button>
+          <div style={{ width: '1px', background: '#cbd5e1', margin: '0 4px' }}></div>
           <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>Franquicia</button>
           <button onClick={(e) => insertTemplate(e, templateAgoras)} style={btnStyle('#dcfce7', '#166534')}>Ágoras</button>
           <button onClick={(e) => insertTemplate(e, templatePreContrato)} style={btnStyle('#f5f3ff', '#6d28d9')}>Pre-contrato</button>
+          
+          {customTemplates.length > 0 && <div style={{ width: '1px', background: '#cbd5e1', margin: '0 4px' }}></div>}
+          {customTemplates.map((t) => (
+            <button 
+              key={t.id} 
+              onClick={(e) => insertTemplate(e, t.content)} 
+              onContextMenu={(e) => handleEditCustomTemplate(e, t)}
+              style={btnStyle('#fef9c3', '#854d0e')} 
+              title={`${t.name} (Clic derecho para Editar/Eliminar)`}
+            >
+              {t.name}
+            </button>
+          ))}
+          <button onClick={handleAddCustomTemplate} style={btnStyle('#f1f5f9', '#475569')} title="Crear texto predefinido personal">
+            <Plus size={14} style={{ marginRight: '4px' }} /> Agregar
+          </button>
         </div>
       </div>
       <div className="tiptap-editor-container" style={{
@@ -926,6 +1097,15 @@ function MinutaEditor({ form, setForm }) {
           </div>
         </div>
       </div>
+      {modalState.isOpen && (
+        <CustomTemplateModal 
+          initialName={modalState.template?.name} 
+          initialContent={modalState.template?.content} 
+          onSave={handleSaveModal} 
+          onClose={() => setModalState({ isOpen: false, template: null })} 
+        />
+      )}
+      
       {showPreviewModal && (
         <div 
           onClick={() => setShowPreviewModal(false)}

@@ -62,11 +62,28 @@ const AgendarReunion = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [mobileViewMode, setMobileViewMode] = useState("day");
   const [calendarTheme, setCalendarTheme] = useState(() => {
-    return localStorage.getItem("calendar_theme") || "blue";
+    // Prioridad: preferencias del usuario (BD) > localStorage > default
+    try {
+      const u = JSON.parse(localStorage.getItem("usuario") || "{}");
+      return u?.preferencias?.calendar_theme
+        || localStorage.getItem("calendar_theme")
+        || "blue";
+    } catch {
+      return localStorage.getItem("calendar_theme") || "blue";
+    }
   });
   
   const user = JSON.parse(localStorage.getItem("usuario") || "{}");
   const { empresas } = useReunionesData(user);
+
+  // Detectar cambios de tema desde el Topbar
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setCalendarTheme(localStorage.getItem("calendar_theme") || "blue");
+    };
+    window.addEventListener("calendar_theme_changed", handleThemeChange);
+    return () => window.removeEventListener("calendar_theme_changed", handleThemeChange);
+  }, []);
 
   // Detección de responsive para el layout móvil
   useEffect(() => {
@@ -625,36 +642,6 @@ const AgendarReunion = () => {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div className="theme-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '4px 8px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Tema:</span>
-            {[
-              { id: 'blue', color: '#3b82f6', label: 'Azul' },
-              { id: 'green', color: '#10b981', label: 'Verde' },
-              { id: 'purple', color: '#8b5cf6', label: 'Morado' },
-              { id: 'pink', color: '#ec4899', label: 'Rosado' },
-              { id: 'orange', color: '#f97316', label: 'Naranja' }
-            ].map(t => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  setCalendarTheme(t.id);
-                  localStorage.setItem("calendar_theme", t.id);
-                }}
-                title={t.label}
-                style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: t.color,
-                  border: calendarTheme === t.id ? '2px solid #0f172a' : '2px solid transparent',
-                  cursor: 'pointer',
-                  padding: 0,
-                  transition: 'all 0.2s',
-                  boxShadow: calendarTheme === t.id ? '0 0 4px rgba(0,0,0,0.3)' : 'none'
-                }}
-              />
-            ))}
-          </div>
           <button 
             className="btn btn-primary btn-nueva-reunion" 
             onClick={() => { setSelectedDate(currentDate || new Date()); setIsModalOpen(true); }}
@@ -867,6 +854,46 @@ const AgendarReunion = () => {
           --primary-text: #c2410c;
         }
 
+        .theme-indigo .rbc-calendar {
+          --primary-color: #6366f1;
+          --primary-hover: #e0e7ff;
+          --primary-bg: #eef2ff;
+          --primary-border: #c7d2fe;
+          --primary-text: #4338ca;
+        }
+
+        .theme-rose .rbc-calendar {
+          --primary-color: #f43f5e;
+          --primary-hover: #ffe4e6;
+          --primary-bg: #fff1f2;
+          --primary-border: #fecdd3;
+          --primary-text: #be123c;
+        }
+
+        .theme-amber .rbc-calendar {
+          --primary-color: #f59e0b;
+          --primary-hover: #fef3c7;
+          --primary-bg: #fffbeb;
+          --primary-border: #fde68a;
+          --primary-text: #b45309;
+        }
+
+        .theme-teal .rbc-calendar {
+          --primary-color: #14b8a6;
+          --primary-hover: #ccfbf1;
+          --primary-bg: #f0fdfa;
+          --primary-border: #99f6e4;
+          --primary-text: #0f766e;
+        }
+
+        .theme-cyan .rbc-calendar {
+          --primary-color: #06b6d4;
+          --primary-hover: #cffafe;
+          --primary-bg: #ecfeff;
+          --primary-border: #a5f3fc;
+          --primary-text: #0e7490;
+        }
+
         .rbc-time-view {
           width: 100% !important;
           min-width: 0 !important;
@@ -971,11 +998,11 @@ const AgendarReunion = () => {
           border-radius: 50%;
         }
         .rbc-today .custom-week-header-number {
-          background-color: #14b8a6 !important;
+          background-color: var(--primary-color) !important;
           color: white !important;
         }
         .rbc-today .custom-week-header-name {
-          color: #14b8a6;
+          color: var(--primary-color);
           font-weight: 700;
         }
 
@@ -1067,17 +1094,17 @@ const AgendarReunion = () => {
           color: #0f172a !important;
           text-decoration: none;
         }
-        /* En la vista de Mes, el fondo de 'hoy' es azul claro */
+        /* En la vista de Mes, el fondo de 'hoy' usa el color del tema */
         .rbc-month-view .rbc-today {
-          background-color: #bfdbfe !important; 
+          background-color: var(--primary-bg) !important; 
         }
 
-        /* En las vistas de Día/Semana, usamos un fondo tenue para que la cuadrícula se vea limpia */
+        /* En las vistas de Día/Semana, fondo tenue */
         .rbc-time-view .rbc-today {
-          background-color: #f8fafc !important; 
+          background-color: var(--primary-bg) !important; 
         }
         .rbc-month-view .rbc-today .rbc-button-link {
-          background-color: #0284c7 !important; /* Azul oscuro para el texto del día */
+          background-color: var(--primary-color) !important;
           color: white !important;
           border-radius: 50% !important;
           width: 24px;

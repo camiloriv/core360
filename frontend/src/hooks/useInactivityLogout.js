@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Swal from 'sweetalert2';
 
-const DEFAULT_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const DEFAULT_TIMEOUT = 90 * 60 * 1000; // 1 hour 30 minutes in milliseconds
 
 export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ export const useInactivityLogout = (timeoutMs = DEFAULT_TIMEOUT) => {
       // Mostrar alerta al usuario y redirigir al login al presionar Aceptar
       Swal.fire({
         title: 'Sesión Expirada',
-        text: 'Tu sesión ha sido cerrada automáticamente tras 30 minutos de inactividad.',
+        text: 'Tu sesión ha sido cerrada automáticamente tras 1 hora y 30 minutos de inactividad.',
         icon: 'warning',
         confirmButtonText: 'Volver a Ingresar',
         confirmButtonColor: 'var(--secondary-color, #e05e2b)',

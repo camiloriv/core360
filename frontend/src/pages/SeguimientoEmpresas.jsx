@@ -50,7 +50,7 @@ export default function SeguimientoEmpresas() {
   });
   const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
   const [filtroMacroZona, setFiltroMacroZona] = useState("Todas");
-  const [filtroPeriodo, setFiltroPeriodo] = useState(getPeriodoActual());
+  const [filtroPeriodo, setFiltroPeriodo] = useState(() => `anio-${new Date().getFullYear()}`);
   const [viewMode, setViewMode] = useState("split");
   const [invertedSplit, setInvertedSplit] = useState(false);
   const [loading, setLoading] = useState(true);

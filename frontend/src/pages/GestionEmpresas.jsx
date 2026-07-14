@@ -246,7 +246,7 @@ export default function GestionEmpresas() {
   };
 
   // --- CRUD Empresas ---
-  const crearEmpresa = async () => {
+  const crearEmpresaIndividual = async () => {
     const { value: formValues } = await Swal.fire({
       title: "Nueva Empresa",
       showCancelButton: true,
@@ -283,9 +283,132 @@ export default function GestionEmpresas() {
         await api.post("/empresas", formValues);
         Swal.fire("Creado", "Empresa creada exitosamente", "success");
         fetchDatos();
+        clearDashboardCache(); // invalidamos caché al crear
       } catch (e) {
-        Swal.fire("Error", "Error al crear la empresa", "error");
+        Swal.fire("Error", "No se pudo crear la empresa", "error");
       }
+    }
+  };
+
+  const descargarPlantillaMasiva = () => {
+    const wb = XLSX.utils.book_new();
+    const ws_data = [
+      ["empresa", "ejecutiva", "zona_regional"],
+      ["Ejemplo Empresa S.A.", "Beatriz Silva", "Matriz"],
+      ["Otra Empresa Ltda.", "Carolina Osorio", "Concepción"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, "Empresas");
+    XLSX.writeFile(wb, "Plantilla_Carga_Masiva_Empresas.xlsx");
+  };
+
+  const abrirCargaMasiva = async () => {
+    const html = `
+      <div style="text-align: left; font-size: 14px; color: #475569;">
+        <p>1. Descarga la plantilla de Excel y llénala con los datos correspondientes. <strong>Importante:</strong> no modifiques los nombres de las columnas en la fila 1.</p>
+        <button id="btn-descargar-plantilla" style="margin-bottom: 20px; padding: 8px 12px; border: none; border-radius: 6px; background-color: #2563eb; color: white; cursor: pointer; font-weight: 600;">📥 Descargar Plantilla</button>
+        
+        <p>2. Sube el archivo completado aquí:</p>
+        <input type="file" id="input-excel-carga" accept=".xlsx, .xls" style="width: 100%; padding: 8px; border: 1px dashed #cbd5e1; border-radius: 6px;" />
+      </div>
+    `;
+
+    const result = await Swal.fire({
+      title: "Carga Masiva de Empresas",
+      html,
+      showCancelButton: true,
+      confirmButtonText: "Procesar Archivo",
+      cancelButtonText: "Cancelar",
+      didOpen: () => {
+        document.getElementById("btn-descargar-plantilla").addEventListener("click", descargarPlantillaMasiva);
+      },
+      preConfirm: () => {
+        const fileInput = document.getElementById("input-excel-carga");
+        if (!fileInput.files || fileInput.files.length === 0) {
+          Swal.showValidationMessage("Debes seleccionar un archivo Excel");
+          return false;
+        }
+        return fileInput.files[0];
+      }
+    });
+
+    if (result.isConfirmed && result.value) {
+      const file = result.value;
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        
+        if (jsonData.length === 0) {
+          return Swal.fire("Error", "El archivo está vacío o no tiene el formato correcto.", "error");
+        }
+
+        try {
+          Swal.fire({
+            title: "Procesando...",
+            text: "Validando y guardando empresas",
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+          });
+
+          const response = await api.post("/empresas/carga-masiva", { empresas: jsonData });
+          const { msg, resumen, errores } = response.data;
+          
+          if (errores && errores.length > 0) {
+            let errorHtml = `<div style="text-align: left; max-height: 200px; overflow-y: auto; font-size: 13px; color: #dc2626; background: #fef2f2; padding: 10px; border-radius: 6px;">
+              <strong>${errores.length} filas rechazadas:</strong><br/>
+              <ul style="padding-left: 20px; margin-top: 5px;">
+            `;
+            errores.forEach(err => {
+              errorHtml += `<li><b>${err.fila.empresa || 'Fila'}:</b> ${err.error}</li>`;
+            });
+            errorHtml += `</ul></div>`;
+
+            Swal.fire({
+              title: "Carga Masiva Finalizada",
+              html: `
+                <p><strong>Insertadas correctamente:</strong> ${resumen.insertados} de ${resumen.totalProcesados}</p>
+                ${errorHtml}
+              `,
+              icon: "warning"
+            });
+          } else {
+            Swal.fire("Carga Exitosa", `Se insertaron ${resumen.insertados} empresas correctamente.`, "success");
+          }
+          
+          fetchDatos();
+          clearDashboardCache();
+        } catch (error) {
+          Swal.fire("Error", error.response?.data?.error || "Error al procesar el archivo.", "error");
+        }
+      };
+      
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  const abrirMenuCreacionEmpresa = async () => {
+    const result = await Swal.fire({
+      title: "Crear Empresa",
+      text: "¿Cómo deseas ingresar las empresas?",
+      icon: "question",
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: "Creación Individual",
+      denyButtonText: "Carga Masiva (Excel)",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#2563eb",
+      denyButtonColor: "#10b981",
+    });
+
+    if (result.isConfirmed) {
+      crearEmpresaIndividual();
+    } else if (result.isDenied) {
+      abrirCargaMasiva();
     }
   };
 
@@ -797,7 +920,7 @@ export default function GestionEmpresas() {
             </p>
           </div>
           {(user?.permisos === "admin" || user?.permisos === "ADMIN") && (
-            <button onClick={crearEmpresa} className="btn-header-primary">
+            <button onClick={abrirMenuCreacionEmpresa} className="btn-header-primary">
               🏢 + Nueva Empresa
             </button>
           )}

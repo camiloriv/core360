@@ -2,7 +2,20 @@ const db = require("../../database/connection");
 
 exports.listarEmpresas = async (req, res) => {
   try {
-    const { gerencia_id, jefatura_id } = req.query;
+    let { gerencia_id, jefatura_id } = req.query;
+    
+    // Auto-filtro de seguridad para no-admins
+    if (req.usuario && req.usuario.permisos !== 'admin' && req.usuario.permisos !== 'ADMIN') {
+      if (req.usuario.permisos === 'gerencia') {
+        gerencia_id = req.usuario.id;
+      } else if (req.usuario.permisos === 'jefatura') {
+        jefatura_id = req.usuario.id;
+      } else if (req.usuario.permisos === 'ejecutiva') {
+        // Ejecutivas solo ven empresas de su jefatura
+        jefatura_id = req.usuario.jefatura_id || -1; // -1 para forzar que no vea nada si no tiene jefatura
+      }
+    }
+
     let whereClause = "";
     const params = [];
     if (gerencia_id) {
@@ -245,6 +258,103 @@ exports.traspasoMasivo = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
+exports.cargaMasivaEmpresas = async (req, res) => {
+  const { empresas } = req.body;
+  if (!empresas || !Array.isArray(empresas) || empresas.length === 0) {
+    return res.status(400).json({ error: "No se proporcionaron empresas para procesar." });
+  }
+
+  try {
+    const [zonas] = await db.query("SELECT id, nombre FROM zonas");
+    const [usuarios] = await db.query("SELECT id, nombre, correo FROM usuarios");
+    const [empresasExistentes] = await db.query("SELECT nombre FROM empresas");
+    
+    const zonasMap = new Map();
+    zonas.forEach(z => zonasMap.set(z.nombre.toLowerCase().trim(), z.id));
+    
+    const usuariosMap = new Map();
+    usuarios.forEach(u => {
+      usuariosMap.set(u.nombre.toLowerCase().trim(), u.id);
+      usuariosMap.set(u.correo.toLowerCase().trim(), u.id);
+    });
+
+    const empresasSet = new Set(empresasExistentes.map(e => e.nombre.toLowerCase().trim()));
+
+    const exitosos = [];
+    const errores = [];
+
+    for (const item of empresas) {
+      const nombreEmpresa = item.empresa ? String(item.empresa).trim() : "";
+      const ejecutiva = item.ejecutiva ? String(item.ejecutiva).trim() : "";
+      const zona = item.zona_regional ? String(item.zona_regional).trim() : "";
+
+      if (!nombreEmpresa) {
+        errores.push({ fila: item, error: "Falta el nombre de la empresa" });
+        continue;
+      }
+      
+      if (empresasSet.has(nombreEmpresa.toLowerCase())) {
+        errores.push({ fila: item, error: "La empresa ya existe en la base de datos" });
+        continue;
+      }
+
+      let jefatura_id = null;
+      if (ejecutiva) {
+        if (usuariosMap.has(ejecutiva.toLowerCase())) {
+          jefatura_id = usuariosMap.get(ejecutiva.toLowerCase());
+        } else {
+          errores.push({ fila: item, error: `No se encontró coincidencia para ejecutiva: ${ejecutiva}` });
+          continue;
+        }
+      }
+
+      let zona_id = null;
+      if (zona) {
+        if (zonasMap.has(zona.toLowerCase())) {
+          zona_id = zonasMap.get(zona.toLowerCase());
+        } else {
+          errores.push({ fila: item, error: `No se encontró coincidencia para zona: ${zona}` });
+          continue;
+        }
+      }
+
+      exitosos.push({
+        nombre: nombreEmpresa,
+        jefatura_id,
+        zona_id,
+        estado_seguimiento: 'pendiente'
+      });
+      // Añadimos al Set para evitar duplicados en el mismo archivo Excel
+      empresasSet.add(nombreEmpresa.toLowerCase());
+    }
+
+    // Insertar exitosos
+    let insertados = 0;
+    if (exitosos.length > 0) {
+      const values = exitosos.map(e => [e.nombre, e.jefatura_id, e.zona_id, e.estado_seguimiento]);
+      await db.query(
+        "INSERT INTO empresas (nombre, jefatura_id, zona_id, estado_seguimiento) VALUES ?",
+        [values]
+      );
+      insertados = exitosos.length;
+    }
+
+    res.json({
+      msg: "Proceso completado",
+      resumen: {
+        totalProcesados: empresas.length,
+        insertados,
+        conErrores: errores.length
+      },
+      errores
+    });
+
+  } catch (err) {
+    console.error("Error en carga masiva de empresas:", err);
+    res.status(500).json({ error: "Error interno procesando la carga masiva" });
   }
 };
 

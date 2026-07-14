@@ -10,6 +10,7 @@ import {
   eliminarNuevoNegocio,
   exportarExcel,
   obtenerHistorial,
+  importarNuevosNegocios,
 } from "../services/nuevosNegociosService";
 
 /* ───── Constantes de referencia ───── */
@@ -164,6 +165,11 @@ const SeguimientoNegocios = () => {
   // Exporting
   const [exporting, setExporting] = useState(false);
 
+  // Import masivo
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importingData, setImportingData] = useState(false);
+
   /* ── Cargar datos ── */
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -258,6 +264,32 @@ const SeguimientoNegocios = () => {
       fetchData();
     } catch (err) {
       Swal.fire({ icon: "error", title: "Error", text: err.response?.data?.error || "Error al guardar" });
+    }
+  };
+
+  /* ── Carga Masiva ── */
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    if (!importFile) {
+      Swal.fire("Atención", "Debe seleccionar un archivo Excel (.xlsx, .xls, .csv)", "warning");
+      return;
+    }
+    setImportingData(true);
+    try {
+      const result = await importarNuevosNegocios(importFile);
+      Swal.fire({
+        icon: "success",
+        title: "Carga Finalizada",
+        html: `Se procesó la planilla exitosamente.<br><b>Creados:</b> ${result.creados}<br><b>Actualizados:</b> ${result.actualizados}<br><b>Ignorados/Vacíos:</b> ${result.ignorados}`,
+      });
+      setShowImportModal(false);
+      setImportFile(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", err.response?.data?.error || "Error al procesar el archivo Excel", "error");
+    } finally {
+      setImportingData(false);
     }
   };
 
@@ -359,6 +391,10 @@ const SeguimientoNegocios = () => {
           <button style={S.btnExport} onClick={handleExport} disabled={exporting}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             {exporting ? "Exportando..." : "Descargar Excel"}
+          </button>
+          <button style={S.btnExport} onClick={() => { setImportFile(null); setShowImportModal(true); }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 15 16 10 11 15"/><line x1="16" y1="10" x2="16" y2="21"/><path d="M22 4h-10a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-12a2 2 0 0 0-2-2z"/><path d="M2 17h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H2"/></svg>
+            Carga Masiva
           </button>
           <button style={S.btnPrimary} onClick={openCreateModal}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -805,6 +841,81 @@ const SeguimientoNegocios = () => {
               <div style={S.modalFooter}>
                 <button type="button" style={S.btnCancel} onClick={() => setShowModal(false)}>Cancelar</button>
                 <button type="submit" style={S.btnPrimary}>{editingId ? "Guardar Cambios" : "Crear Registro"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ──── MODAL CARGA MASIVA ──── */}
+      {showImportModal && (
+        <div style={S.overlay} onClick={() => { if (!importingData) setShowImportModal(false); }}>
+          <div style={{ ...S.modal, maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <h2 style={S.modalTitle}>Carga Masiva de Nuevos Negocios</h2>
+              <button style={S.modalClose} onClick={() => { if (!importingData) setShowImportModal(false); }}>×</button>
+            </div>
+            <form onSubmit={handleImportSubmit}>
+              <div style={S.modalBody}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+                    Seleccione un archivo de Excel (<code>.xlsx</code>, <code>.xls</code> o <code>.csv</code>). 
+                    El sistema buscará automáticamente la pestaña <strong>"2026"</strong> y utilizará las cabeceras (RUT, Razón Social, Holding, etc.) para insertar nuevos negocios o actualizar los existentes.
+                  </p>
+                  
+                  <div style={{
+                    border: "2px dashed var(--border-color)",
+                    borderRadius: "var(--radius-card)",
+                    padding: "24px 16px",
+                    textAlign: "center",
+                    backgroundColor: "#f8fafc",
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onClick={() => document.getElementById("excel-file-input").click()}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-main)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                      {importFile ? importFile.name : "Haga clic para seleccionar archivo"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-light)", marginTop: 4 }}>
+                      {importFile ? `${(importFile.size / 1024).toFixed(1)} KB` : "Formatos soportados: .xlsx, .xls, .csv"}
+                    </div>
+                    <input 
+                      id="excel-file-input"
+                      type="file" 
+                      accept=".xlsx,.xls,.csv" 
+                      style={{ display: "none" }} 
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImportFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div style={S.modalFooter}>
+                <button 
+                  type="button" 
+                  style={S.btnCancel} 
+                  onClick={() => { if (!importingData) setShowImportModal(false); }}
+                  disabled={importingData}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  style={{ ...S.btnPrimary, minWidth: 120, justifyContent: "center" }}
+                  disabled={importingData || !importFile}
+                >
+                  {importingData ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ ...S.spinner, width: 14, height: 14, borderWidth: "2px" }} />
+                      <span>Procesando...</span>
+                    </div>
+                  ) : "Iniciar Carga"}
+                </button>
               </div>
             </form>
           </div>

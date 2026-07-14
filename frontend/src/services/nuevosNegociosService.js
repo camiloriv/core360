@@ -40,3 +40,11 @@ export const exportarExcel = (params = {}) =>
     link.remove();
     window.URL.revokeObjectURL(url);
   });
+
+export const importarNuevosNegocios = (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`${BASE}/import`, formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  }).then((r) => r.data);
+};

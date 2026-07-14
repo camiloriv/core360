@@ -467,6 +467,211 @@ const opciones = async (req, res) => {
   }
 };
 
+// =============================================
+// POST /nuevos-negocios/import — Carga Masiva
+// =============================================
+const importarMasivo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Debe subir un archivo Excel" });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames.find(n => n === "2026") || workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) {
+      return res.status(400).json({ error: "No se encontró ninguna pestaña en el archivo Excel" });
+    }
+
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    if (rawRows.length === 0) {
+      return res.status(400).json({ error: "El archivo Excel está vacío" });
+    }
+
+    // Buscar cabecera
+    let headerRowIndex = -1;
+    for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+      const row = rawRows[i].map(c => String(c).trim().toUpperCase());
+      if (row.includes("RUT") || row.includes("RAZÓN SOCIAL") || row.includes("RAZON SOCIAL")) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      return res.status(400).json({ error: "No se encontró la fila de cabecera con RUT o Razón Social" });
+    }
+
+    const headers = rawRows[headerRowIndex].map(h => String(h).trim());
+    const dataRows = rawRows.slice(headerRowIndex + 1);
+
+    const getValByHeader = (row, headerNames) => {
+      for (const name of headerNames) {
+        const idx = headers.findIndex(h => h.toLowerCase() === name.toLowerCase() || h.replace(/\s+/g, ' ').trim().toLowerCase() === name.toLowerCase());
+        if (idx !== -1 && row[idx] !== undefined && row[idx] !== null && row[idx] !== '') {
+          return row[idx];
+        }
+      }
+      return null;
+    };
+
+    const parseExcelDate = (val) => {
+      if (!val) return null;
+      if (typeof val === 'number') {
+        const date = new Date((val - 25569) * 86400 * 1000);
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        const adjustedDate = new Date(date.getTime() + tzOffset);
+        return adjustedDate.toISOString().split('T')[0];
+      }
+      const cleaned = String(val).trim();
+      if (!cleaned || cleaned.toLowerCase() === 'no aplica' || cleaned === '-' || cleaned === '—') return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+      const parts = cleaned.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[2].length === 4) {
+          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        if (parts[0].length === 4) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        }
+      }
+      const d = new Date(cleaned);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+      return null;
+    };
+
+    const cleanRut = (val) => {
+      if (!val) return null;
+      return String(val).trim().toUpperCase().replace(/[^0-9K-]/gi, '');
+    };
+
+    let creados = 0;
+    let actualizados = 0;
+    let ignorados = 0;
+
+    const usuario = req.user ? req.user.nombre || req.user.email : "Sistema (Carga Masiva)";
+
+    for (const row of dataRows) {
+      if (row.length === 0 || row.every(c => c === "")) continue;
+
+      const rut = getValByHeader(row, ["rut"]);
+      const razon_social = getValByHeader(row, ["razón social", "razon social"]);
+      const holding = getValByHeader(row, ["holding"]);
+
+      // Si no hay RUT ni Razón Social ni Holding, ignoramos la fila
+      if (!rut && !razon_social && !holding) {
+        ignorados++;
+        continue;
+      }
+
+      const estado_contacto = getValByHeader(row, ["estado contacto", "estado_contacto"]) || "PROSPECTO";
+      const evento = getValByHeader(row, ["evento"]);
+      const indicador = getValByHeader(row, ["indicador"]);
+      const asistio_evento = getValByHeader(row, ["evento2", "asistio evento", "asistio_evento"]) || "No";
+      const zona = getValByHeader(row, ["zona"]);
+      const monto_1_porciento = parseFloat(getValByHeader(row, ["monto 1% u aporte", "monto 1% u aporte ", "monto_1_porciento", "monto 1%"])) || 0;
+      const tasa_administracion = parseFloat(getValByHeader(row, ["tasa propuesta administración otic", "tasa propuesta administracion otic", "tasa_administracion", "tasa"])) || 0;
+      const monto_administracion = parseFloat(getValByHeader(row, ["monto administración", "monto administracion", "monto_administracion"])) || 0;
+      const otic_actual = getValByHeader(row, ["otic actual", "otic_actual"]);
+      const mes_envio_propuesta = getValByHeader(row, ["mes envío propuesta", "mes envio propuesta", "mes_envio_propuesta"]);
+      const jefa_cartera = getValByHeader(row, ["jefa de cartera asignada", "jefa de cartera asignada ", "jefa_cartera", "jefa cartera"]);
+      const estado = getValByHeader(row, ["estado", "estado "]) || "Prospecto";
+      const aporte_ingresado = parseFloat(getValByHeader(row, ["aporte ingresado", "aporte_ingresado"])) || 0;
+      const fecha_autoriza_propuesta = getValByHeader(row, ["fecha autoriza propuesta", "fecha_autoriza_propuesta"]);
+      const contacto = getValByHeader(row, ["contacto", "contacto "]);
+      const contacto_2 = getValByHeader(row, ["contacto 2"]);
+      const correo = getValByHeader(row, ["correo"]);
+      const cargo = getValByHeader(row, ["cargo", "cargo "]);
+      const celular_telefono = getValByHeader(row, ["celular / telefono", "celular / teléfono", "celular", "telefono", "celular_telefono"]);
+      const comentarios = getValByHeader(row, ["comentarios (acciones / reuniones)", "comentarios"]);
+      const fecha_reunion = parseExcelDate(getValByHeader(row, ["fecha reunión", "fecha reunion", "fecha_reunion"]));
+
+      const rutLimpio = cleanRut(rut);
+      let existingId = null;
+
+      // Buscar por RUT si existe
+      if (rutLimpio) {
+        const [[foundRut]] = await db.query(
+          "SELECT id FROM nuevos_negocios WHERE REPLACE(REPLACE(rut, '.', ''), '-', '') = REPLACE(REPLACE(?, '.', ''), '-', '') LIMIT 1",
+          [rutLimpio]
+        );
+        if (foundRut) existingId = foundRut.id;
+      }
+
+      // Si no se encontró por RUT, buscar por Razón Social
+      if (!existingId && razon_social) {
+        const [[foundName]] = await db.query(
+          "SELECT id FROM nuevos_negocios WHERE razon_social = ? LIMIT 1",
+          [String(razon_social).trim()]
+        );
+        if (foundName) existingId = foundName.id;
+      }
+
+      if (existingId) {
+        // Actualizar registro existente
+        await db.query(
+          `UPDATE nuevos_negocios SET
+            holding = ?, estado_contacto = ?, rut = ?, razon_social = ?, evento = ?, indicador = ?,
+            asistio_evento = ?, zona = ?, monto_1_porciento = ?, tasa_administracion = ?,
+            monto_administracion = ?, otic_actual = ?, mes_envio_propuesta = ?, jefa_cartera = ?,
+            estado = ?, aporte_ingresado = ?, fecha_autoriza_propuesta = ?, contacto = ?,
+            contacto_2 = ?, correo = ?, cargo = ?, celular_telefono = ?, comentarios = ?, fecha_reunion = ?
+           WHERE id = ?`,
+          [
+            holding || null, estado_contacto, rutLimpio || null, razon_social || null, evento || null, indicador || null,
+            asistio_evento, zona || null, monto_1_porciento, tasa_administracion,
+            monto_administracion, otic_actual || null, mes_envio_propuesta || null, jefa_cartera || null,
+            estado, aporte_ingresado, fecha_autoriza_propuesta || null, contacto || null,
+            contacto_2 || null, correo || null, cargo || null, celular_telefono || null, comentarios || null, fecha_reunion,
+            existingId
+          ]
+        );
+
+        await db.query(
+          `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
+           VALUES (?, 'carga_masiva', 'Existente', 'Registro actualizado mediante importación masiva', ?)`,
+          [existingId, usuario]
+        );
+
+        actualizados++;
+      } else {
+        // Crear registro nuevo
+        const [result] = await db.query(
+          `INSERT INTO nuevos_negocios (
+            holding, estado_contacto, rut, razon_social, evento, indicador,
+            asistio_evento, zona, monto_1_porciento, tasa_administracion,
+            monto_administracion, otic_actual, mes_envio_propuesta, jefa_cartera,
+            estado, aporte_ingresado, fecha_autoriza_propuesta, contacto,
+            contacto_2, correo, cargo, celular_telefono, comentarios, fecha_reunion
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            holding || null, estado_contacto, rutLimpio || null, razon_social || null, evento || null, indicador || null,
+            asistio_evento, zona || null, monto_1_porciento, tasa_administracion,
+            monto_administracion, otic_actual || null, mes_envio_propuesta || null, jefa_cartera || null,
+            estado, aporte_ingresado, fecha_autoriza_propuesta || null, contacto || null,
+            contacto_2 || null, correo || null, cargo || null, celular_telefono || null, comentarios || null, fecha_reunion
+          ]
+        );
+
+        await db.query(
+          `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
+           VALUES (?, 'carga_masiva', NULL, 'Registro creado mediante importación masiva', ?)`,
+          [result.insertId, usuario]
+        );
+
+        creados++;
+      }
+    }
+
+    res.json({ success: true, creados, actualizados, ignorados });
+  } catch (error) {
+    console.error("Error en importación masiva:", error);
+    res.status(500).json({ error: "Error interno al procesar el archivo Excel" });
+  }
+};
+
 module.exports = {
   listar,
   stats,
@@ -478,4 +683,5 @@ module.exports = {
   eliminar,
   exportExcel,
   opciones,
+  importarMasivo,
 };

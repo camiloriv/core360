@@ -13,6 +13,7 @@ const ALL_VIEWS = [
   { path: "/editor-encuestas", label: "Editar encuestas" },
   { path: "/gestion-empresas", label: "Empresas" },
   { path: "/seguimiento-empresas", label: "Cobertura" },
+  { path: "/seguimiento-negocios", label: "Negocios" },
   { path: "/gestion-usuarios", label: "Usuarios" }
 ];
 
@@ -28,6 +29,7 @@ const getDefaultViewsForRole = (role) => {
         "/editor-encuestas",
         "/gestion-empresas",
         "/seguimiento-empresas",
+        "/seguimiento-negocios",
         "/gestion-usuarios"
       ];
     case "gerencia":
@@ -37,7 +39,8 @@ const getDefaultViewsForRole = (role) => {
         "/agendar",
         "/dashboard-reuniones",
         "/dashboard-encuestas",
-        "/seguimiento-empresas"
+        "/seguimiento-empresas",
+        "/seguimiento-negocios"
       ];
     case "jefatura":
     case "ejecutiva":

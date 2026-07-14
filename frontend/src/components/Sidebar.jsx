@@ -201,6 +201,25 @@ const Sidebar = ({ isOpen, onClose }) => {
       ),
     },
     {
+      path: "/seguimiento-negocios",
+      label: "Negocios",
+      title: "Seguimiento Nuevos Negocios",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          stroke="currentColor"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      ),
+    },
+    {
       path: "/gestion-usuarios",
       label: "Usuarios",
       title: "Gestión de Usuarios",
@@ -258,12 +277,18 @@ const Sidebar = ({ isOpen, onClose }) => {
       if (item.path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva")) {
         return true;
       }
+      if (item.path === "/seguimiento-negocios" && (user.permisos === "gerencia" || user.permisos === "gerencia_general")) {
+        return true;
+      }
       return vistas.includes(item.path) || (item.path === "/home" && (vistas.includes("/registrar-reunion") || vistas.includes("/home")));
     });
   } else {
     if (user.permisos !== "admin" && user.permisos !== "ADMIN") {
       menuItems = menuItems.filter((item) => {
         if (item.path === "/gestion-empresas" && (user.permisos === "jefatura" || user.permisos === "ejecutiva")) {
+          return true;
+        }
+        if (item.path === "/seguimiento-negocios" && (user.permisos === "gerencia" || user.permisos === "gerencia_general")) {
           return true;
         }
         return !["/gestion-usuarios", "/gestion-empresas", "/admin"].includes(item.path);

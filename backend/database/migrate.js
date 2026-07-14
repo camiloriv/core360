@@ -306,6 +306,59 @@ async function runMigrations() {
       console.log("Migration: Note: minutas.empresa_id nullable update failed:", e.message);
     }
 
+    // ============================================================
+    // 18. Tabla nuevos_negocios — Pipeline comercial de Nuevos Negocios
+    // ============================================================
+    console.log("Migration: Checking/creating 'nuevos_negocios' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS nuevos_negocios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        holding VARCHAR(200),
+        estado_contacto VARCHAR(50) NOT NULL DEFAULT 'PROSPECTO',
+        rut VARCHAR(20),
+        razon_social VARCHAR(300),
+        evento VARCHAR(200),
+        indicador VARCHAR(100),
+        asistio_evento VARCHAR(10) DEFAULT 'No',
+        zona VARCHAR(50),
+        monto_1_porciento DECIMAL(15,2) DEFAULT 0,
+        tasa_administracion DECIMAL(5,4) DEFAULT 0,
+        monto_administracion DECIMAL(15,2) DEFAULT 0,
+        otic_actual VARCHAR(100),
+        mes_envio_propuesta VARCHAR(50),
+        jefa_cartera VARCHAR(150),
+        estado VARCHAR(100) DEFAULT 'Prospecto',
+        aporte_ingresado DECIMAL(15,2) DEFAULT 0,
+        fecha_autoriza_propuesta VARCHAR(100),
+        contacto VARCHAR(200),
+        contacto_2 VARCHAR(200),
+        correo VARCHAR(300),
+        cargo VARCHAR(200),
+        celular_telefono VARCHAR(100),
+        comentarios TEXT,
+        fecha_reunion DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // ============================================================
+    // 19. Tabla nuevos_negocios_historial — Log de cambios de estado
+    // ============================================================
+    console.log("Migration: Checking/creating 'nuevos_negocios_historial' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS nuevos_negocios_historial (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        negocio_id INT NOT NULL,
+        campo_modificado VARCHAR(50) NOT NULL,
+        valor_anterior VARCHAR(200),
+        valor_nuevo VARCHAR(200),
+        usuario VARCHAR(150),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (negocio_id) REFERENCES nuevos_negocios(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log("Migration: All migrations verified and applied successfully!");
 
   } catch (error) {

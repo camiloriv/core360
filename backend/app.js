@@ -70,6 +70,7 @@ const usuariosRoutes = require("./modules/usuarios/usuarios.routes");
 const zonasRoutes = require("./modules/zonas/zonas.routes");
 const agendamientoRoutes = require("./modules/agendamiento/agendamiento.routes");
 const adminRoutes = require("./modules/admin/admin.routes");
+const nuevosNegociosRoutes = require("./modules/nuevos_negocios/nuevos_negocios.routes");
 
 const { verificarToken } = require("./middleware/auth.middleware");
 
@@ -83,6 +84,7 @@ app.use("/usuarios", verificarToken, usuariosRoutes);
 app.use("/zonas", verificarToken, zonasRoutes);
 app.use("/agendamiento", verificarToken, agendamientoRoutes);
 app.use("/admin", verificarToken, adminRoutes);
+app.use("/nuevos-negocios", verificarToken, nuevosNegociosRoutes);
 
 // 🔹 Test de Salud
 app.get("/health", (req, res) => {

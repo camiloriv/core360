@@ -19,7 +19,8 @@ exports.login = async (req, res) => {
     const payload = {
       id: usuario.id,
       correo: usuario.correo,
-      permisos: usuario.permisos
+      permisos: usuario.permisos,
+      jefatura_id: usuario.jefatura_id
     };
     
     const token = jwt.sign(

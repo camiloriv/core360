@@ -12,7 +12,12 @@ exports.listarEmpresas = async (req, res) => {
         jefatura_id = req.usuario.id;
       } else if (req.usuario.permisos === 'ejecutiva') {
         // Ejecutivas solo ven empresas de su jefatura
-        jefatura_id = req.usuario.jefatura_id || -1; // -1 para forzar que no vea nada si no tiene jefatura
+        if (req.usuario.jefatura_id !== undefined && req.usuario.jefatura_id !== null) {
+          jefatura_id = req.usuario.jefatura_id;
+        } else {
+          const [userRow] = await db.query("SELECT jefatura_id FROM usuarios WHERE id = ?", [req.usuario.id]);
+          jefatura_id = userRow[0]?.jefatura_id || -1;
+        }
       }
     }
 

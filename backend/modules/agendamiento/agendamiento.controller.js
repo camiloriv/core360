@@ -445,22 +445,10 @@ const syncEventosPasados = async (req, res) => {
 
         const accessToken = await getGraphToken();
 
-        const [usuarioRows] = await db.query("SELECT sync_delta_token, ultima_sincronizacion FROM usuarios WHERE id = ?", [usuarioId]);
-        const deltaToken = usuarioRows[0]?.sync_delta_token;
-
-        let endpoint = "";
-        let isDeltaRequest = false;
-
-        if (deltaToken) {
-            endpoint = deltaToken;
-            isDeltaRequest = true;
-        } else {
-            endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=${start}&endDateTime=${end}`;
-        }
+        let endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=100`;
 
         let allRawEvents = [];
         let currentEndpoint = endpoint;
-        let finalDeltaToken = null;
 
         while (currentEndpoint) {
             const response = await fetch(currentEndpoint, {
@@ -472,12 +460,8 @@ const syncEventosPasados = async (req, res) => {
             });
 
             if (!response.ok) {
-                if (response.status === 410) {
-                    // Token expirado → forzar sync completo
-                    await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
-                }
                 if (!res.headersSent) {
-                    return res.status(200).json({ success: true, message: "No se pudo sincronizar o el token expiró. Se intentará de nuevo.", procesados: 0 });
+                    return res.status(200).json({ success: true, message: "No se pudo sincronizar.", procesados: 0 });
                 }
                 return;
             }
@@ -485,21 +469,10 @@ const syncEventosPasados = async (req, res) => {
             const data = await response.json();
             if (data.value && data.value.length > 0) allRawEvents.push(...data.value);
 
-            if (data['@odata.nextLink']) {
-                currentEndpoint = data['@odata.nextLink'];
-            } else if (data['@odata.deltaLink']) {
-                finalDeltaToken = data['@odata.deltaLink'];
-                currentEndpoint = null;
-            } else {
-                currentEndpoint = null;
-            }
+            currentEndpoint = data['@odata.nextLink'] || null;
         }
 
-        if (finalDeltaToken) {
-            await db.query("UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?", [finalDeltaToken, usuarioId]);
-        } else {
-            await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
-        }
+        await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
 
         // Cargar dominios conocidos para matching
         const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");

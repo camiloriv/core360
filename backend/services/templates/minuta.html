@@ -49,42 +49,40 @@
 
 <body style="margin:0; padding:0; font-family:Segoe UI, Arial, sans-serif; background:#ffffff; text-align: left;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
-    <tr>
-      <td height="20"></td>
-    </tr>
+  <!-- TEXTO PREVIO AFUERA DE LA TABLA -->
+  <div style="font-size: 15px; color: #334155; line-height: 1.5; margin-bottom: 25px; padding: 20px 20px 0 20px;">
+    {{texto_previo}}
+  </div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;">
     <tr>
       <td style="padding-left: 20px;">
         
         <!-- CONTENEDOR PRINCIPAL (UNA SOLA COLUMNA) -->
-        <table width="800" align="left" cellpadding="0" cellspacing="0"
+        <table width="800" align="left" cellpadding="0" cellspacing="0" role="presentation"
           style="background:#ffffff; border:1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin: 0;">
 
           <!-- BANNER HEADER -->
           <tr>
             <td align="left" style="background-color: #ffffff; border-bottom: 2px solid #e2e8f0; width: 800px;">
-              <img src="cid:banner-header" width="800" height="auto"
-                style="display:block; border:0; width:800px; height:auto;">
+              <img src="cid:banner-header" width="800" height="auto" nosend="1" alt=""
+                style="display:block; border:0; width:800px; height:auto; pointer-events:none;">
             </td>
           </tr>
 
           <!-- CONTENIDO DE LA MINUTA -->
           <tr>
             <td style="padding: 30px 40px;">
-              <!-- TEXTO PREVIO -->
-              <div style="font-size: 15px; color: #334155; line-height: 1.5; margin-bottom: 25px; white-space: pre-line;">
-                {{texto_previo}}
-              </div>
 
                     <!-- INFO CABECERA ESTILO LISTA -->
-                    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px; overflow: hidden;">
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius: 8px; margin-bottom: 25px; overflow: hidden;">
                       <tr>
                         <td style="padding: 20px;">
                           <h2 style="margin:0 0 15px 0; color:#1e293b; font-size: 22px; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; display: inline-block;">
                             Minuta de Reunión
                           </h2>
                           
-                          <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #475569;">
+                          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size: 14px; color: #475569;">
                             <!-- PARTICIPANTES -->
                             <tr>
                               <td width="120" style="padding: 10px 0; border-bottom: 1px dashed #e2e8f0; color: #1e3a8a; font-weight: bold;">Participantes:</td>

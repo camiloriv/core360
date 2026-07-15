@@ -668,7 +668,7 @@ const SeguimientoNegocios = () => {
 
       {/* ──── MODAL CREAR/EDITAR ──── */}
       {showModal && (
-        <div style={S.overlay} onClick={() => setShowModal(false)}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={(e) => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <h2 style={S.modalTitle}>{editingId ? "Editar Registro" : "Nuevo Registro"}</h2>
@@ -849,7 +849,7 @@ const SeguimientoNegocios = () => {
 
       {/* ──── MODAL CARGA MASIVA ──── */}
       {showImportModal && (
-        <div style={S.overlay} onClick={() => { if (!importingData) setShowImportModal(false); }}>
+        <div style={S.overlay}>
           <div style={{ ...S.modal, maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <h2 style={S.modalTitle}>Carga Masiva de Nuevos Negocios</h2>
@@ -924,7 +924,7 @@ const SeguimientoNegocios = () => {
 
       {/* ──── MODAL HISTORIAL ──── */}
       {showHistorial && (
-        <div style={S.overlay} onClick={() => setShowHistorial(false)}>
+        <div style={S.overlay}>
           <div style={{ ...S.modal, maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <h2 style={S.modalTitle}>Historial — {historialNombre}</h2>

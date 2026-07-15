@@ -56,7 +56,7 @@ export default function useReunionesData(user, empresa_id) {
 
     getDestinatarios(empresa_id).then(res => setDestinatarios(res.data));
 
-    if (user?.permisos === "admin" || user?.permisos === "gerencia") {
+    if (user?.permisos === "admin" || user?.permisos === "gerencia" || user?.permisos === "jefatura") {
       getUsuariosPorEmpresa(empresa_id).then(list => setEjecutivas(list));
     }
   }, [empresa_id, user?.permisos]);

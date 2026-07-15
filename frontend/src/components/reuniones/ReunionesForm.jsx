@@ -40,7 +40,7 @@ function ReunionesForm({ onSuccess }) {
       setField("enviado_por_id", user.id);
     }
     
-    if ((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia") && !user.nombre?.toLowerCase().includes("lilian")) {
+    if ((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia" && user.permisos !== "jefatura") && !user.nombre?.toLowerCase().includes("lilian")) {
       if (!form.jefatura_id) {
         setField("jefatura_id", user.jefatura_id || user.id);
       }
@@ -50,7 +50,7 @@ function ReunionesForm({ onSuccess }) {
       if (!form.enviado_por) {
         setField("enviado_por", user.nombre);
       }
-    } else if ((user.permisos === "admin" || user.permisos === "gerencia") && !form.enviado_por) {
+    } else if ((user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") && !form.enviado_por) {
       setField("enviado_por", user.nombre);
     }
   }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo]);
@@ -59,11 +59,23 @@ function ReunionesForm({ onSuccess }) {
   useEffect(() => {
     setIsCcEditable(false);
     setField("correos_cc", "");
-    if (user.permisos === "admin" || user.permisos === "gerencia") {
+    if (user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") {
       setField("ejecutiva_id", "");
       setField("jefatura_id", "");
     }
   }, [form.empresa_id]);
+
+  // Auto-asignar jefatura y ejecutiva cuando se cargan los usuarios de la empresa
+  useEffect(() => {
+    if (form.empresa_id && ejecutivas.length > 0 && user.permisos !== "admin") {
+      // Find default roles from the fetched team
+      const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
+      const jefa = ejecutivas.find(u => u.permisos === 'jefatura');
+      
+      if (ejec) setField("ejecutiva_id", ejec.id);
+      if (jefa) setField("jefatura_id", jefa.id);
+    }
+  }, [ejecutivas, form.empresa_id, user.permisos]);
 
   // Si cambia de ejecutiva, también resetear el estado editable para recargar el CC correspondiente
   useEffect(() => {
@@ -88,6 +100,9 @@ function ReunionesForm({ onSuccess }) {
     setField("teams_evento_id", draft.teams_evento_id || "");
     setField("event_id", draft.event_id || "");
     setField("empresa_id", draft.empresa_id || "");
+    if (draft.ejecutiva_id) {
+      setField("ejecutiva_id", draft.ejecutiva_id);
+    }
     if (!draft.empresa_id) {
       setField("asunto_correo", draft.asunto_teams || draft.motivo_reu || "");
     }
@@ -140,10 +155,9 @@ function ReunionesForm({ onSuccess }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setField("lugar", draft.lugar || "");
 
-    const fechaFormatStr = draft.fecha_reu 
-      ? new Date(draft.fecha_reu).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" })
-      : "";
-    const defaultTextoPrevio = `Estimados,\n\nJunto con saludar, comparto la minuta de la reunión coordinada${fechaFormatStr ? ` para el día ${fechaFormatStr}` : ""}.`;
+    const currentHour = new Date().getHours();
+    const greeting = currentHour < 12 ? "buenos días," : "buenas tardes,";
+    const defaultTextoPrevio = `Estimadas/os ${greeting}\n\nEsperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.`;
     setField("texto_previo", draft.texto_previo || defaultTextoPrevio);
 
     let extractedVideoLink = draft.link_video || "";
@@ -404,8 +418,8 @@ function ReunionesForm({ onSuccess }) {
             </FormSection>
           )}
 
-          {/* Selector de usuario asignado: visible para admin y gerencia */}
-          {!isSinEmpresa && (user.permisos === "admin" || user.permisos === "gerencia") && (
+          {/* Selector de usuario asignado: visible para admin */}
+          {!isSinEmpresa && user.permisos === "admin" && (
             <FormSection
               label={
                 <>

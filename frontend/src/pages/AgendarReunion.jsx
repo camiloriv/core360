@@ -790,7 +790,7 @@ const AgendarReunion = () => {
       </div>
 
       {isModalOpen && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}>
+        <div className="modal-overlay">
           <div className="modal-content modal-teams-form">
             <AgendarForm 
               selectedDate={selectedDate} 

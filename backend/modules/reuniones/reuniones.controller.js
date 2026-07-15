@@ -257,10 +257,41 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
         }
         correosCcArray.push(lilianCorreo);
     } else if (userPermisos === 'jefatura') {
-        const jefaturaId = loggedInUser?.id || ejecutiva_id;
-        const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE jefatura_id = ? AND permisos = 'ejecutiva'", [jefaturaId]);
-        ejRows.forEach(row => { if (row.correo) correosCcArray.push(row.correo); });
-        correosCcArray.push(lilianCorreo);
+        // CC ejecutiva responsable de la reunión
+        if (ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            if (ejRows[0]?.correo) correosCcArray.push(ejRows[0].correo);
+        } else if (loggedInUser?.id) {
+            const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE permisos = 'ejecutiva' AND jefatura_id = ? LIMIT 1", [loggedInUser.id]);
+            if (ejRows[0]?.correo) correosCcArray.push(ejRows[0].correo);
+        }
+        
+        // CC gerencia desde usuario_gerencias
+        if (loggedInUser?.id) {
+            const [gerRows] = await db.query(`
+                SELECT u.correo FROM usuario_gerencias ug
+                JOIN usuarios u ON ug.gerencia_id = u.id
+                WHERE ug.usuario_id = ? LIMIT 1
+            `, [loggedInUser.id]);
+            if (gerRows[0]?.correo) correosCcArray.push(gerRows[0].correo);
+        }
+    } else if (userPermisos === 'gerencia') {
+        // CC gerencia superior automáticamente si corresponde
+        if (loggedInUser?.jefatura_id) {
+            const [supRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [loggedInUser.jefatura_id]);
+            if (supRows[0]?.correo) correosCcArray.push(supRows[0].correo);
+        }
+        // CC ejecutiva y su jefatura si se seleccionó una
+        if (ejecutiva_id) {
+            const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            if (ejRows[0]) {
+                if (ejRows[0].correo) correosCcArray.push(ejRows[0].correo);
+                if (ejRows[0].jefatura_id) {
+                    const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [ejRows[0].jefatura_id]);
+                    if (jefRows[0]?.correo) correosCcArray.push(jefRows[0].correo);
+                }
+            }
+        }
     } else {
         if (ejecutiva_id) {
             const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
@@ -514,7 +545,6 @@ exports.obtenerTiposReunion = async (req, res) => {
 // ============================================================
 exports.obtenerDefaultCc = async (req, res) => {
     const { empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id } = req.query;
-    if (!empresa_id || !ejecutiva_id) return res.json({ cc: enviado_por_correo || "" });
 
     try {
         const cc = await calcularDefaultCc(empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id);

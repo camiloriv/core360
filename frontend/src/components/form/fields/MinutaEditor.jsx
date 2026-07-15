@@ -780,7 +780,9 @@ function MinutaEditor({ form, setForm }) {
 
   useEffect(() => {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
-    if (editor && form.minuta !== editor.getHTML()) { editor.commands.setContent(form.minuta || ""); }
+    if (editor && !editor.isDestroyed && form.minuta !== editor.getHTML()) { 
+      editor.commands.setContent(form.minuta || ""); 
+    }
   }, [form.minuta, editor]);
 
   const [customTemplates, setCustomTemplates] = useState([]);
@@ -852,15 +854,20 @@ function MinutaEditor({ form, setForm }) {
   };
 
   const saveCustomTemplates = async (updatedTemplates) => {
-    setCustomTemplates(updatedTemplates);
     try {
       const u = JSON.parse(localStorage.getItem("usuario") || "{}");
+      const token = localStorage.getItem("token");
       if (u?.id) {
         const { data } = await axios.patch(`${API_URL}/usuarios/${u.id}/preferencias`, {
           preferencias: { custom_templates: updatedTemplates },
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
         });
         const updatedUser = { ...u, preferencias: data.preferencias };
         localStorage.setItem("usuario", JSON.stringify(updatedUser));
+        setCustomTemplates(updatedTemplates);
+      } else {
+        setCustomTemplates(updatedTemplates);
       }
     } catch (err) {
       console.error("Error al guardar templates:", err);

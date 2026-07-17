@@ -67,6 +67,10 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
         </table>`
       : "";
 
+    const currentHour = new Date().getHours();
+    const greeting = currentHour < 12 ? "buenos días," : "buenas tardes,";
+    const defaultTextoPrevio = `Estimadas/os ${greeting}\n\nEsperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.`;
+
     html = html
       .replace(/{{id}}/g, data.id_reunion || "")
       .replace(/{{participantes}}/g, data.participantes || "")
@@ -77,7 +81,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
       .replace(/{{lugar}}/g, data.lugar || "")
       .replace(/{{motivo}}/g, data.motivo_reu || "")
       .replace(/{{documentos_adjuntos}}/g, data.documentos_adjuntos || "")
-      .replace(/{{texto_previo}}/g, `Estimados/as,\nJunto con saludarles, comparto con ustedes la minuta correspondiente a la reunión mantenida el día ${fechaFormateada || data.fecha}, con el objetivo de revisar los puntos tratados, los acuerdos alcanzados y los compromisos asignados.\n\nA continuación, se detallan los puntos clave:`)
+      .replace(/{{texto_previo}}/g, (data.texto_previo ? data.texto_previo : defaultTextoPrevio).replace(/\n/g, '<br>'))
       .replace(/{{link_video_section}}/g, videoHtml)
       .replace(/{{minuta}}/g, data.minuta || "");
 

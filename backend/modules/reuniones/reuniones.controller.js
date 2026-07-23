@@ -463,7 +463,7 @@ exports.crearReunion = async (req, res) => {
                 const asuntoCorreo = asunto_correo
                     ? asunto_correo
                     : (data.empresa_nombre
-                        ? `Minuta ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
+                        ? `Minuta de reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
                         : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
                 enviarCorreo({

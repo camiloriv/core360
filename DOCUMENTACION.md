@@ -39,6 +39,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite 8**.
 | **Calendario** | React Big Calendar | Visualización de agenda y eventos Teams. |
 | **Estilos** | CSS Moderno | Diseño responsivo, variables CSS y animaciones. |
 | **Íconos** | Lucide React | Sistema de iconografía consistente. |
+| **Infraestructura / Despliegue** | Docker & Docker Compose | Contenedorización de la aplicación y base de datos para entornos consistentes. |
 | **Editor** | TipTap v3 | Edición de minutas en formato enriquecido (tablas, colores, tipografía). |
 | **Comunicaciones** | Microsoft Graph API (Azure AD) | Envío automatizado de correos vía OAuth2. |
 | **Autenticación** | JWT (jsonwebtoken) + bcrypt | Autenticación y hashing seguro de contraseñas. |
@@ -139,6 +140,7 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite 8**.
 │   │   ├── layout.css              # Estructura y grids
 │   │   ├── core360-theme.css       # Tema principal de la aplicación
 │   │   ├── components.css          # Estilos de componentes reutilizables
+│   │   ├── DashboardStyles.js      # Estilos inline para componentes del dashboard
 │   │   ├── mobile.css              # Estilos responsivos para móvil
 │   │   └── encuesta.css            # Estilos de la vista pública de encuestas
 │   ├── /utils           # Utilidades compartidas
@@ -147,7 +149,8 @@ Ubicado en la carpeta `/frontend`, construido con **React 19** y **Vite 8**.
 │   ├── /data            # Datos estáticos / constantes
 │   ├── App.jsx          # Componente raíz, rutas y RBAC
 │   └── main.jsx         # Punto de entrada de React
-└── vite.config.js       # Configuración de empaquetado
+├── vite.config.js       # Configuración de empaquetado
+└── eslint.config.js     # Configuración de ESLint (linting de código)
 ```
 
 ---
@@ -315,3 +318,21 @@ El proyecto utiliza un sistema de diseño propio basado en **Variables CSS estan
 - **Responsividad:** Estilos adaptativos con archivo dedicado `mobile.css` para dispositivos móviles.
 - **Interacciones:** Micro-animaciones en botones y transiciones de página suaves, promoviendo una experiencia fluida y consistente en todas las vistas.
 - **Alertas:** SweetAlert2 para diálogos, confirmaciones y notificaciones con estilos personalizados.
+
+---
+
+## 🌐 Despliegue en Producción
+
+| Componente | Plataforma | URL / Detalle |
+| :--- | :--- | :--- |
+| **Backend (API)** | Railway | Hosting del servidor Node.js/Express y base de datos MySQL. Railway provee automáticamente las variables de conexión a BD. |
+| **Frontend (SPA)** | Cloudflare Pages | Build estático de Vite desplegado en `core360.pages.dev`. Se conecta al backend vía variable `VITE_API_URL`. |
+| **Base de Datos** | Railway (MySQL) | Instancia MySQL gestionada dentro del mismo proyecto Railway. |
+| **Contenedores** | Docker & Docker Compose | Disponibles para desarrollo local y despliegue alternativo (`docker-compose.yml` en la raíz). |
+
+### Flujo de Despliegue
+1. **Backend:** Push a la rama principal → Railway detecta cambios → Build automático con Dockerfile → Deploy.
+2. **Frontend:** Push a la rama principal → Cloudflare Pages ejecuta `npm run build` → Sirve los archivos estáticos desde `/dist`.
+
+### Herramientas de Calidad de Código
+- **ESLint:** Configurado en el frontend (`eslint.config.js`) con plugins para React Hooks y React Refresh. Ejecutar con `npm run lint`.

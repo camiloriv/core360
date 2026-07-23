@@ -193,7 +193,6 @@ function ReunionesForm({ onSuccess }) {
   const { submit, loading } = useSubmitReunion({
     form,
     resetForm,
-    isDraft,
     onSuccess: () => {
       fetchEmpresas();
       onSuccess?.();

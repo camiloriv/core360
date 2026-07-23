@@ -108,7 +108,10 @@ function ReunionesForm({ onSuccess }) {
     }
     setField("fecha_reu", new Date(draft.fecha_reu).toISOString().split('T')[0]);
     setField("hora", draft.hora);
-    setField("tipo_reu", ""); // Dejar vacío para que el usuario seleccione
+    setField("tipo_reu", draft.tipo_reu || ""); 
+    setField("motivo_reu", draft.motivo_reu || draft.asunto_teams || "");
+    setField("minuta", draft.minuta || "");
+    setField("form_f", draft.form_f || "");
     setField("participantes", draft.participantes || "");
     
     let filteredEnviadoA = "";

@@ -4,7 +4,7 @@ import { crearReunion } from "../../services/reunionesService";
 export default function useSubmitReunion({ form, resetForm, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
-  const submit = async () => {
+  const submit = async (isDraftSubmit = false) => {
     try {
       setLoading(true);
 
@@ -23,6 +23,8 @@ export default function useSubmitReunion({ form, resetForm, onSuccess }) {
       form.archivos?.forEach(file => {
         formData.append("archivos", file);
       });
+
+      formData.append("es_borrador", isDraftSubmit);
 
       const res = await crearReunion(formData);
 

@@ -107,17 +107,98 @@ const BASE_REUNION_SQL = `
     LEFT JOIN minutas m ON m.teams_evento_id = te.id
 `;
 
+const BASE_MINUTA_STANDALONE_SQL = `
+    SELECT
+        NULL                            AS teams_evento_id,
+        NULL                            AS event_id,
+        NULL                            AS ical_uid,
+        m.motivo_reu                    AS asunto_teams,
+        m.fecha_reu                     AS fecha_reu,
+        m.hora                          AS hora,
+        m.hora                          AS hora_fin,
+        'borrador'                      AS estado_teams,
+        0                               AS es_online,
+        m.participantes                 AS asistentes,
+        NULL                            AS join_url,
+        m.empresa_id                    AS empresa_id,
+        m.ejecutiva_id                  AS ejecutiva_id,
+        NULL                            AS ultima_sync,
+        emp.nombre                      AS empresa_nombre,
+        u.nombre                        AS ejecutiva_nombre,
+        j.nombre                        AS jefatura_nombre,
+
+        m.id                            AS minuta_row_id,
+        m.id_minuta                     AS id_reunion,
+        m.tipo_reu,
+        m.enviado_a,
+        m.enviado_por,
+        m.participantes,
+        m.motivo_reu,
+        m.minuta,
+        m.form_f,
+        m.lugar,
+        m.estado_envio                  AS minuta_estado,
+        m.archivos_nombres,
+        m.programar_encuesta,
+        m.encuesta_tipo,
+        m.encuesta_programada_para,
+        m.encuesta_estado_envio,
+        m.encuesta_relacionada,
+        m.encuesta_destinatario,
+        m.texto_previo,
+        m.link_video,
+        m.created_at,
+
+        m.estado_envio                  AS estado_envio,
+        'borrador'                      AS te_estado,
+        0                               AS is_huerfana,
+        1                               AS tiene_minuta,
+        (m.empresa_id IS NOT NULL)      AS tiene_empresa
+
+    FROM minutas m
+    LEFT JOIN empresas emp ON m.empresa_id = emp.id
+    LEFT JOIN usuarios u ON m.ejecutiva_id = u.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+`;
+
 // ============================================================
 // GET /reuniones — Listar reuniones (teams_eventos + minutas)
 // ============================================================
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
+    const whereM = whereClause.replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL').replace(/te\.usuario_id/g, 'm.ejecutiva_id').replace(/te\.asistentes/g, 'm.participantes');
 
-    const sql = `${BASE_REUNION_SQL} ${whereClause} ORDER BY te.fecha DESC, te.hora DESC`;
+    const sql = `
+        SELECT * FROM (
+            ${BASE_REUNION_SQL} ${whereClause}
+            UNION ALL
+            ${BASE_MINUTA_STANDALONE_SQL} ${whereM}
+        ) AS combined
+        ORDER BY fecha_reu DESC, hora DESC
+    `;
 
     try {
-        const [result] = await db.query(sql, params);
+        // --- INICIO HOTFIX ESTADO PASADA ---
+        // Marcar en tiempo real como 'pasada' las reuniones que ya finalizaron
+        // Usamos la hora de Santiago calculada en Node para evitar desfases de timezone en la BD
+        const now = new Date();
+        const chileDateParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+        const y = chileDateParts.find(p => p.type === 'year').value;
+        const m = chileDateParts.find(p => p.type === 'month').value;
+        const d = chileDateParts.find(p => p.type === 'day').value;
+        const currentDateChile = `${y}-${m}-${d}`;
+        const currentTimeChile = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+
+        await db.query(`
+            UPDATE teams_eventos 
+            SET estado = 'pasada' 
+            WHERE estado = 'agendada' 
+              AND (fecha < ? OR (fecha = ? AND hora_fin <= ?))
+        `, [currentDateChile, currentDateChile, currentTimeChile]);
+        // --- FIN HOTFIX ---
+
+        const [result] = await db.query(sql, [...params, ...params]);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
@@ -322,7 +403,8 @@ exports.crearReunion = async (req, res) => {
         teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
         asunto_correo,    // Asunto personalizado para minutas sin empresa (excluidas/proforma)
         texto_previo,
-        link_video
+        link_video,
+        es_borrador
     } = req.body;
 
     const archivos = req.files || [];
@@ -352,36 +434,90 @@ exports.crearReunion = async (req, res) => {
             if (teRows.length > 0) teId = teRows[0].id;
         }
 
-        const sql = `
-            INSERT INTO minutas (
-                id_minuta, teams_evento_id, ejecutiva_id, empresa_id,
+        const isDraft = es_borrador === 'true' || es_borrador === true;
+        const estado_final_minuta = isDraft ? 'borrador' : 'enviado';
+
+        const reqIdReunion = req.body.id_reunion;
+        let isUpdate = false;
+        let final_id_minuta = null;
+        let final_archivos_nombres = archivosNombres;
+
+        if (reqIdReunion && reqIdReunion.startsWith('MIN-')) {
+            const [existing] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE id_minuta = ?", [reqIdReunion]);
+            if (existing.length > 0) {
+                isUpdate = true;
+                final_id_minuta = existing[0].id_minuta;
+                // Si no se suben archivos nuevos, conservamos los anteriores
+                if (archivos.length === 0 && existing[0].archivos_nombres) {
+                    final_archivos_nombres = existing[0].archivos_nombres;
+                }
+            }
+        }
+
+        if (!final_id_minuta) {
+            final_id_minuta = await generarIdMinuta();
+        }
+
+        if (isUpdate) {
+            const sqlUpdate = `
+                UPDATE minutas SET
+                    teams_evento_id = ?, ejecutiva_id = ?, empresa_id = ?,
+                    tipo_reu = ?, enviado_a = ?, enviado_por = ?, participantes = ?,
+                    motivo_reu = ?, minuta = ?, form_f = ?,
+                    fecha_reu = ?, hora = ?, lugar = ?, documentos_adjuntos = ?,
+                    estado_envio = ?, archivos_nombres = ?,
+                    programar_encuesta = ?, encuesta_tipo = ?, encuesta_programada_para = ?,
+                    encuesta_estado_envio = ?, encuesta_relacionada = ?, encuesta_destinatario = ?,
+                    texto_previo = ?, link_video = ?
+                WHERE id_minuta = ?
+            `;
+            const valuesUpdate = [
+                teId, ejecutiva_id, empresa_id,
                 tipo_reu, enviado_a, enviado_por, participantes,
                 motivo_reu, minuta, form_f,
-                fecha_reu, hora, lugar, documentos_adjuntos,
-                estado_envio, archivos_nombres,
-                programar_encuesta, encuesta_tipo, encuesta_programada_para,
-                encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario,
-                texto_previo, link_video
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        const values = [
-            id_minuta, teId, ejecutiva_id, empresa_id,
-            tipo_reu, enviado_a, enviado_por, participantes,
-            motivo_reu, minuta, form_f,
-            fecha_reu, hora, lugar || 'Teams', documentos_adjuntos,
-            archivosNombres,
-            isSurveyProgrammed ? 1 : 0,
-            isSurveyProgrammed ? encuesta_tipo : null,
-            isSurveyProgrammed ? encuesta_programada_para : null,
-            isSurveyProgrammed ? 'pendiente' : 'enviado',
-            req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
-            isSurveyProgrammed ? encuesta_destinatario : null,
-            texto_previo || null,
-            link_video || null
-        ];
-
-        await db.query(sql, values);
+                fecha_reu, hora, lugar || 'Teams', documentos_adjuntos,
+                estado_final_minuta, final_archivos_nombres,
+                isSurveyProgrammed ? 1 : 0,
+                isSurveyProgrammed ? encuesta_tipo : null,
+                isSurveyProgrammed ? encuesta_programada_para : null,
+                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+                isSurveyProgrammed ? encuesta_destinatario : null,
+                texto_previo || null,
+                link_video || null,
+                final_id_minuta
+            ];
+            await db.query(sqlUpdate, valuesUpdate);
+        } else {
+            const sqlInsert = `
+                INSERT INTO minutas (
+                    id_minuta, teams_evento_id, ejecutiva_id, empresa_id,
+                    tipo_reu, enviado_a, enviado_por, participantes,
+                    motivo_reu, minuta, form_f,
+                    fecha_reu, hora, lugar, documentos_adjuntos,
+                    estado_envio, archivos_nombres,
+                    programar_encuesta, encuesta_tipo, encuesta_programada_para,
+                    encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario,
+                    texto_previo, link_video
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const valuesInsert = [
+                final_id_minuta, teId, ejecutiva_id, empresa_id,
+                tipo_reu, enviado_a, enviado_por, participantes,
+                motivo_reu, minuta, form_f,
+                fecha_reu, hora, lugar || 'Teams', documentos_adjuntos,
+                estado_final_minuta, final_archivos_nombres,
+                isSurveyProgrammed ? 1 : 0,
+                isSurveyProgrammed ? encuesta_tipo : null,
+                isSurveyProgrammed ? encuesta_programada_para : null,
+                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
+                isSurveyProgrammed ? encuesta_destinatario : null,
+                texto_previo || null,
+                link_video || null
+            ];
+            await db.query(sqlInsert, valuesInsert);
+        }
 
         // Si viene de un evento Teams, marcar ese evento como 'pasada'
         if (teId) {
@@ -396,7 +532,7 @@ exports.crearReunion = async (req, res) => {
             );
             await db.query(
                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
-                [empresa_id, fecha_reu, ejecutiva_id, id_minuta, motivo_reu || 'Minuta de reunión registrada']
+                [empresa_id, fecha_reu, ejecutiva_id, final_id_minuta, motivo_reu || 'Minuta de reunión registrada']
             );
         }
 
@@ -442,7 +578,7 @@ exports.crearReunion = async (req, res) => {
             JOIN usuarios e ON m.ejecutiva_id = e.id
             LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE m.id_minuta = ?
-        `, [id_minuta]);
+        `, [final_id_minuta]);
 
         if (result2.length > 0) {
             const data = result2[0];
@@ -466,11 +602,16 @@ exports.crearReunion = async (req, res) => {
                         ? `Minuta de reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
                         : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
+                // Si es borrador, enviar solo a la ejecutiva, quitar los CC y agregar [BORRADOR] al asunto
+                const correoToFinal = isDraft ? (data.ejecutiva_correo || req.usuario?.correo || '') : data.enviado_a;
+                const correosCcFinal = isDraft ? '' : correosCc;
+                const asuntoCorreoFinal = isDraft ? `[BORRADOR] ${asuntoCorreo}` : asuntoCorreo;
+
                 enviarCorreo({
-                    to: data.enviado_a,
-                    cc: correosCc,
+                    to: correoToFinal,
+                    cc: correosCcFinal,
                     userEmail: req.usuario?.correo,
-                    subject: asuntoCorreo,
+                    subject: asuntoCorreoFinal,
                     data: {
                         id_reunion: data.id_minuta,
                         participantes: data.participantes,
@@ -495,7 +636,10 @@ exports.crearReunion = async (req, res) => {
             }
         }
 
-        res.json({ msg: "Minuta creada y enviada", id_reunion: id_minuta });
+        res.json({ 
+            msg: isDraft ? "Borrador guardado y enviado a su correo" : "Minuta creada y enviada", 
+            id_reunion: final_id_minuta 
+        });
 
     } catch (error) {
         console.error("Error al crear minuta:", error);
@@ -688,9 +832,15 @@ exports.marcarNoAplica = async (req, res) => {
 exports.obtenerReunionPorId = async (req, res) => {
     const { id_reunion } = req.params;
 
-    const sql = `${BASE_REUNION_SQL}
-        WHERE m.id_minuta = ? OR CAST(te.id AS CHAR) = ?
-        LIMIT 1`;
+    const sql = `
+        SELECT * FROM (
+            ${BASE_REUNION_SQL}
+            UNION ALL
+            ${BASE_MINUTA_STANDALONE_SQL}
+        ) AS combined
+        WHERE id_reunion = ? OR CAST(teams_evento_id AS CHAR) = ?
+        LIMIT 1
+    `;
 
     try {
         const [result] = await db.query(sql, [id_reunion, id_reunion]);

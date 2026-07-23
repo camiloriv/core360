@@ -193,6 +193,7 @@ function ReunionesForm({ onSuccess }) {
   const { submit, loading } = useSubmitReunion({
     form,
     resetForm,
+    isDraft,
     onSuccess: () => {
       fetchEmpresas();
       onSuccess?.();
@@ -203,6 +204,7 @@ function ReunionesForm({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const isDraftSubmit = e.nativeEvent.submitter?.name === "borrador";
 
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];
@@ -230,7 +232,7 @@ function ReunionesForm({ onSuccess }) {
     }
 
     try {
-      const res = await submit();
+      const res = await submit(isDraftSubmit);
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { crearReunion } from "../../services/reunionesService";
 
-export default function useSubmitReunion({ form, resetForm, onSuccess }) {
+export default function useSubmitReunion({ form, resetForm, onSuccess, isDraft }) {
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
@@ -23,6 +23,8 @@ export default function useSubmitReunion({ form, resetForm, onSuccess }) {
       form.archivos?.forEach(file => {
         formData.append("archivos", file);
       });
+
+      formData.append("es_borrador", isDraft);
 
       const res = await crearReunion(formData);
 

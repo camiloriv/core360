@@ -322,7 +322,8 @@ exports.crearReunion = async (req, res) => {
         teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
         asunto_correo,    // Asunto personalizado para minutas sin empresa (excluidas/proforma)
         texto_previo,
-        link_video
+        link_video,
+        es_borrador
     } = req.body;
 
     const archivos = req.files || [];
@@ -352,6 +353,9 @@ exports.crearReunion = async (req, res) => {
             if (teRows.length > 0) teId = teRows[0].id;
         }
 
+        const isDraft = es_borrador === 'true' || es_borrador === true;
+        const estado_final_minuta = isDraft ? 'borrador' : 'enviado';
+
         const sql = `
             INSERT INTO minutas (
                 id_minuta, teams_evento_id, ejecutiva_id, empresa_id,
@@ -362,7 +366,7 @@ exports.crearReunion = async (req, res) => {
                 programar_encuesta, encuesta_tipo, encuesta_programada_para,
                 encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario,
                 texto_previo, link_video
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const values = [
@@ -370,7 +374,7 @@ exports.crearReunion = async (req, res) => {
             tipo_reu, enviado_a, enviado_por, participantes,
             motivo_reu, minuta, form_f,
             fecha_reu, hora, lugar || 'Teams', documentos_adjuntos,
-            archivosNombres,
+            estado_final_minuta, archivosNombres,
             isSurveyProgrammed ? 1 : 0,
             isSurveyProgrammed ? encuesta_tipo : null,
             isSurveyProgrammed ? encuesta_programada_para : null,
@@ -466,11 +470,16 @@ exports.crearReunion = async (req, res) => {
                         ? `Minuta de reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
                         : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
+                // Si es borrador, enviar solo a la ejecutiva, quitar los CC y agregar [BORRADOR] al asunto
+                const correoToFinal = isDraft ? (data.ejecutiva_correo || req.usuario?.correo || '') : data.enviado_a;
+                const correosCcFinal = isDraft ? '' : correosCc;
+                const asuntoCorreoFinal = isDraft ? `[BORRADOR] ${asuntoCorreo}` : asuntoCorreo;
+
                 enviarCorreo({
-                    to: data.enviado_a,
-                    cc: correosCc,
+                    to: correoToFinal,
+                    cc: correosCcFinal,
                     userEmail: req.usuario?.correo,
-                    subject: asuntoCorreo,
+                    subject: asuntoCorreoFinal,
                     data: {
                         id_reunion: data.id_minuta,
                         participantes: data.participantes,
@@ -495,7 +504,10 @@ exports.crearReunion = async (req, res) => {
             }
         }
 
-        res.json({ msg: "Minuta creada y enviada", id_reunion: id_minuta });
+        res.json({ 
+            msg: isDraft ? "Borrador guardado y enviado a su correo" : "Minuta creada y enviada", 
+            id_reunion: id_minuta 
+        });
 
     } catch (error) {
         console.error("Error al crear minuta:", error);

@@ -4,7 +4,7 @@ import { crearReunion } from "../../services/reunionesService";
 export default function useSubmitReunion({ form, resetForm, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
-  const submit = async (isDraftSubmit = false) => {
+  const submit = async (options = {}) => {
     try {
       setLoading(true);
 
@@ -24,7 +24,10 @@ export default function useSubmitReunion({ form, resetForm, onSuccess }) {
         formData.append("archivos", file);
       });
 
-      formData.append("es_borrador", isDraftSubmit);
+      formData.append("es_borrador", options.es_borrador || false);
+      if (options.solo_guardar) {
+        formData.append("solo_guardar", true);
+      }
 
       const res = await crearReunion(formData);
 

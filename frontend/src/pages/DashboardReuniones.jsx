@@ -1887,38 +1887,40 @@ export default function DashboardReuniones() {
                               >
                                 {r.tiene_minuta ? "📝 En Borrador" : "✍️ Pendiente de Minuta"}
                               </div>
-                              <button
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  const isTeOnly = !r.minuta_row_id;
-                                  handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
-                                }}
-                                style={{
-                                  background: "#fee2e2",
-                                  color: "#ef4444",
-                                  border: "none",
-                                  borderRadius: "4px",
-                                  width: "24px",
-                                  height: "24px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  cursor: "pointer",
-                                  fontSize: "12px",
-                                  fontWeight: "bold",
-                                  padding: 0,
-                                  transition: "all 0.2s"
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = "#fca5a5";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = "#fee2e2";
-                                }}
-                                title="No aplica enviar minuta"
-                              >
-                                ❌
-                              </button>
+                              {!r.tiene_minuta && (
+                                <button
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    const isTeOnly = !r.minuta_row_id;
+                                    handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
+                                  }}
+                                  style={{
+                                    background: "#fee2e2",
+                                    color: "#ef4444",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    width: "24px",
+                                    height: "24px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    padding: 0,
+                                    transition: "all 0.2s"
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#fca5a5";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "#fee2e2";
+                                  }}
+                                  title="No aplica enviar minuta"
+                                >
+                                  ❌
+                                </button>
+                              )}
                             </div>
                           ) : r.estado_envio === "agendada" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>

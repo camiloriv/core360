@@ -1883,9 +1883,9 @@ export default function DashboardReuniones() {
                                 }}
                                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
-                                title="Redactar Minuta"
+                                title={r.tiene_minuta ? "Editar Borrador" : "Redactar Minuta"}
                               >
-                                ✍️ Pendiente de Minuta
+                                {r.tiene_minuta ? "📝 En Borrador" : "✍️ Pendiente de Minuta"}
                               </div>
                               <button
                                 onClick={(e) => { 
@@ -2249,7 +2249,7 @@ export default function DashboardReuniones() {
                                         background: "#fef08a", padding: "4px 8px", borderRadius: "4px"
                                       }}
                                     >
-                                      ✍️ Redactar Minuta
+                                      {r.tiene_minuta ? "📝 En Borrador" : "✍️ Pendiente de Minuta"}
                                     </div>
                                     <button
                                       onClick={() => { 

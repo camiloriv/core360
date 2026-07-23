@@ -203,7 +203,7 @@ function ReunionesForm({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const isDraftSubmit = e.nativeEvent.submitter?.name === "borrador";
+    const isDraftSubmit = e.target.elements.es_borrador_checkbox?.checked;
 
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];

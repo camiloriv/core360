@@ -117,6 +117,25 @@ exports.listarReuniones = async (req, res) => {
     const sql = `${BASE_REUNION_SQL} ${whereClause} ORDER BY te.fecha DESC, te.hora DESC`;
 
     try {
+        // --- INICIO HOTFIX ESTADO PASADA ---
+        // Marcar en tiempo real como 'pasada' las reuniones que ya finalizaron
+        // Usamos la hora de Santiago calculada en Node para evitar desfases de timezone en la BD
+        const now = new Date();
+        const chileDateParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+        const y = chileDateParts.find(p => p.type === 'year').value;
+        const m = chileDateParts.find(p => p.type === 'month').value;
+        const d = chileDateParts.find(p => p.type === 'day').value;
+        const currentDateChile = `${y}-${m}-${d}`;
+        const currentTimeChile = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+
+        await db.query(`
+            UPDATE teams_eventos 
+            SET estado = 'pasada' 
+            WHERE estado = 'agendada' 
+              AND (fecha < ? OR (fecha = ? AND hora_fin <= ?))
+        `, [currentDateChile, currentDateChile, currentTimeChile]);
+        // --- FIN HOTFIX ---
+
         const [result] = await db.query(sql, params);
         res.json(result);
     } catch (err) {

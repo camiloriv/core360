@@ -107,14 +107,76 @@ const BASE_REUNION_SQL = `
     LEFT JOIN minutas m ON m.teams_evento_id = te.id
 `;
 
+const BASE_MINUTA_STANDALONE_SQL = `
+    SELECT
+        NULL                            AS teams_evento_id,
+        NULL                            AS event_id,
+        NULL                            AS ical_uid,
+        m.motivo_reu                    AS asunto_teams,
+        m.fecha_reu                     AS fecha_reu,
+        m.hora                          AS hora,
+        m.hora                          AS hora_fin,
+        'borrador'                      AS estado_teams,
+        0                               AS es_online,
+        m.participantes                 AS asistentes,
+        NULL                            AS join_url,
+        m.empresa_id                    AS empresa_id,
+        m.ejecutiva_id                  AS ejecutiva_id,
+        NULL                            AS ultima_sync,
+        emp.nombre                      AS empresa_nombre,
+        u.nombre                        AS ejecutiva_nombre,
+        j.nombre                        AS jefatura_nombre,
+
+        m.id                            AS minuta_row_id,
+        m.id_minuta                     AS id_reunion,
+        m.tipo_reu,
+        m.enviado_a,
+        m.enviado_por,
+        m.participantes,
+        m.motivo_reu,
+        m.minuta,
+        m.form_f,
+        m.lugar,
+        m.estado_envio                  AS minuta_estado,
+        m.archivos_nombres,
+        m.programar_encuesta,
+        m.encuesta_tipo,
+        m.encuesta_programada_para,
+        m.encuesta_estado_envio,
+        m.encuesta_relacionada,
+        m.encuesta_destinatario,
+        m.texto_previo,
+        m.link_video,
+        m.created_at,
+
+        m.estado_envio                  AS estado_envio,
+        'borrador'                      AS te_estado,
+        0                               AS is_huerfana,
+        1                               AS tiene_minuta,
+        (m.empresa_id IS NOT NULL)      AS tiene_empresa
+
+    FROM minutas m
+    LEFT JOIN empresas emp ON m.empresa_id = emp.id
+    LEFT JOIN usuarios u ON m.ejecutiva_id = u.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+`;
+
 // ============================================================
 // GET /reuniones — Listar reuniones (teams_eventos + minutas)
 // ============================================================
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
+    const whereM = whereClause.replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL').replace(/te\.usuario_id/g, 'm.ejecutiva_id').replace(/te\.asistentes/g, 'm.participantes');
 
-    const sql = `${BASE_REUNION_SQL} ${whereClause} ORDER BY te.fecha DESC, te.hora DESC`;
+    const sql = `
+        SELECT * FROM (
+            ${BASE_REUNION_SQL} ${whereClause}
+            UNION ALL
+            ${BASE_MINUTA_STANDALONE_SQL} ${whereM}
+        ) AS combined
+        ORDER BY fecha_reu DESC, hora DESC
+    `;
 
     try {
         // --- INICIO HOTFIX ESTADO PASADA ---
@@ -136,7 +198,7 @@ exports.listarReuniones = async (req, res) => {
         `, [currentDateChile, currentDateChile, currentTimeChile]);
         // --- FIN HOTFIX ---
 
-        const [result] = await db.query(sql, params);
+        const [result] = await db.query(sql, [...params, ...params]);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
@@ -770,9 +832,15 @@ exports.marcarNoAplica = async (req, res) => {
 exports.obtenerReunionPorId = async (req, res) => {
     const { id_reunion } = req.params;
 
-    const sql = `${BASE_REUNION_SQL}
-        WHERE m.id_minuta = ? OR CAST(te.id AS CHAR) = ?
-        LIMIT 1`;
+    const sql = `
+        SELECT * FROM (
+            ${BASE_REUNION_SQL}
+            UNION ALL
+            ${BASE_MINUTA_STANDALONE_SQL}
+        ) AS combined
+        WHERE id_reunion = ? OR CAST(teams_evento_id AS CHAR) = ?
+        LIMIT 1
+    `;
 
     try {
         const [result] = await db.query(sql, [id_reunion, id_reunion]);

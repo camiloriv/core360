@@ -234,7 +234,12 @@ function ReunionesForm({ onSuccess }) {
     }
 
     try {
-      const res = await submit(isDraftSubmit);
+      const isSoloGuardar = e.nativeEvent.submitter?.name === "solo_guardar";
+    
+      const res = await submit({ 
+        es_borrador: isDraftSubmit || isSoloGuardar, 
+        solo_guardar: isSoloGuardar 
+      });
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",

@@ -185,7 +185,7 @@ const Login = () => {
           <div style="background: #f9fafb; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; color: #1f2937; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
               <span>📧 <strong>Correo:</strong></span>
-              <span><strong>minutas@proforma.cl</strong></span>
+              <span><strong>crivera@proforma.cl</strong></span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
               <span>📞 <strong>Teléfono:</strong></span>

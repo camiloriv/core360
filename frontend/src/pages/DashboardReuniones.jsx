@@ -159,7 +159,7 @@ export default function DashboardReuniones() {
   useEffect(() => {
     // Para el modal de vinculación, cargar TODAS las empresas (no solo de la cartera actual),
     // ya que reuniones antiguas pueden pertenecer a empresas que cambiaron de ejecutiva.
-    api.get("/empresas")
+    api.get("/empresas?global=true")
       .then(res => setGlobalEmpresas(res.data))
       .catch(err => console.error("Error cargando empresas globales:", err));
   }, []);

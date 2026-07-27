@@ -2,10 +2,10 @@ const db = require("../../database/connection");
 
 exports.listarEmpresas = async (req, res) => {
   try {
-    let { gerencia_id, jefatura_id } = req.query;
+    let { gerencia_id, jefatura_id, global } = req.query;
     
-    // Auto-filtro de seguridad para no-admins
-    if (req.usuario && req.usuario.permisos !== 'admin' && req.usuario.permisos !== 'ADMIN') {
+    // Auto-filtro de seguridad para no-admins (a menos que se pida lista global)
+    if (global !== 'true' && req.usuario && req.usuario.permisos !== 'admin' && req.usuario.permisos !== 'ADMIN') {
       if (req.usuario.permisos === 'gerencia') {
         gerencia_id = req.usuario.id;
       } else if (req.usuario.permisos === 'jefatura') {

@@ -607,37 +607,42 @@ exports.crearReunion = async (req, res) => {
                 const correosCcFinal = isDraft ? '' : correosCc;
                 const asuntoCorreoFinal = isDraft ? `[BORRADOR] ${asuntoCorreo}` : asuntoCorreo;
 
-                enviarCorreo({
-                    to: correoToFinal,
-                    cc: correosCcFinal,
-                    userEmail: req.usuario?.correo,
-                    subject: asuntoCorreoFinal,
-                    data: {
-                        id_reunion: data.id_minuta,
-                        participantes: data.participantes,
-                        empresa: data.empresa_nombre || '',
-                        ejecutiva: data.ejecutiva_nombre,
-                        fecha_reu: data.fecha_reu,
-                        hora: data.hora,
-                        lugar: data.lugar,
-                        motivo_reu: data.motivo_reu,
-                        minuta: data.minuta,
-                        enviado_por: data.enviado_por,
-                        documentos_adjuntos: data.documentos_adjuntos,
-                        texto_previo: data.texto_previo,
-                        link_video: data.link_video
-                    },
-                    attachments
-                }).catch(error => {
-                    console.error("Error enviando correo:", error);
-                });
+                const isSoloGuardar = req.body.solo_guardar === 'true' || req.body.solo_guardar === true;
+
+                if (!isSoloGuardar) {
+                    enviarCorreo({
+                        to: correoToFinal,
+                        cc: correosCcFinal,
+                        userEmail: req.usuario?.correo,
+                        subject: asuntoCorreoFinal,
+                        data: {
+                            id_reunion: data.id_minuta,
+                            participantes: data.participantes,
+                            empresa: data.empresa_nombre || '',
+                            ejecutiva: data.ejecutiva_nombre,
+                            fecha_reu: data.fecha_reu,
+                            hora: data.hora,
+                            lugar: data.lugar,
+                            motivo_reu: data.motivo_reu,
+                            minuta: data.minuta,
+                            enviado_por: data.enviado_por,
+                            documentos_adjuntos: data.documentos_adjuntos,
+                            texto_previo: data.texto_previo,
+                            link_video: data.link_video
+                        },
+                        attachments
+                    }).catch(error => {
+                        console.error("Error enviando correo:", error);
+                    });
+                }
             } catch (error) {
                 console.error("Error al preparar envío de correo:", error);
             }
         }
 
+        const isSoloGuardar = req.body.solo_guardar === 'true' || req.body.solo_guardar === true;
         res.json({ 
-            msg: isDraft ? "Borrador guardado y enviado a su correo" : "Minuta creada y enviada", 
+            msg: isSoloGuardar ? "Borrador guardado sin enviar correo" : (isDraft ? "Borrador guardado y enviado a su correo" : "Minuta creada y enviada"),
             id_reunion: final_id_minuta 
         });
 

@@ -830,7 +830,7 @@ export default function GestionEmpresas() {
 
   // Filtrar vinculaciones
   const filteredVinculaciones = useMemo(() => {
-    const isAdmin = user?.permisos === "admin" || user?.permisos === "ADMIN";
+    const isAdmin = user?.permisos === "admin" || user?.permisos === "ADMIN" || user?.permisos === "gerencia";
     const allowedVinc = isAdmin
       ? vinculaciones
       : vinculaciones.filter((v) => empresas.some((emp) => emp.id === v.id));
@@ -919,7 +919,7 @@ export default function GestionEmpresas() {
               ASIGNE O REASIGNE EMPRESAS POR EJECUTIVA.
             </p>
           </div>
-          {(user?.permisos === "admin" || user?.permisos === "ADMIN") && (
+          {(user?.permisos === "admin" || user?.permisos === "ADMIN" || user?.permisos === "gerencia") && (
             <button onClick={abrirMenuCreacionEmpresa} className="btn-header-primary">
               🏢 + Nueva Empresa
             </button>
@@ -928,7 +928,7 @@ export default function GestionEmpresas() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           {/* PANEL TRASPASO MASIVO (Sección premium con tabs para manual o Excel) */}
-          {(user?.permisos === "admin" || user?.permisos === "ADMIN") && (
+          {(user?.permisos === "admin" || user?.permisos === "ADMIN" || user?.permisos === "gerencia") && (
             <div
               style={{
                 background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",

@@ -12,6 +12,7 @@ import {
   obtenerHistorial,
   importarNuevosNegocios,
 } from "../services/nuevosNegociosService";
+import api from "../services/api";
 
 /* ───── Constantes de referencia ───── */
 const ESTADOS_CONTACTO = ["AFILIADA", "EN GESTIÓN", "PROSPECTO"];
@@ -139,6 +140,7 @@ const SeguimientoNegocios = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [empresasSelect, setEmpresasSelect] = useState([]);
 
   // Filtros
   const [filtroEstadoContacto, setFiltroEstadoContacto] = useState("");
@@ -200,6 +202,18 @@ const SeguimientoNegocios = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const fetchEmpresas = async () => {
+      try {
+        const res = await api.get("/empresas");
+        setEmpresasSelect(res.data || []);
+      } catch (err) {
+        console.error("Error cargando empresas:", err);
+      }
+    };
+    fetchEmpresas();
+  }, []);
 
   /* ── Debounce búsqueda ── */
   const handleSearchChange = (e) => {
@@ -680,7 +694,16 @@ const SeguimientoNegocios = () => {
               <div style={S.formGrid}>
                 <div style={S.formGroup}>
                   <label style={S.formLabel}>Holding / Grupo</label>
-                  <input style={S.formInput} value={form.holding} onChange={(e) => handleFormChange("holding", e.target.value)} placeholder="Nombre del holding" />
+                  <select 
+                    style={S.formSelect} 
+                    value={form.holding} 
+                    onChange={(e) => handleFormChange("holding", e.target.value)}
+                  >
+                    <option value="">Seleccione un holding...</option>
+                    {empresasSelect.map((emp) => (
+                      <option key={emp.id} value={emp.nombre}>{emp.nombre}</option>
+                    ))}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.formLabel}>Estado Contacto</label>

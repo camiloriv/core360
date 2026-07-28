@@ -97,7 +97,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
       }),
     ];
 
-    const firmaPath = resolverFirma(data.ejecutiva || data.enviado_por);
+    const firmaPath = resolverFirma(data.enviado_por || data.ejecutiva);
     if (firmaPath) {
       baseAttachments.push({ filename: "firma.png", path: firmaPath, cid: "firma" });
     }

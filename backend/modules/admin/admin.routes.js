@@ -14,5 +14,13 @@ router.post("/cleanup-dev", adminController.cleanupDev);
 
 // POST /admin/reset-passwords - Resetea masivamente las contraseñas a 123
 router.post("/reset-passwords", adminController.resetPasswords);
+const auditController = require("./audit.controller");
+
+// ... (existing routes)
+// GET /admin/audit-log - Obtener logs de auditoría
+router.get("/audit-log", auditController.getAuditLog);
+
+// GET /admin/audit-log/acciones - Obtener acciones disponibles para filtros
+router.get("/audit-log/acciones", auditController.getAccionesDisponibles);
 
 module.exports = router;

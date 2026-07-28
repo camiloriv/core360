@@ -359,6 +359,32 @@ async function runMigrations() {
       )
     `);
 
+    // ============================================================
+    // 20. AUDIT LOG — Registro de actividad del sistema
+    // ============================================================
+    console.log("Migration: Checking/creating 'audit_log' table...");
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        accion VARCHAR(100) NOT NULL,
+        entidad VARCHAR(50) NOT NULL,
+        entidad_id VARCHAR(100) DEFAULT NULL,
+        usuario_id INT DEFAULT NULL,
+        usuario_nombre VARCHAR(255) DEFAULT NULL,
+        ejecutiva_id INT DEFAULT NULL,
+        ejecutiva_nombre VARCHAR(255) DEFAULT NULL,
+        empresa_id INT DEFAULT NULL,
+        empresa_nombre VARCHAR(255) DEFAULT NULL,
+        detalles JSON DEFAULT NULL,
+        ip_address VARCHAR(45) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_audit_accion (accion),
+        INDEX idx_audit_usuario (usuario_id),
+        INDEX idx_audit_entidad (entidad, entidad_id),
+        INDEX idx_audit_fecha (created_at)
+      )
+    `);
+
     console.log("Migration: All migrations verified and applied successfully!");
 
   } catch (error) {

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import { getAuditLog, getAccionesDisponibles } from '../services/auditService';
 import Swal from 'sweetalert2';
 import "../styles/core360-theme.css";
 
@@ -195,6 +196,15 @@ export default function AdminPanel() {
           onAction={handleResetPasswords}
           tag="MASIVO"
         />
+      </SectionCard>
+      {/* ── SECCIÓN: AUDIT LOG ────────────────────────────────────── */}
+      <SectionCard
+        icon="📋"
+        title="Registro de Actividad (Audit Log)"
+        description="Historial detallado de todas las acciones del sistema"
+        color="#9b59b6"
+      >
+        <AuditLogViewer />
       </SectionCard>
 
       {/* ── SECCIÓN: DIAGNÓSTICO ──────────────────────────────────── */}
@@ -442,6 +452,210 @@ function ToolRow({ icon, title, description, buttonLabel, buttonDisabled, onActi
           {buttonLabel}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Audit Log Viewer Component
+// ─────────────────────────────────────────────────────────────────────
+function AuditLogViewer() {
+  const [logs, setLogs] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [loading, setLoading] = useState(false);
+  const [accionesDisponibles, setAccionesDisponibles] = useState([]);
+  const [expandedRowId, setExpandedRowId] = useState(null);
+
+  // Filters state
+  const [filters, setFilters] = useState({
+    buscar: '',
+    accion: '',
+    desde: '',
+    hasta: '',
+    delegadas: false
+  });
+
+  useEffect(() => {
+    getAccionesDisponibles().then(setAccionesDisponibles).catch(console.error);
+  }, []);
+
+  const fetchLogs = useCallback(async (page = 1) => {
+    setLoading(true);
+    try {
+      const res = await getAuditLog({ ...filters, page, limit: pagination.limit });
+      setLogs(res.data || []);
+      setPagination(res.pagination);
+    } catch (error) {
+      console.error("Error fetching audit logs", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, pagination.limit]);
+
+  useEffect(() => {
+    fetchLogs(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  const handleFilterChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const toggleRow = (id) => {
+    setExpandedRowId(prev => prev === id ? null : id);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      
+      {/* Filters Bar */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center',
+        padding: '16px', background: 'rgba(255,255,255,0.03)',
+        borderRadius: '8px', border: '1px solid var(--border-color, #2a2a4a)'
+      }}>
+        <input 
+          type="text" name="buscar" placeholder="🔍 Buscar nombre, entidad..."
+          value={filters.buscar} onChange={handleFilterChange}
+          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #2a2a4a)', background: 'var(--card-bg)', color: 'var(--text-light)' }}
+        />
+        
+        <select name="accion" value={filters.accion} onChange={handleFilterChange}
+          style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #2a2a4a)', background: 'var(--card-bg)', color: 'var(--text-light)' }}>
+          <option value="">Todas las acciones</option>
+          {accionesDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input type="date" name="desde" value={filters.desde} onChange={handleFilterChange}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #2a2a4a)', background: 'var(--card-bg)', color: 'var(--text-light)' }} title="Desde" />
+          <span style={{color: 'var(--text-muted)'}}>→</span>
+          <input type="date" name="hasta" value={filters.hasta} onChange={handleFilterChange}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #2a2a4a)', background: 'var(--card-bg)', color: 'var(--text-light)' }} title="Hasta" />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-light)', fontSize: '13px', cursor: 'pointer' }}>
+          <input type="checkbox" name="delegadas" checked={filters.delegadas} onChange={handleFilterChange} />
+          <span>Solo acciones delegadas 🟡</span>
+        </label>
+      </div>
+
+      {/* Data Table */}
+      <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color, #2a2a4a)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)', width: '40px' }}></th>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>Fecha</th>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>Acción</th>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>Usuario Operador</th>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>Ejecutiva Resp.</th>
+              <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>Empresa / Entidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Cargando logs...</td></tr>
+            ) : logs.length === 0 ? (
+              <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No se encontraron registros</td></tr>
+            ) : (
+              logs.map(log => {
+                const isDelegada = log.detalles?.es_delegada;
+                const isExpanded = expandedRowId === log.id;
+                
+                return (
+                  <React.Fragment key={log.id}>
+                    <tr style={{ 
+                      borderBottom: '1px solid var(--border-color, #2a2a4a)', 
+                      background: isDelegada ? 'rgba(241, 196, 15, 0.05)' : 'transparent',
+                      cursor: 'pointer'
+                    }} onClick={() => toggleRow(log.id)}>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        {isExpanded ? '▼' : '▶'}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(log.created_at).toLocaleString('es-CL')}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-light)', fontWeight: 600 }}>
+                        {log.accion}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-light)' }}>
+                        {log.usuario_nombre}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-light)' }}>
+                        {log.ejecutiva_nombre || '-'} 
+                        {isDelegada && <span title="Acción Delegada: El operador es distinto a la ejecutiva responsable" style={{ marginLeft: '6px', fontSize: '10px', background: '#f1c40f', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Delegada</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
+                        {log.empresa_nombre ? (
+                          <div style={{ color: 'var(--secondary-color)', fontWeight: 600 }}>{log.empresa_nombre}</div>
+                        ) : null}
+                        <div style={{ fontSize: '11px' }}>{log.entidad}: {log.entidad_id}</div>
+                      </td>
+                    </tr>
+                    
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <tr style={{ background: 'rgba(0,0,0,0.1)' }}>
+                        <td colSpan="6" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-color, #2a2a4a)' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+                            <div style={{ flex: 1, minWidth: '300px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Detalles del Payload</h4>
+                              <pre style={{ 
+                                margin: 0, padding: '12px', background: '#111', borderRadius: '6px', 
+                                color: '#a8ff60', fontSize: '12px', overflowX: 'auto' 
+                              }}>
+                                {JSON.stringify(log.detalles, null, 2)}
+                              </pre>
+                            </div>
+                            <div style={{ minWidth: '200px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Metadatos</h4>
+                              <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '12px', color: 'var(--text-light)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <li><strong>ID Registro:</strong> {log.id}</li>
+                                <li><strong>IP Address:</strong> <span style={{ color: 'var(--text-muted)' }}>{log.ip_address || 'N/A'}</span></li>
+                                <li><strong>ID Operador:</strong> {log.usuario_id || 'N/A'}</li>
+                                <li><strong>ID Ejecutiva:</strong> {log.ejecutiva_id || 'N/A'}</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px', padding: '0 8px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => fetchLogs(pagination.page - 1)} disabled={pagination.page <= 1}
+              style={{ padding: '6px 12px', background: 'var(--card-bg)', border: '1px solid var(--border-color, #2a2a4a)', borderRadius: '4px', color: 'var(--text-light)', cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Anterior
+            </button>
+            <button 
+              onClick={() => fetchLogs(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}
+              style={{ padding: '6px 12px', background: 'var(--card-bg)', border: '1px solid var(--border-color, #2a2a4a)', borderRadius: '4px', color: 'var(--text-light)', cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

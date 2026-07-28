@@ -1,5 +1,6 @@
 const db = require("../../database/connection");
 const { enviarCorreo } = require("../../services/email/email.service");
+const { registrarAudit } = require("../../services/audit/audit.service");
 
 // ============================================================
 // HELPERS — Control de acceso por rol
@@ -584,6 +585,20 @@ exports.crearReunion = async (req, res) => {
             const data = result2[0];
             const attachments = archivos.map(file => ({ filename: file.originalname, path: file.path }));
 
+            // Validación server-side: resolver el nombre real del usuario logueado para firma
+            let enviadoPorReal = data.enviado_por;
+            const enviadoPorIdBody = req.body.enviado_por_id || req.usuario?.id;
+            if (enviadoPorIdBody) {
+                try {
+                    const [userRows] = await db.query("SELECT nombre FROM usuarios WHERE id = ? LIMIT 1", [enviadoPorIdBody]);
+                    if (userRows.length > 0) {
+                        enviadoPorReal = userRows[0].nombre;
+                    }
+                } catch (e) {
+                    console.error("Error resolviendo nombre de usuario para firma:", e.message);
+                }
+            }
+
             try {
                 const enviado_por_correo = req.body.enviado_por_correo;
                 const enviado_por_id = req.body.enviado_por_id;
@@ -625,7 +640,7 @@ exports.crearReunion = async (req, res) => {
                             lugar: data.lugar,
                             motivo_reu: data.motivo_reu,
                             minuta: data.minuta,
-                            enviado_por: data.enviado_por,
+                            enviado_por: enviadoPorReal,
                             documentos_adjuntos: data.documentos_adjuntos,
                             texto_previo: data.texto_previo,
                             link_video: data.link_video
@@ -635,6 +650,30 @@ exports.crearReunion = async (req, res) => {
                         console.error("Error enviando correo:", error);
                     });
                 }
+
+                // Registrar en audit log
+                registrarAudit({
+                    accion: isSoloGuardar ? 'minuta_guardada' : (isDraft ? 'minuta_borrador' : (isUpdate ? 'minuta_actualizada' : 'minuta_enviada')),
+                    entidad: 'minuta',
+                    entidad_id: final_id_minuta,
+                    usuario_id: req.usuario?.id || parseInt(enviado_por_id),
+                    usuario_nombre: enviadoPorReal || req.usuario?.nombre,
+                    ejecutiva_id: parseInt(ejecutiva_id),
+                    ejecutiva_nombre: data.ejecutiva_nombre,
+                    empresa_id: empresa_id ? parseInt(empresa_id) : null,
+                    empresa_nombre: data.empresa_nombre || null,
+                    detalles: {
+                        enviado_por_formulario: data.enviado_por,
+                        enviado_por_resuelto: enviadoPorReal,
+                        firma_usada: enviadoPorReal || data.ejecutiva_nombre,
+                        destinatarios: correoToFinal,
+                        cc: correosCcFinal,
+                        tipo_reu: data.tipo_reu,
+                        estado: estado_final_minuta,
+                        solo_guardar: isSoloGuardar
+                    },
+                    ip_address: req.ip || req.connection?.remoteAddress
+                });
             } catch (error) {
                 console.error("Error al preparar envío de correo:", error);
             }
@@ -783,6 +822,17 @@ exports.marcarNoAplica = async (req, res) => {
                 }
             }
 
+            // Audit log
+            registrarAudit({
+                accion: noAplica ? 'minuta_no_aplica' : 'minuta_revertida',
+                entidad: 'minuta',
+                entidad_id: id,
+                usuario_id: req.usuario?.id,
+                usuario_nombre: req.usuario?.nombre,
+                detalles: { noAplica, teams_evento_id: minutaRows[0].teams_evento_id },
+                ip_address: req.ip || req.connection?.remoteAddress
+            });
+
             return res.json({ success: true, message: "Estado de minuta actualizado" });
         }
 
@@ -815,6 +865,18 @@ exports.marcarNoAplica = async (req, res) => {
                             [teRow.empresa_id, teRow.fecha, req.usuario.id, teRow.event_id, teRow.asunto || 'Reunión No Aplica']
                         );
                     }
+
+                    // Audit log
+                    registrarAudit({
+                        accion: 'reunion_no_aplica',
+                        entidad: 'reunion',
+                        entidad_id: String(teId),
+                        usuario_id: req.usuario?.id,
+                        usuario_nombre: req.usuario?.nombre,
+                        empresa_id: teRow.empresa_id,
+                        detalles: { asunto: teRow.asunto, event_id: teRow.event_id },
+                        ip_address: req.ip || req.connection?.remoteAddress
+                    });
                 }
             } else {
                 // Si por alguna razón se intentaba revertir un evento puro

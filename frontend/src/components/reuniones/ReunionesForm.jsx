@@ -41,6 +41,7 @@ function ReunionesForm({ onSuccess }) {
     }
     
     if ((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia" && user.permisos !== "jefatura") && !user.nombre?.toLowerCase().includes("lilian")) {
+      // Ejecutiva: su propia ID como ejecutiva, y su jefatura
       if (!form.jefatura_id) {
         setField("jefatura_id", user.jefatura_id || user.id);
       }
@@ -50,7 +51,15 @@ function ReunionesForm({ onSuccess }) {
       if (!form.enviado_por) {
         setField("enviado_por", user.nombre);
       }
-    } else if ((user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") && !form.enviado_por) {
+    } else if (user.permisos === "jefatura") {
+      // Jefatura: ella misma es la ejecutiva de sus minutas
+      if (!form.ejecutiva_id) {
+        setField("ejecutiva_id", user.id);
+      }
+      if (!form.enviado_por) {
+        setField("enviado_por", user.nombre);
+      }
+    } else if ((user.permisos === "admin" || user.permisos === "gerencia") && !form.enviado_por) {
       setField("enviado_por", user.nombre);
     }
   }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo]);
@@ -59,8 +68,12 @@ function ReunionesForm({ onSuccess }) {
   useEffect(() => {
     setIsCcEditable(false);
     setField("correos_cc", "");
-    if (user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") {
+    if (user.permisos === "admin" || user.permisos === "gerencia") {
       setField("ejecutiva_id", "");
+      setField("jefatura_id", "");
+    } else if (user.permisos === "jefatura") {
+      // Jefatura mantiene su propio ID como ejecutiva al cambiar de empresa
+      setField("ejecutiva_id", user.id);
       setField("jefatura_id", "");
     }
   }, [form.empresa_id]);
@@ -68,12 +81,17 @@ function ReunionesForm({ onSuccess }) {
   // Auto-asignar jefatura y ejecutiva cuando se cargan los usuarios de la empresa
   useEffect(() => {
     if (form.empresa_id && ejecutivas.length > 0 && user.permisos !== "admin") {
-      // Find default roles from the fetched team
-      const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
       const jefa = ejecutivas.find(u => u.permisos === 'jefatura');
-      
-      if (ejec) setField("ejecutiva_id", ejec.id);
       if (jefa) setField("jefatura_id", jefa.id);
+
+      // Para jefatura: ella misma es siempre la ejecutiva de sus minutas
+      // Para gerencia: auto-asignar la primera ejecutiva del equipo de la empresa
+      if (user.permisos === "jefatura") {
+        setField("ejecutiva_id", user.id);
+      } else {
+        const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
+        if (ejec) setField("ejecutiva_id", ejec.id);
+      }
     }
   }, [ejecutivas, form.empresa_id, user.permisos]);
 

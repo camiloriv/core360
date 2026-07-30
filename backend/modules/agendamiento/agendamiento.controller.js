@@ -567,8 +567,8 @@ const syncEventosPasados = async (req, res) => {
                 const organizerName = event.organizer?.emailAddress?.name || '';
                 const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
-                // Extraer preview del cuerpo
-                const bodyPreview = event.bodyPreview || '';
+                // Extraer preview del cuerpo (usamos body.content para no perder los enlaces de grabación)
+                const bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
 
                 if (emails.length === 0) {
                     // Sin asistentes → ignorar

@@ -994,6 +994,9 @@ const desvincularEmpresaDeEvento = async (req, res) => {
         // Si hay una minuta borrador vinculada, eliminarla
         await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [evento.id]);
 
+        // Limpiar el historial fantasma de la línea de tiempo
+        await db.query("DELETE FROM empresa_seguimiento_log WHERE reunion_id = ? AND empresa_id = ?", [evento.event_id, empresa_id]);
+
         // Quitar empresa del evento
         await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [evento.id]);
 

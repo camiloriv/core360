@@ -15,6 +15,7 @@ router.post("/", controller.crearEmpresa);
 router.put("/:id", controller.actualizarEmpresa);
 router.delete("/:id", controller.eliminarEmpresa);
 router.patch("/:id/estado", controller.actualizarEstadoEmpresa);
+router.delete("/seguimiento-logs/:id", controller.eliminarSeguimientoLog);
 router.post("/traspaso-masivo", controller.traspasoMasivo);
 router.post("/carga-masiva", controller.cargaMasivaEmpresas);
 router.post("/traspaso-excel", controller.traspasoExcel);

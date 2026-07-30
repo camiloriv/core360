@@ -160,6 +160,17 @@ exports.actualizarEstadoEmpresa = async (req, res) => {
   }
 };
 
+exports.eliminarSeguimientoLog = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query("DELETE FROM empresa_seguimiento_log WHERE id = ?", [id]);
+    res.json({ msg: "Log de seguimiento eliminado" });
+  } catch (err) {
+    console.error("Error eliminando log de seguimiento:", err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
 // Obtener historial de seguimiento de una empresa
 exports.obtenerHistorialSeguimiento = async (req, res) => {
   const { id } = req.params;

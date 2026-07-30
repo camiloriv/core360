@@ -567,6 +567,7 @@ export default function SeguimientoEmpresas() {
         dateEnvioMinuta,
         reschedules: uniqueReschedules,
         cancellations: uniqueCancellations,
+        logIds: allLogs.map((l) => l.id).join(","),
         sortDate,
         minuta,
         reunionId,
@@ -642,13 +643,22 @@ export default function SeguimientoEmpresas() {
                   const textBadge = textBadgeMap[item.estado] || "#475569";
                   const statusText = statusTextMap[item.estado] || item.estado;
                   const hasMinuta = (item.estado === 'enviado' || item.estado === 'gestionada') && item.minuta;
-                  const minutaAttr = hasMinuta ? `data-minuta-id="${item.reunionId}"` : '';
                   const respText = item.ejecutiva ? `👤 ${item.ejecutiva}` : "";
 
                   return `
                     <tr style="border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                      <td style="padding: 10px; word-break: break-word;">
-                        <div style="font-weight: 700; color: #1e293b; margin-bottom: 6px; font-size: 12px; line-height: 1.2;">${item.asunto}</div>
+                      <td style="padding: 10px; word-break: break-word; position: relative;">
+                        <button
+                          data-delete-reunion-id="${item.reunionId || ''}"
+                          data-delete-log-ids="${item.logIds || ''}"
+                          style="position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: #ef4444; font-size: 14px; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;"
+                          onmouseover="this.style.background='#fee2e2'"
+                          onmouseout="this.style.background='transparent'"
+                          title="Eliminar este evento"
+                        >
+                          🗑️
+                        </button>
+                        <div style="font-weight: 700; color: #1e293b; margin-bottom: 6px; font-size: 12px; line-height: 1.2; padding-right: 24px;">${item.asunto}</div>
                         <div style="margin-bottom: 4px;">
                           ${hasMinuta
                             ? `<span
@@ -766,18 +776,28 @@ export default function SeguimientoEmpresas() {
 
     const carnetHtml = `
       <div style="background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 8px; flex-shrink: 0;">
-        <div style="background: ${gradient}; padding: 10px 16px; color: white; display: flex; align-items: center; gap: 12px; text-align: left;">
-          <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: white; flex-shrink: 0;">
-            ${initial}
+        <div style="background: ${gradient}; padding: 10px 16px; color: white; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: white; flex-shrink: 0;">
+              ${initial}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.75); display: block;">
+                Ficha de Empresa
+              </span>
+              <h3 style="margin: 1px 0 0 0; font-size: 15px; font-weight: 800; color: white; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${emp.nombre}
+              </h3>
+            </div>
           </div>
-          <div style="flex: 1; min-width: 0;">
-            <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.75); display: block;">
-              Ficha de Empresa
-            </span>
-            <h3 style="margin: 1px 0 0 0; font-size: 15px; font-weight: 800; color: white; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${emp.nombre}
-            </h3>
-          </div>
+          <button
+            onclick="window.__core360_addManualLog(${emp.id})"
+            style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;"
+            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.2)'"
+          >
+            + Registro Manual
+          </button>
         </div>
       </div>
     `;
@@ -815,6 +835,79 @@ export default function SeguimientoEmpresas() {
       });
     };
 
+    window.__core360_deleteLog = async (reunionId, logIds) => {
+      try {
+        const isTeams = !!reunionId;
+        const result = await Swal.fire({
+          title: '¿Eliminar Evento?',
+          text: isTeams 
+            ? "Se desvinculará esta reunión y sus registros se borrarán del historial."
+            : "Este registro manual se eliminará permanentemente.",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#ef4444',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'Sí, eliminar',
+          cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+          if (isTeams) {
+            await api.post(`/agendamiento/teams-eventos/${reunionId}/desvincular`, { dominios: [] });
+          } else {
+            const ids = logIds.split(',').filter(id => id);
+            for (const id of ids) {
+              await api.delete(`/empresas/seguimiento-logs/${id}`);
+            }
+          }
+          Swal.close();
+          fetchEmpresas(); // Refrescar los datos para actualizar la vista
+          Swal.fire('Eliminado', 'El evento fue eliminado exitosamente.', 'success');
+        }
+      } catch (error) {
+        console.error('Error eliminando evento:', error);
+        Swal.fire('Error', 'No se pudo eliminar el evento.', 'error');
+      }
+    };
+
+    window.__core360_addManualLog = async (empresaId) => {
+      Swal.close(); // Cerramos el modal actual para mostrar el de formulario
+      
+      const { value: formValues } = await Swal.fire({
+        title: 'Registrar Evento Manual',
+        html: `
+          <select id="swal-manual-state" class="swal2-select" style="width: 80%; font-size: 14px; margin-bottom: 10px;">
+            <option value="solicitada">Solicitud de Reunión</option>
+            <option value="agendada">Reunión Agendada</option>
+            <option value="pendiente">Volver a Pendiente</option>
+          </select>
+          <input type="date" id="swal-manual-date" class="swal2-input" style="width: 80%; font-size: 14px;" value="${new Date().toISOString().split('T')[0]}" />
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+          return {
+            estado_seguimiento: document.getElementById('swal-manual-state').value,
+            fecha: document.getElementById('swal-manual-date').value,
+            usuario_id: user.id
+          };
+        }
+      });
+
+      if (formValues) {
+        try {
+          await api.patch(`/empresas/${empresaId}/estado`, formValues);
+          fetchEmpresas();
+          Swal.fire('Guardado', 'El registro manual fue ingresado con éxito.', 'success');
+        } catch (error) {
+          console.error("Error guardando estado manual:", error);
+          Swal.fire('Error', 'No se pudo guardar el registro.', 'error');
+        }
+      }
+    };
+
     Swal.fire({
       html: modalHtml,
       showConfirmButton: true,
@@ -833,9 +926,21 @@ export default function SeguimientoEmpresas() {
             window.__core360_viewMinuta(el.getAttribute('data-minuta-id'));
           });
         });
+
+        // Adjuntar listeners a los botones de eliminar
+        popup.querySelectorAll('[data-delete-log-ids]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            window.__core360_deleteLog(
+              btn.getAttribute('data-delete-reunion-id'),
+              btn.getAttribute('data-delete-log-ids')
+            );
+          });
+        });
       },
       didClose: () => {
         delete window.__core360_viewMinuta;
+        delete window.__core360_deleteLog;
+        delete window.__core360_addManualLog;
       }
     });
   };

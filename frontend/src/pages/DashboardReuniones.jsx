@@ -308,8 +308,6 @@ export default function DashboardReuniones() {
             setShowEmpresaDropdown(false);
             setIsAssignModalOpen(true);
           });
-        } else if (reunion._isProforma) {
-          createBtn('🔍 Ver Detalle', '#e2e8f0', '#1e293b', () => handleVerDetalleProforma(reunion));
         } else if (reunion._isExcluida || reunion.estado_envio === "no_aplica") {
           createBtn('Revertir No Aplica', '#eff6ff', '#3b82f6', () => {
             const isTeOnly = !reunion.minuta_row_id;
@@ -1844,22 +1842,6 @@ export default function DashboardReuniones() {
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span style={{ color: "var(--text-muted)" }}>-</span>
                             </div>
-                          ) : r._isProforma ? (
-                            <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
-                              <div
-                                onClick={() => handleVerDetalleProforma(r)}
-                                style={{
-                                  color: "#1e293b", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                  background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#cbd5e1")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#e2e8f0")}
-                                title="Ver Detalle de Reunión Interna"
-                              >
-                                🔍 Ver Detalle
-                              </div>
-                            </div>
                           ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span
@@ -2224,16 +2206,6 @@ export default function DashboardReuniones() {
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                                 {r.estado_envio === "huerfana" ? (
                                   <span style={{ color: '#64748b' }}>Sin acciones disponibles (Reunión Huérfana)</span>
-                                ) : r._isProforma ? (
-                                  <div
-                                    onClick={() => handleVerDetalleProforma(r)}
-                                    style={{
-                                      color: "#1e293b", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
-                                      background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px"
-                                    }}
-                                  >
-                                    🔍 Ver Detalle
-                                  </div>
                                 ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                                   <span
                                     onClick={() => { 

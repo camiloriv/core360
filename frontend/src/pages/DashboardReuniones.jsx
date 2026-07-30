@@ -321,6 +321,7 @@ export default function DashboardReuniones() {
             const isTeOnly = !reunion.minuta_row_id;
             handleMarcarNoAplica(reunion.id_reunion, isTeOnly, false);
           });
+          createBtn('Desvincular', '#ffe4e6', '#be123c', () => handleDesvincular(reunion));
         } else if (reunion.estado_envio === "enviado" || reunion.estado_envio === "programado") {
           createBtn('🔍 Ver Minuta', '#f1f5f9', 'var(--secondary-color)', () => handleVerMinuta(reunion));
           createBtn('Desvincular', '#ffe4e6', '#be123c', () => handleDesvincular(reunion));
@@ -2236,6 +2237,17 @@ export default function DashboardReuniones() {
                                         ❌
                                       </button>
                                     )}
+                                    <div
+                                      onClick={() => handleDesvincular(r)}
+                                      style={{
+                                        color: "#be123c", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
+                                        background: "#ffe4e6", padding: "4px 6px", borderRadius: "4px",
+                                        display: "flex", alignItems: "center", justifyContent: "center"
+                                      }}
+                                      title="Desvincular reunión"
+                                    >
+                                      Desvincular
+                                    </div>
                                   </div>
                                 ) : r.estado_envio === "enviado" || r.estado_envio === "programado" ? (
                                   <div style={{ display: "flex", gap: "8px" }}>

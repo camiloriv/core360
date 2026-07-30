@@ -618,13 +618,16 @@ const syncEventosPasados = async (req, res) => {
                     }
                 }
 
-                // Si todos los asistentes y el organizador son internos (proforma.cl o oticproforma.cl), es una reunión Proforma Interna
                 const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
                 const allEmailsForProformaCheck = [...emails];
                 if (organizerEmail) allEmailsForProformaCheck.push(organizerEmail);
 
+                // Obtener todos los correos del sistema
+                const [systemUsers] = await db.query("SELECT correo FROM usuarios WHERE correo IS NOT NULL AND estado = 'activo'");
+                const systemEmails = new Set(systemUsers.map(u => u.correo.toLowerCase().trim()));
+
                 const isPurelyProforma = allEmailsForProformaCheck.length > 0 && allEmailsForProformaCheck.every(email => 
-                    PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d))
+                    PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d)) || systemEmails.has(email.toLowerCase())
                 );
 
                 if (isPurelyProforma && proformaEmpId) {

@@ -31,7 +31,9 @@ export default function useSubmitReunion({ form, resetForm, onSuccess }) {
 
       const res = await crearReunion(formData);
 
-      resetForm();
+      if (!options.es_borrador && !options.solo_guardar) {
+        resetForm();
+      }
       onSuccess?.();
 
       return res;

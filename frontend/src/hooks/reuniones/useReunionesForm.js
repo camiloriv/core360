@@ -27,7 +27,10 @@ const initialState = {
   teams_evento_id: "",
   event_id: "",
   texto_previo: "",
-  link_video: ""
+  link_video: "",
+  es_retroactiva: false,
+  id_reunion: "",
+  archivos_nombres: []
 };
 
 export default function useReunionesForm() {

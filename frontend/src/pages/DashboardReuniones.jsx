@@ -1785,10 +1785,15 @@ export default function DashboardReuniones() {
                       <td style={styles.tdCell} data-label="TIPO / MOTIVO">
                         <div>
                           <div 
-                            style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "250px" }}
+                            style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "350px", display: "flex", alignItems: "center", gap: "6px" }}
                             title={r.asunto_teams || r.motivo_reu || 'Sin asunto'}
                           >
-                            {r.asunto_teams || r.motivo_reu || 'Sin asunto'}
+                            {r.es_retroactiva === 1 && (
+                              <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", flexShrink: 0 }} title="Minuta Retroactiva">
+                                📋 Retroactiva
+                              </span>
+                            )}
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.asunto_teams || r.motivo_reu || 'Sin asunto'}</span>
                           </div>
                           {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (r.asunto_teams && r.asunto_teams !== r.motivo_reu) && (
                             <div

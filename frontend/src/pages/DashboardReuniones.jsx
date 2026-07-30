@@ -1670,7 +1670,8 @@ export default function DashboardReuniones() {
                   <th style={{...styles.thCell, width: "13%"}}>AGENDA</th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA / ID</th>
                   <th style={{...styles.thCell, width: "20%"}}>EMPRESA</th>
-                  <th style={{...styles.thCell, width: "24%"}}>TIPO / MOTIVO</th>
+                  <th style={{...styles.thCell, width: "12%"}}>TIPO</th>
+                  <th style={{...styles.thCell, width: "12%"}}>MOTIVO</th>
                   <th style={{...styles.thCell, width: "17%", textAlign: "center"}}>MINUTA</th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA DE ENVÍO</th>
                   <th style={{...styles.thCell, width: "8%"}}>ADJUNTOS</th>
@@ -1780,17 +1781,20 @@ export default function DashboardReuniones() {
                           )}
                         </div>
                       </td>
-                      <td style={styles.tdCell} data-label="TIPO / MOTIVO">
+                      <td style={styles.tdCell} data-label="TIPO">
+                        <div 
+                          style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}
+                          title={r.tipo_reu || 'No asignado'}
+                        >
+                          {r.tipo_reu || 'No asignado'}
+                        </div>
+                      </td>
+                      <td style={styles.tdCell} data-label="MOTIVO">
                         <div>
                           <div 
                             style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "350px", display: "flex", alignItems: "center", gap: "6px" }}
                             title={r.asunto_teams || r.motivo_reu || 'Sin asunto'}
                           >
-                            {r.es_retroactiva === 1 && (
-                              <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "#f1f5f9", color: "#64748b", border: "1px solid #cbd5e1", flexShrink: 0 }} title="Minuta Retroactiva">
-                                📋 Retroactiva
-                              </span>
-                            )}
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.asunto_teams || r.motivo_reu || 'Sin asunto'}</span>
                           </div>
                           {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (r.asunto_teams && r.asunto_teams !== r.motivo_reu) && (
@@ -1803,24 +1807,9 @@ export default function DashboardReuniones() {
                                 textOverflow: "ellipsis",
                                 maxWidth: "250px",
                               }}
-                              title={`${r.tipo_reu || ''} - ${r.motivo_reu || ''}`}
+                              title={r.motivo_reu || ''}
                             >
-                              {r.tipo_reu ? `${r.tipo_reu} - ${r.motivo_reu}` : r.motivo_reu}
-                            </div>
-                          )}
-                          {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (!r.asunto_teams || r.asunto_teams === r.motivo_reu) && r.tipo_reu && (
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "var(--text-muted)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                maxWidth: "250px",
-                              }}
-                              title={r.tipo_reu}
-                            >
-                              {r.tipo_reu}
+                              {r.motivo_reu}
                             </div>
                           )}
                         </div>
@@ -1944,7 +1933,7 @@ export default function DashboardReuniones() {
                                 onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
                               >
-                                ✅ Minuta Enviada 📄
+                                {r.es_retroactiva === 1 ? "✅ Minuta Retroactiva 📋" : "✅ Minuta Enviada 📄"}
                               </div>
                               <span
                                 onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
@@ -2173,7 +2162,7 @@ export default function DashboardReuniones() {
                     </tr>
                     {isExpanded && (
                       <tr className="meeting-details-row mobile-only-row" onClick={(e) => e.stopPropagation()}>
-                        <td colSpan={7} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0' }}>
+                        <td colSpan={8} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '11px', textAlign: 'left' }}>
                             <div>
                               <strong>Ejecutivo Responsable:</strong> {rowOwner?.nombre || 'No asignado'} ({rowJefaturaName})

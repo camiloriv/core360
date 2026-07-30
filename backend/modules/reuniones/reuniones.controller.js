@@ -401,7 +401,7 @@ exports.crearReunion = async (req, res) => {
     const {
         ejecutiva_id, enviado_a, enviado_por, participantes,
         tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
-        motivo_reu, minuta, form_f, empresa_id,
+        motivo_reu, minuta, form_f, empresa_id: raw_empresa_id,
         programar_encuesta, encuesta_tipo, encuesta_programada_para, encuesta_destinatario,
         teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
         asunto_correo,    // Asunto personalizado para minutas sin empresa (excluidas/proforma)
@@ -421,6 +421,8 @@ exports.crearReunion = async (req, res) => {
     }
 
     // empresa_id puede ser null para reuniones excluidas o proforma sin empresa asignada
+    const empresa_id = (raw_empresa_id && raw_empresa_id !== "null" && raw_empresa_id !== "") ? parseInt(raw_empresa_id, 10) : null;
+
     if (!ejecutiva_id || !fecha_reu || !hora) {
         return res.status(400).json({ error: "Campos obligatorios faltantes" });
     }

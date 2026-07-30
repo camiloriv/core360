@@ -176,6 +176,25 @@ export default function SeguimientoEmpresas() {
     }
   };
 
+  const formatearFechaHora = (fechaStr) => {
+    if (!fechaStr) return "";
+    try {
+      const d = new Date(fechaStr);
+      if (isNaN(d.getTime())) return formatearFecha(fechaStr);
+      const formatter = new Intl.DateTimeFormat("es-CL", {
+        timeZone: "America/Santiago",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      return formatter.format(d).replace(/-/g, "/");
+    } catch {
+      return formatearFecha(fechaStr);
+    }
+  };
+
   const empresasPorJefatura = useMemo(() => {
     return empresas.filter((emp) => {
       const pasaJefatura =
@@ -472,16 +491,19 @@ export default function SeguimientoEmpresas() {
             reschedules.push({
               fecha_cambio: log.created_at || log.fecha,
               fecha_nueva: log.fecha,
+              asunto: log.asunto,
             });
           }
         } else if (log.estado === "reagendada") {
           reschedules.push({
             fecha_cambio: log.created_at || log.fecha,
             fecha_nueva: log.fecha,
+            asunto: log.asunto,
           });
         } else if (log.estado === "cancelada") {
           cancellations.push({
             fecha_cambio: log.created_at || log.fecha,
+            asunto: log.asunto,
           });
         } else if (log.estado === "gestionada" || log.estado === "concretada") {
           dateRealizacion = log.fecha;
@@ -659,27 +681,44 @@ export default function SeguimientoEmpresas() {
                               <span style="color: #3b82f6; font-size: 12px; line-height: 1; margin-top: 2px;">●</span>
                               <span>
                                 <strong>Agendada:</strong> ${formatearFecha(item.dateAgendadaTarget)}
-                                ${item.dateAgendadaAction ? `<br/><span style="font-size: 9px; color: #94a3b8;">(creada: ${formatearFecha(item.dateAgendadaAction)})</span>` : ""}
+                                ${item.dateAgendadaAction ? `<br/><span style="font-size: 9px; color: #94a3b8;">(creada: ${formatearFechaHora(item.dateAgendadaAction)})</span>` : ""}
                               </span>
                             </div>
                           ` : ""}
                           
-                          ${item.reschedules.map(r => `
+                          ${item.reschedules.map(r => {
+                            let motivoResch = "";
+                            if (r.asunto && r.asunto.includes("Motivo: ")) {
+                              motivoResch = r.asunto.split("Motivo: ")[1];
+                            }
+                            return `
                             <div style="display: flex; align-items: flex-start; gap: 6px; color: #475569;">
                               <span style="color: #6366f1; font-size: 11px; line-height: 1; margin-top: 2px;">↻</span>
                               <span>
                                 <strong>Reagendada:</strong> ${formatearFecha(r.fecha_nueva)}
-                                <br/><span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFecha(r.fecha_cambio)})</span>
+                                <br/><span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFechaHora(r.fecha_cambio)})</span>
+                                ${motivoResch ? `<br/><span style="font-size: 10px; color: #64748b; font-style: italic;">Motivo: ${motivoResch}</span>` : ""}
                               </span>
                             </div>
-                          `).join("")}
+                            `;
+                          }).join("")}
                           
-                          ${item.cancellations.map(c => `
-                            <div style="display: flex; align-items: center; gap: 6px; color: #ef4444;">
-                              <span style="font-size: 11px; line-height: 1;">✕</span>
-                              <span><strong>Cancelada</strong> <span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFecha(c.fecha_cambio)})</span></span>
+                          ${item.cancellations.map(c => {
+                            let motivoCanc = "";
+                            if (c.asunto && c.asunto.includes("Motivo: ")) {
+                              motivoCanc = c.asunto.split("Motivo: ")[1];
+                            }
+                            return `
+                            <div style="display: flex; align-items: flex-start; gap: 6px; color: #ef4444;">
+                              <span style="font-size: 11px; line-height: 1; margin-top: 2px;">✕</span>
+                              <span>
+                                <strong>Cancelada</strong>
+                                <br/><span style="font-size: 9px; color: #94a3b8;">(el: ${formatearFechaHora(c.fecha_cambio)})</span>
+                                ${motivoCanc ? `<br/><span style="font-size: 10px; color: #64748b; font-style: italic; color: #dc2626;">Motivo: ${motivoCanc}</span>` : ""}
+                              </span>
                             </div>
-                          `).join("")}
+                            `;
+                          }).join("")}
                           
                           ${item.dateRealizacion ? `
                             <div style="display: flex; align-items: center; gap: 6px; color: #475569;">

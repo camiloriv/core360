@@ -257,11 +257,15 @@ const anularReunionTeams = async (req, res) => {
             );
         }
 
-        // Determinar empresa_id desde teams_eventos si no vino en body
+        // Determinar empresa_id y fecha desde teams_eventos si no vino en body
         let empId = empresa_id;
-        if (!empId && teEvt.length > 0) {
-            const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
-            if (teData.length > 0) empId = teData[0].empresa_id;
+        let eventFecha = null;
+        if (teEvt.length > 0) {
+            const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
+            if (teData.length > 0) {
+                if (!empId) empId = teData[0].empresa_id;
+                eventFecha = teData[0].fecha;
+            }
         }
 
         if (empId) {
@@ -276,7 +280,10 @@ const anularReunionTeams = async (req, res) => {
                 asuntoCancelacion += ` - Motivo: ${motivo.trim()}`;
             }
 
-            const fechaVal = new Date().toISOString().split('T')[0];
+            // Usar la fecha original del evento si está disponible, sino la actual
+            const fechaVal = eventFecha 
+                ? new Date(eventFecha).toISOString().split('T')[0] 
+                : new Date().toISOString().split('T')[0];
 
             await db.query(
                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
@@ -302,13 +309,14 @@ const marcarReagendada = async (req, res) => {
             return res.status(400).json({ error: "Faltan parámetros." });
         }
 
-        // Determinar empresa_id desde teams_eventos
-        const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
+        // Determinar empresa_id y fecha desde teams_eventos
+        const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
         if (teData.length === 0 || !teData[0].empresa_id) {
             return res.status(400).json({ error: "No se puede registrar motivo en una reunión sin empresa vinculada." });
         }
         
         const empId = teData[0].empresa_id;
+        const eventFecha = teData[0].fecha;
 
         const [prevLog] = await db.query(
             "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
@@ -321,7 +329,10 @@ const marcarReagendada = async (req, res) => {
             asuntoReagendada += ` - Motivo: ${motivo.trim()}`;
         }
 
-        const fechaVal = new Date().toISOString().split('T')[0];
+        // Usar la fecha original del evento si está disponible, sino la actual
+        const fechaVal = eventFecha 
+            ? new Date(eventFecha).toISOString().split('T')[0] 
+            : new Date().toISOString().split('T')[0];
 
         await db.query(
             "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",

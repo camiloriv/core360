@@ -33,8 +33,9 @@ const buildRoleWhereClause = (usuario_id, rol) => {
         whereClause += ` AND (
             te.usuario_id = ?
             OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?)
+            OR te.usuario_id = (SELECT jefatura_id FROM usuarios WHERE id = ?)
         )`;
-        params.push(usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id);
     }
 
     return { whereClause, params };

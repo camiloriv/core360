@@ -40,7 +40,7 @@ function buildPeriodoOptions() {
 }
 
 export default function SeguimientoEmpresas() {
-  const { user, jefaturas, empresas, reuniones, loading: dataLoading } = useDashboardData();
+  const { user, jefaturas, empresas, reuniones, loading: dataLoading, refetch } = useDashboardData();
   const userRol = user?.permisos;
 
   const [seguimientoLogs, setSeguimientoLogs] = useState([]);
@@ -861,7 +861,8 @@ export default function SeguimientoEmpresas() {
             }
           }
           Swal.close();
-          fetchEmpresas(); // Refrescar los datos para actualizar la vista
+          refetch();
+          cargarLogs(); // Refrescar los datos para actualizar la vista
           Swal.fire('Eliminado', 'El evento fue eliminado exitosamente.', 'success');
         }
       } catch (error) {
@@ -899,7 +900,8 @@ export default function SeguimientoEmpresas() {
       if (formValues) {
         try {
           await api.patch(`/empresas/${empresaId}/estado`, formValues);
-          fetchEmpresas();
+          refetch();
+          cargarLogs();
           Swal.fire('Guardado', 'El registro manual fue ingresado con éxito.', 'success');
         } catch (error) {
           console.error("Error guardando estado manual:", error);

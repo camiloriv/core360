@@ -793,9 +793,9 @@ const getTeamsEventos = async (req, res) => {
         let params = [usuarioId];
 
         if (rol === 'ejecutiva') {
-            // Solo sus propios eventos o donde es invitado
-            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?))";
-            params.push(usuarioId);
+            // Solo sus propios eventos, donde es invitado, o de su jefatura
+            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?) OR te.usuario_id = (SELECT jefatura_id FROM usuarios WHERE id = ?))";
+            params.push(usuarioId, usuarioId);
         } else if (rol === 'jefatura') {
             whereExtra = `AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?))`;
             params.push(usuarioId);

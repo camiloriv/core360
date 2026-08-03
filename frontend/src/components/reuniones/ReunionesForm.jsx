@@ -130,6 +130,7 @@ function ReunionesForm({ onSuccess }) {
     setField("tipo_reu", draft.tipo_reu || ""); 
     setField("motivo_reu", draft.motivo_reu || draft.asunto_teams || "");
     setField("minuta", draft.minuta || "");
+    setField("documentos_adjuntos", draft.documentos_adjuntos || "");
     setField("form_f", draft.form_f || "");
     setField("participantes", draft.participantes || "");
     

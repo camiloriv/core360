@@ -702,7 +702,16 @@ function ReunionesForm({ onSuccess }) {
 
 
           <MinutaEditor form={form} setForm={setField} />
-          <FileUpload archivos={form.archivos} setFiles={setFiles} archivosPrevios={form.archivos_nombres} />
+              <FileUpload
+                archivos={form.archivos}
+                setFiles={(files) => setField("archivos", files)}
+                archivosPrevios={form.archivos_nombres || []}
+                onRemovePrevio={(index) => {
+                  const newArchivosPrevios = [...(form.archivos_nombres || [])];
+                  newArchivosPrevios.splice(index, 1);
+                  setField("archivos_nombres", newArchivosPrevios);
+                }}
+              />
 
           <FormSection label="DOCUMENTOS ADJUNTOS" full>
             <input

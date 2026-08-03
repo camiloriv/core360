@@ -3,6 +3,8 @@ const db = require("../../database/connection");
 const { enviarCorreo, enviarCorreoEncuesta } = require("../email/email.service");
 const encuestaService = require("../../modules/encuestas/encuestas.service");
 const agendamientoController = require("../../modules/agendamiento/agendamiento.controller");
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================
 // SCHEDULER DE ENCUESTAS: cada 1 minuto
@@ -141,6 +143,38 @@ const runDailySync = async () => {
 };
 
 // ============================================================
+// LIMPIEZA DE UPLOADS: todos los días a las 4:00 AM
+// Elimina archivos mayores a 7 días en la carpeta uploads
+// ============================================================
+const cleanOldUploads = () => {
+    console.log("🧹 Iniciando limpieza de archivos temporales (uploads) > 7 días...");
+    try {
+        const uploadsDir = path.resolve(__dirname, "../../uploads");
+        if (!fs.existsSync(uploadsDir)) return;
+
+        const files = fs.readdirSync(uploadsDir);
+        const now = Date.now();
+        const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 días en ms
+        let deletedCount = 0;
+
+        files.forEach(file => {
+            if (file === '.gitkeep') return;
+            const filePath = path.join(uploadsDir, file);
+            const stats = fs.statSync(filePath);
+            
+            if (now - stats.mtimeMs > maxAge) {
+                fs.unlinkSync(filePath);
+                deletedCount++;
+            }
+        });
+
+        console.log(`✅ Limpieza completada. Se eliminaron ${deletedCount} archivos temporales.`);
+    } catch (error) {
+        console.error("❌ Error en cleanOldUploads:", error);
+    }
+};
+
+// ============================================================
 // INICIAR SCHEDULERS
 // ============================================================
 const startScheduler = () => {
@@ -154,9 +188,15 @@ const startScheduler = () => {
         runDailySync();
     }, { timezone: 'America/Santiago' });
 
-    console.log("🚀 Schedulers iniciados:");
-    console.log("   • Encuestas programadas: cada minuto");
-    console.log("   • Sync Teams → teams_eventos: diariamente a las 3:00 AM (America/Santiago)");
+    // 3. Limpieza de archivos temporales: todos los días a las 4:00 AM
+    cron.schedule('0 4 * * *', () => {
+        cleanOldUploads();
+    }, { timezone: 'America/Santiago' });
+
+    console.log("⏰ Schedulers iniciados:");
+    console.log("   👉 Encuestas programadas: cada minuto");
+    console.log("   👉 Sync Teams → teams_eventos: diariamente a las 3:00 AM (America/Santiago)");
+    console.log("   🧹 Limpieza de uploads > 7 días: diariamente a las 4:00 AM (America/Santiago)");
 };
 
 module.exports = { startScheduler, runDailySync };

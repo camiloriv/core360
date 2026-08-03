@@ -618,7 +618,15 @@ exports.crearReunion = async (req, res) => {
 
         if (result2.length > 0) {
             const data = result2[0];
-            const attachments = archivos.map(file => ({ filename: file.originalname, path: file.path }));
+            const attachments = archivos.map(file => {
+                let decodedName = file.originalname;
+                try {
+                    decodedName = Buffer.from(file.originalname, "latin1").toString("utf8");
+                } catch (e) {
+                    console.error("Error decodificando nombre de adjunto:", e);
+                }
+                return { filename: decodedName, path: file.path };
+            });
 
             // Validación server-side: resolver el nombre real del usuario logueado para firma
             let enviadoPorReal = data.enviado_por;

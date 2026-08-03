@@ -293,7 +293,7 @@ function ReunionesForm({ onSuccess }) {
 
   const isDirectRegistrarRoute = location.pathname === "/registrar-reunion";
 
-  if (!isDirectRegistrarRoute && !forceShowForm && (!location.state || !location.state.draft)) {
+  if (!isDirectRegistrarRoute && !forceShowForm && !id_reunion && (!location.state || !location.state.draft)) {
     return (
       <div 
         className="container" 

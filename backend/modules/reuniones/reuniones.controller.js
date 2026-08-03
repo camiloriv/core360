@@ -660,8 +660,8 @@ exports.crearReunion = async (req, res) => {
                         ? `Minuta de reunión ${data.tipo_reu} - ${data.empresa_nombre} - ${data.id_minuta}`
                         : `${data.motivo_reu || 'Minuta de Reunión'} - ${data.id_minuta}`);
 
-                // Si es borrador, enviar solo a la ejecutiva, quitar los CC y agregar [BORRADOR] al asunto
-                const correoToFinal = isDraft ? (data.ejecutiva_correo || req.usuario?.correo || '') : data.enviado_a;
+                // Si es borrador, enviar siempre a la persona que realiza la acción, y si no hay sesión, a la ejecutiva. Quitar los CC y agregar [BORRADOR] al asunto.
+                const correoToFinal = isDraft ? (req.usuario?.correo || data.ejecutiva_correo || '') : data.enviado_a;
                 const correosCcFinal = isDraft ? '' : correosCc;
                 const asuntoCorreoFinal = isDraft ? `[BORRADOR] ${asuntoCorreo}` : asuntoCorreo;
 

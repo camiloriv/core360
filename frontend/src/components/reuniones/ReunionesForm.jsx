@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import useSubmitReunion from "../../hooks/reuniones/useSubmitReunion";
+import { clearDashboardCache } from "../../hooks/useDashboardData";
 import { getDefaultCc, getReunionPorId } from "../../services/reunionesService";
 
 import FormSection from "../form/core/FormSection";
@@ -284,6 +285,8 @@ function ReunionesForm({ onSuccess }) {
         } catch (e) {}
       }
       setField("archivos", []);
+
+      clearDashboardCache();
 
       Swal.fire({
         icon: "success",

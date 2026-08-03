@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import useReunionesForm from "../../hooks/reuniones/useReunionesForm";
 import useReunionesData from "../../hooks/reuniones/useReunionesData";
 import useSubmitReunion from "../../hooks/reuniones/useSubmitReunion";
+import { clearDashboardCache } from "../../hooks/useDashboardData";
 import { getDefaultCc, getReunionPorId } from "../../services/reunionesService";
 
 import FormSection from "../form/core/FormSection";
@@ -273,6 +274,20 @@ function ReunionesForm({ onSuccess }) {
       if (res.data?.id_reunion && !form.id_reunion?.toString().startsWith('REU-')) {
         setField("id_reunion", res.data.id_reunion);
       }
+      
+      // Actualizar archivos guardados para evitar duplicados en posteriores guardados de borrador
+      if (res.data?.archivos_nombres) {
+        try {
+          const parsed = JSON.parse(res.data.archivos_nombres);
+          if (Array.isArray(parsed)) {
+            setField("archivos_nombres", parsed);
+          }
+        } catch (e) {}
+      }
+      setField("archivos", []);
+
+      clearDashboardCache();
+
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",

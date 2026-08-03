@@ -640,13 +640,29 @@ exports.crearReunion = async (req, res) => {
             if (hasRetainedFiles) {
                 const fs = require('fs');
                 const path = require('path');
+                const uploadsDir = path.join(__dirname, '../../uploads');
+                let allFiles = [];
+                if (fs.existsSync(uploadsDir)) {
+                    allFiles = fs.readdirSync(uploadsDir);
+                }
+
                 retainedOldFiles.forEach(oldFile => {
-                    const filePath = path.join(__dirname, '../../uploads', oldFile);
-                    if (fs.existsSync(filePath)) {
-                        // El nombre guardado es uniqueSuffix-nombreoriginal, 
-                        // extraemos el nombre original decodificado (después de 2 guiones)
-                        const parts = oldFile.split("-");
-                        const originalName = parts.slice(2).join("-") || oldFile;
+                    let filePath = path.join(uploadsDir, oldFile);
+                    let found = fs.existsSync(filePath);
+                    let actualFileName = oldFile;
+
+                    if (!found) {
+                        const match = allFiles.find(f => f.endsWith("-" + oldFile) || f === oldFile);
+                        if (match) {
+                            filePath = path.join(uploadsDir, match);
+                            found = true;
+                            actualFileName = match;
+                        }
+                    }
+
+                    if (found) {
+                        const parts = actualFileName.split("-");
+                        const originalName = parts.slice(2).join("-") || actualFileName;
                         attachments.push({
                             filename: originalName,
                             path: filePath
@@ -750,14 +766,11 @@ exports.crearReunion = async (req, res) => {
         }
 
         const isSoloGuardar = req.body.solo_guardar === 'true' || req.body.solo_guardar === true;
-        let responseMsg = "Minuta creada y enviada";
-        if (isRetroactiva) responseMsg = "Minuta retroactiva registrada correctamente (no se envió correo)";
-        else if (isSoloGuardar) responseMsg = "Borrador guardado sin enviar correo";
-        else if (isDraft) responseMsg = "Borrador guardado y enviado a su correo";
 
-        res.json({ 
-            msg: responseMsg,
-            id_reunion: final_id_minuta 
+        res.status(200).json({
+            message: isUpdate ? "Minuta actualizada exitosamente" : "Reunión creada exitosamente",
+            id_reunion: final_id_minuta,
+            archivos_nombres: final_archivos_nombres
         });
 
     } catch (error) {

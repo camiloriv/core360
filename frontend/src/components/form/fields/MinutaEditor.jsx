@@ -709,6 +709,12 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
       TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
     ],
     content: initialContent || "",
+    editorProps: {
+      attributes: {
+        spellcheck: 'true',
+        lang: 'es-CL',
+      }
+    }
   });
 
   const handleSave = () => {
@@ -790,6 +796,12 @@ function MinutaEditor({ form, setForm }) {
     ],
     content: form.minuta || "",
     onUpdate: ({ editor }) => { setForm("minuta", editor.getHTML()); },
+    editorProps: {
+      attributes: {
+        spellcheck: 'true',
+        lang: 'es-CL',
+      }
+    }
   });
 
   const isInitialMount = useRef(true);

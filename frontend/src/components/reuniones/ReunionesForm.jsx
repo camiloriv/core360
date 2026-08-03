@@ -273,6 +273,18 @@ function ReunionesForm({ onSuccess }) {
       if (res.data?.id_reunion && !form.id_reunion?.toString().startsWith('REU-')) {
         setField("id_reunion", res.data.id_reunion);
       }
+      
+      // Actualizar archivos guardados para evitar duplicados en posteriores guardados de borrador
+      if (res.data?.archivos_nombres) {
+        try {
+          const parsed = JSON.parse(res.data.archivos_nombres);
+          if (Array.isArray(parsed)) {
+            setField("archivos_nombres", parsed);
+          }
+        } catch (e) {}
+      }
+      setField("archivos", []);
+
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",

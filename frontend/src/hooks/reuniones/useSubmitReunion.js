@@ -14,6 +14,8 @@ export default function useSubmitReunion({ form, resetForm, onSuccess }) {
         if (key !== "archivos") {
           if (key === "tipo_reu" && form.tipo_reu === "Otros" && form.tipo_reu_detalle) {
             formData.append("tipo_reu", form.tipo_reu_detalle);
+          } else if (key === "archivos_nombres") {
+            formData.append(key, JSON.stringify(form[key]));
           } else if (key !== "tipo_reu_detalle") {
             formData.append(key, form[key]);
           }

@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import Swal from "sweetalert2";
 
-function FileUpload({ archivos = [], setFiles, archivosPrevios = [] }) {
+function FileUpload({ archivos = [], setFiles, archivosPrevios = [], onRemovePrevio }) {
   const inputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -115,6 +115,18 @@ function FileUpload({ archivos = [], setFiles, archivosPrevios = [] }) {
                     {filename.split('-').slice(2).join('-') || filename}
                   </span>
                 </div>
+                {onRemovePrevio && (
+                  <button
+                    type="button"
+                    className="btn-remove-file"
+                    onClick={() => onRemovePrevio(index)}
+                    title="Quitar archivo guardado"
+                  >
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
           </div>

@@ -452,20 +452,29 @@ exports.crearReunion = async (req, res) => {
         let final_id_minuta = null;
         let final_archivos_nombres = archivosNombres;
 
+        let retainedOldFiles = [];
+        let hasRetainedFiles = false;
+        if (req.body.archivos_nombres) {
+            try {
+                retainedOldFiles = JSON.parse(req.body.archivos_nombres);
+                if (!Array.isArray(retainedOldFiles)) retainedOldFiles = [];
+                hasRetainedFiles = true;
+            } catch (e) {}
+        }
+
         if (reqIdReunion && reqIdReunion.startsWith('REU-')) {
             const [existing] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE id_minuta = ?", [reqIdReunion]);
             if (existing.length > 0) {
                 isUpdate = true;
                 final_id_minuta = existing[0].id_minuta;
                 // Fusionar archivos antiguos con los nuevos si existen
-                if (existing[0].archivos_nombres) {
-                    try {
-                        const oldFiles = JSON.parse(existing[0].archivos_nombres);
-                        const newFiles = archivos.map(f => f.filename);
-                        final_archivos_nombres = JSON.stringify([...oldFiles, ...newFiles]);
-                    } catch (e) {
-                        console.error("Error parseando archivos antiguos", e);
-                    }
+                try {
+                    const dbOldFiles = existing[0].archivos_nombres ? JSON.parse(existing[0].archivos_nombres) : [];
+                    const oldFilesToKeep = hasRetainedFiles ? retainedOldFiles : dbOldFiles;
+                    const newFiles = archivos.map(f => f.filename);
+                    final_archivos_nombres = JSON.stringify([...oldFilesToKeep, ...newFiles]);
+                } catch (e) {
+                    console.error("Error parseando archivos antiguos", e);
                 }
             }
         }
@@ -476,14 +485,13 @@ exports.crearReunion = async (req, res) => {
             if (existingTe.length > 0) {
                 isUpdate = true;
                 final_id_minuta = existingTe[0].id_minuta;
-                if (existingTe[0].archivos_nombres) {
-                    try {
-                        const oldFiles = JSON.parse(existingTe[0].archivos_nombres);
-                        const newFiles = archivos.map(f => f.filename);
-                        final_archivos_nombres = JSON.stringify([...oldFiles, ...newFiles]);
-                    } catch (e) {
-                        console.error("Error parseando archivos antiguos", e);
-                    }
+                try {
+                    const dbOldFiles = existingTe[0].archivos_nombres ? JSON.parse(existingTe[0].archivos_nombres) : [];
+                    const oldFilesToKeep = hasRetainedFiles ? retainedOldFiles : dbOldFiles;
+                    const newFiles = archivos.map(f => f.filename);
+                    final_archivos_nombres = JSON.stringify([...oldFilesToKeep, ...newFiles]);
+                } catch (e) {
+                    console.error("Error parseando archivos antiguos", e);
                 }
             }
         }
@@ -627,6 +635,25 @@ exports.crearReunion = async (req, res) => {
                 }
                 return { filename: decodedName, path: file.path };
             });
+
+            // Adjuntar también los archivos previos que se mantuvieron
+            if (hasRetainedFiles) {
+                const fs = require('fs');
+                const path = require('path');
+                retainedOldFiles.forEach(oldFile => {
+                    const filePath = path.join(__dirname, '../../uploads', oldFile);
+                    if (fs.existsSync(filePath)) {
+                        // El nombre guardado es uniqueSuffix-nombreoriginal, 
+                        // extraemos el nombre original decodificado (después de 2 guiones)
+                        const parts = oldFile.split("-");
+                        const originalName = parts.slice(2).join("-") || oldFile;
+                        attachments.push({
+                            filename: originalName,
+                            path: filePath
+                        });
+                    }
+                });
+            }
 
             // Validación server-side: resolver el nombre real del usuario logueado para firma
             let enviadoPorReal = data.enviado_por;

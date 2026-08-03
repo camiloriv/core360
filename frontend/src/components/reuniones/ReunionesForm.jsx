@@ -269,6 +269,10 @@ function ReunionesForm({ onSuccess }) {
         es_borrador: isDraftSubmit || isSoloGuardar, 
         solo_guardar: isSoloGuardar 
       });
+
+      if (res.data?.id_reunion && !form.id_reunion?.toString().startsWith('REU-')) {
+        setField("id_reunion", res.data.id_reunion);
+      }
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",

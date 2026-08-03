@@ -470,6 +470,24 @@ exports.crearReunion = async (req, res) => {
             }
         }
 
+        // Si no se encontró por ID de minuta pero hay un ID de evento de Teams, verificar si ya existe minuta para ese evento
+        if (!isUpdate && teId) {
+            const [existingTe] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE teams_evento_id = ?", [teId]);
+            if (existingTe.length > 0) {
+                isUpdate = true;
+                final_id_minuta = existingTe[0].id_minuta;
+                if (existingTe[0].archivos_nombres) {
+                    try {
+                        const oldFiles = JSON.parse(existingTe[0].archivos_nombres);
+                        const newFiles = archivos.map(f => f.filename);
+                        final_archivos_nombres = JSON.stringify([...oldFiles, ...newFiles]);
+                    } catch (e) {
+                        console.error("Error parseando archivos antiguos", e);
+                    }
+                }
+            }
+        }
+
         if (!final_id_minuta) {
             final_id_minuta = await generarIdMinuta();
         }

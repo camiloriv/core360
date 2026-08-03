@@ -23,7 +23,7 @@ import {
   Trash2, Palette, Type, Columns, Rows, Eye,
   ChevronUp, ChevronDown, ChevronRight, GripHorizontal,
   CaseUpper, CaseLower,
-  Plus, Minus, Highlighter
+  Plus, Minus, Highlighter, Settings
 } from "lucide-react";
 
 // Extensión personalizada para Tamaño de Fuente
@@ -759,6 +759,22 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
 
 function MinutaEditor({ form, setForm }) {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  
+  const settingsDropdownRef = useRef(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target)) {
+        setShowSettingsMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -799,6 +815,55 @@ function MinutaEditor({ form, setForm }) {
   const handleAddCustomTemplate = (e) => {
     e.preventDefault();
     setModalState({ isOpen: true, template: null });
+  };
+
+  const handleSelectTemplateForAction = async (action) => {
+    setShowSettingsMenu(false);
+    if (action === 'add') {
+      setModalState({ isOpen: true, template: null });
+      return;
+    }
+
+    if (customTemplates.length === 0) {
+      Swal.fire('Info', 'No hay botones personalizados creados.', 'info');
+      return;
+    }
+    
+    const inputOptions = {};
+    customTemplates.forEach(t => {
+      inputOptions[t.id] = t.name;
+    });
+
+    const { value: selectedId } = await Swal.fire({
+      title: action === 'edit' ? 'Editar Botón' : 'Borrar Botón',
+      input: 'select',
+      inputOptions,
+      inputPlaceholder: 'Selecciona un botón',
+      showCancelButton: true,
+      confirmButtonText: 'Seleccionar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (selectedId) {
+      const template = customTemplates.find(t => t.id === selectedId);
+      if (action === 'edit') {
+         setModalState({ isOpen: true, template });
+      } else if (action === 'delete') {
+         const confirmDelete = await Swal.fire({
+           title: '¿Estás seguro?',
+           text: `Se eliminará el botón "${template.name}".`,
+           icon: 'warning',
+           showCancelButton: true,
+           confirmButtonColor: '#d33',
+           cancelButtonColor: '#3085d6',
+           confirmButtonText: 'Sí, eliminar'
+         });
+         if (confirmDelete.isConfirmed) {
+           const updatedTemplates = customTemplates.filter(t => t.id !== template.id);
+           await saveCustomTemplates(updatedTemplates);
+         }
+      }
+    }
   };
 
   const handleSaveModal = async (name, content) => {
@@ -1056,9 +1121,34 @@ function MinutaEditor({ form, setForm }) {
               {t.name}
             </button>
           ))}
-          <button onClick={handleAddCustomTemplate} style={btnStyle('#f1f5f9', '#475569')} title="Crear texto predefinido personal">
-            <Plus size={14} style={{ marginRight: '4px' }} /> Agregar
-          </button>
+          <div ref={settingsDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <button 
+              onClick={(e) => { e.preventDefault(); setShowSettingsMenu(!showSettingsMenu); }} 
+              style={btnStyle('#f1f5f9', '#475569')} 
+              title="Gestionar botones personalizados"
+            >
+              <Settings size={14} style={{ marginRight: '4px' }} /> Herramientas
+            </button>
+            {showSettingsMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '6px',
+                zIndex: 1000,
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                minWidth: '150px',
+                marginTop: '4px'
+              }}>
+                <button onClick={(e) => { e.preventDefault(); handleSelectTemplateForAction('add'); }} style={{ width: '100%', padding: '6px 10px', fontSize: '13px', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px', marginBottom: '4px' }}>➕ Agregar</button>
+                <button onClick={(e) => { e.preventDefault(); handleSelectTemplateForAction('edit'); }} style={{ width: '100%', padding: '6px 10px', fontSize: '13px', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px', marginBottom: '4px' }}>✏️ Editar</button>
+                <button onClick={(e) => { e.preventDefault(); handleSelectTemplateForAction('delete'); }} style={{ width: '100%', padding: '6px 10px', fontSize: '13px', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px', color: 'var(--danger-color)' }}>🗑️ Borrar</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="tiptap-editor-container" style={{

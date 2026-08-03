@@ -712,6 +712,8 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
     editorProps: {
       attributes: {
         spellcheck: 'true',
+        autocorrect: 'on',
+        autocapitalize: 'on',
         lang: 'es-CL',
       }
     }
@@ -799,6 +801,8 @@ function MinutaEditor({ form, setForm }) {
     editorProps: {
       attributes: {
         spellcheck: 'true',
+        autocorrect: 'on',
+        autocapitalize: 'on',
         lang: 'es-CL',
       }
     }

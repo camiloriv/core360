@@ -752,8 +752,8 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
             <div style={{ width: '100%', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', borderTopLeftRadius: '12px', borderTopRightRadius: '12px', position: 'sticky', top: 0, zIndex: 10 }}>
               <MenuBar editor={editor} />
             </div>
-            <div style={{ minHeight: '300px', padding: '20px', width: '100%', boxSizing: 'border-box' }}>
-              <EditorContent editor={editor} />
+            <div style={{ minHeight: '300px', padding: '20px', width: '100%', boxSizing: 'border-box' }} spellCheck={true} lang="es-CL">
+              <EditorContent editor={editor} spellCheck={true} lang="es-CL" />
             </div>
           </div>
         </div>
@@ -1205,8 +1205,8 @@ function MinutaEditor({ form, setForm }) {
             marginBottom: '40px',
             overflowX: 'auto',
             boxSizing: 'border-box'
-          }}>
-            <EditorContent editor={editor} />
+          }} spellCheck={true} lang="es-CL">
+            <EditorContent editor={editor} spellCheck={true} lang="es-CL" />
           </div>
         </div>
       </div>

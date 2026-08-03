@@ -190,6 +190,17 @@ function ReunionesForm({ onSuccess }) {
       }
     }
     setField("link_video", extractedVideoLink);
+
+    if (draft.archivos_nombres) {
+      try {
+        const parsed = JSON.parse(draft.archivos_nombres);
+        if (Array.isArray(parsed)) {
+          setField("archivos_nombres", parsed);
+        }
+      } catch (e) {
+        console.error("Error parseando archivos_nombres", e);
+      }
+    }
   };
 
   // Si abrimos la pantalla con un borrador o un ID en la URL, precargarlo
@@ -258,6 +269,10 @@ function ReunionesForm({ onSuccess }) {
         es_borrador: isDraftSubmit || isSoloGuardar, 
         solo_guardar: isSoloGuardar 
       });
+
+      if (res.data?.id_reunion && !form.id_reunion?.toString().startsWith('REU-')) {
+        setField("id_reunion", res.data.id_reunion);
+      }
       Swal.fire({
         icon: "success",
         title: "¡Éxito!",
@@ -415,6 +430,39 @@ function ReunionesForm({ onSuccess }) {
             Registrar Reunión
           </h1>
           <p className="page-subtitle">COMPLETA LOS DATOS PARA REGISTRAR LA REUNIÓN</p>
+        </div>
+
+        <div style={{
+          marginBottom: "20px",
+          padding: "16px",
+          background: "var(--bg-muted)",
+          borderRadius: "8px",
+          border: "1px solid var(--border-color)",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
+        }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ margin: 0, fontSize: "15px", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
+              📋 ¿Es una minuta retroactiva?
+            </h3>
+            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
+              Activa esta opción si estás registrando una minuta que <b>ya fue enviada por correo</b> antes de usar la plataforma. 
+              {form.es_retroactiva && (
+                <span style={{ color: "#10b981", fontWeight: "bold", display: "block", marginTop: "4px" }}>
+                  Al guardar, no se enviará ningún correo y la minuta quedará registrada como "Enviada".
+                </span>
+              )}
+            </p>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+            <input 
+              type="checkbox" 
+              checked={form.es_retroactiva}
+              onChange={(e) => setField("es_retroactiva", e.target.checked)}
+              style={{ width: "24px", height: "24px", cursor: "pointer", accentColor: "#10b981" }}
+            />
+          </label>
         </div>
 
         <div className="grid">
@@ -654,7 +702,7 @@ function ReunionesForm({ onSuccess }) {
 
 
           <MinutaEditor form={form} setForm={setField} />
-          <FileUpload archivos={form.archivos} setFiles={setFiles} />
+          <FileUpload archivos={form.archivos} setFiles={setFiles} archivosPrevios={form.archivos_nombres} />
 
           <FormSection label="DOCUMENTOS ADJUNTOS" full>
             <input
@@ -671,6 +719,7 @@ function ReunionesForm({ onSuccess }) {
               background: "var(--bg-muted)",
               borderRadius: "8px",
               border: "1px solid var(--border-color)",
+              display: form.es_retroactiva ? "none" : "block"
             }}
           >
             <label
@@ -831,7 +880,7 @@ function ReunionesForm({ onSuccess }) {
             )}
           </div>
         </div>
-        <FormActions loading={loading} />
+        <FormActions loading={loading} esRetroactiva={form.es_retroactiva} />
       </form>
     </div>
   );

@@ -33,8 +33,9 @@ const buildRoleWhereClause = (usuario_id, rol) => {
         whereClause += ` AND (
             te.usuario_id = ?
             OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?)
+            OR te.usuario_id = (SELECT jefatura_id FROM usuarios WHERE id = ?)
         )`;
-        params.push(usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id);
     }
 
     return { whereClause, params };
@@ -62,6 +63,7 @@ const BASE_REUNION_SQL = `
         emp.nombre                      AS empresa_nombre,
         u.nombre                        AS ejecutiva_nombre,
         j.nombre                        AS jefatura_nombre,
+        te.body_preview,
 
         m.id                            AS minuta_row_id,
         COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
@@ -83,6 +85,7 @@ const BASE_REUNION_SQL = `
         m.encuesta_destinatario,
         m.texto_previo,
         m.link_video,
+        m.es_retroactiva,
         m.created_at,
 
         CASE
@@ -127,6 +130,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
         emp.nombre                      AS empresa_nombre,
         u.nombre                        AS ejecutiva_nombre,
         j.nombre                        AS jefatura_nombre,
+        NULL                            AS body_preview,
 
         m.id                            AS minuta_row_id,
         m.id_minuta                     AS id_reunion,
@@ -148,6 +152,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
         m.encuesta_destinatario,
         m.texto_previo,
         m.link_video,
+        m.es_retroactiva,
         m.created_at,
 
         m.estado_envio                  AS estado_envio,
@@ -399,13 +404,14 @@ exports.crearReunion = async (req, res) => {
     const {
         ejecutiva_id, enviado_a, enviado_por, participantes,
         tipo_reu, fecha_reu, hora, lugar, documentos_adjuntos,
-        motivo_reu, minuta, form_f, empresa_id,
+        motivo_reu, minuta, form_f, empresa_id: raw_empresa_id,
         programar_encuesta, encuesta_tipo, encuesta_programada_para, encuesta_destinatario,
         teams_evento_id,  // ID interno de teams_eventos (si viene de un evento Teams)
         asunto_correo,    // Asunto personalizado para minutas sin empresa (excluidas/proforma)
         texto_previo,
         link_video,
-        es_borrador
+        es_borrador,
+        es_retroactiva
     } = req.body;
 
     const archivos = req.files || [];
@@ -418,12 +424,15 @@ exports.crearReunion = async (req, res) => {
     }
 
     // empresa_id puede ser null para reuniones excluidas o proforma sin empresa asignada
+    const empresa_id = (raw_empresa_id && raw_empresa_id !== "null" && raw_empresa_id !== "") ? parseInt(raw_empresa_id, 10) : null;
+
     if (!ejecutiva_id || !fecha_reu || !hora) {
         return res.status(400).json({ error: "Campos obligatorios faltantes" });
     }
 
     try {
-        const isSurveyProgrammed = programar_encuesta === "true" || programar_encuesta === true;
+        const isRetroactiva = es_retroactiva === 'true' || es_retroactiva === true;
+        const isSurveyProgrammed = !isRetroactiva && (programar_encuesta === "true" || programar_encuesta === true);
         const id_minuta = await generarIdMinuta();
 
         // Resolver teams_evento_id si viene del body
@@ -435,22 +444,46 @@ exports.crearReunion = async (req, res) => {
             if (teRows.length > 0) teId = teRows[0].id;
         }
 
-        const isDraft = es_borrador === 'true' || es_borrador === true;
-        const estado_final_minuta = isDraft ? 'borrador' : 'enviado';
+        const isDraft = !isRetroactiva && (es_borrador === 'true' || es_borrador === true);
+        const estado_final_minuta = isRetroactiva ? 'enviado' : (isDraft ? 'borrador' : 'enviado');
 
         const reqIdReunion = req.body.id_reunion;
         let isUpdate = false;
         let final_id_minuta = null;
         let final_archivos_nombres = archivosNombres;
 
-        if (reqIdReunion && reqIdReunion.startsWith('MIN-')) {
+        if (reqIdReunion && reqIdReunion.startsWith('REU-')) {
             const [existing] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE id_minuta = ?", [reqIdReunion]);
             if (existing.length > 0) {
                 isUpdate = true;
                 final_id_minuta = existing[0].id_minuta;
-                // Si no se suben archivos nuevos, conservamos los anteriores
-                if (archivos.length === 0 && existing[0].archivos_nombres) {
-                    final_archivos_nombres = existing[0].archivos_nombres;
+                // Fusionar archivos antiguos con los nuevos si existen
+                if (existing[0].archivos_nombres) {
+                    try {
+                        const oldFiles = JSON.parse(existing[0].archivos_nombres);
+                        const newFiles = archivos.map(f => f.filename);
+                        final_archivos_nombres = JSON.stringify([...oldFiles, ...newFiles]);
+                    } catch (e) {
+                        console.error("Error parseando archivos antiguos", e);
+                    }
+                }
+            }
+        }
+
+        // Si no se encontró por ID de minuta pero hay un ID de evento de Teams, verificar si ya existe minuta para ese evento
+        if (!isUpdate && teId) {
+            const [existingTe] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE teams_evento_id = ?", [teId]);
+            if (existingTe.length > 0) {
+                isUpdate = true;
+                final_id_minuta = existingTe[0].id_minuta;
+                if (existingTe[0].archivos_nombres) {
+                    try {
+                        const oldFiles = JSON.parse(existingTe[0].archivos_nombres);
+                        const newFiles = archivos.map(f => f.filename);
+                        final_archivos_nombres = JSON.stringify([...oldFiles, ...newFiles]);
+                    } catch (e) {
+                        console.error("Error parseando archivos antiguos", e);
+                    }
                 }
             }
         }
@@ -469,7 +502,7 @@ exports.crearReunion = async (req, res) => {
                     estado_envio = ?, archivos_nombres = ?,
                     programar_encuesta = ?, encuesta_tipo = ?, encuesta_programada_para = ?,
                     encuesta_estado_envio = ?, encuesta_relacionada = ?, encuesta_destinatario = ?,
-                    texto_previo = ?, link_video = ?
+                    texto_previo = ?, link_video = ?, es_retroactiva = ?
                 WHERE id_minuta = ?
             `;
             const valuesUpdate = [
@@ -481,11 +514,12 @@ exports.crearReunion = async (req, res) => {
                 isSurveyProgrammed ? 1 : 0,
                 isSurveyProgrammed ? encuesta_tipo : null,
                 isSurveyProgrammed ? encuesta_programada_para : null,
-                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                isDraft || req.body.solo_guardar ? 'borrador_pendiente' : (isSurveyProgrammed ? 'pendiente' : 'enviado'),
                 req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
                 isSurveyProgrammed ? encuesta_destinatario : null,
                 texto_previo || null,
                 link_video || null,
+                isRetroactiva ? 1 : 0,
                 final_id_minuta
             ];
             await db.query(sqlUpdate, valuesUpdate);
@@ -499,8 +533,8 @@ exports.crearReunion = async (req, res) => {
                     estado_envio, archivos_nombres,
                     programar_encuesta, encuesta_tipo, encuesta_programada_para,
                     encuesta_estado_envio, encuesta_relacionada, encuesta_destinatario,
-                    texto_previo, link_video
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    texto_previo, link_video, es_retroactiva
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const valuesInsert = [
                 final_id_minuta, teId, ejecutiva_id, empresa_id,
@@ -511,11 +545,12 @@ exports.crearReunion = async (req, res) => {
                 isSurveyProgrammed ? 1 : 0,
                 isSurveyProgrammed ? encuesta_tipo : null,
                 isSurveyProgrammed ? encuesta_programada_para : null,
-                isSurveyProgrammed ? 'pendiente' : 'enviado',
+                isDraft || req.body.solo_guardar ? 'borrador_pendiente' : (isSurveyProgrammed ? 'pendiente' : 'enviado'),
                 req.body.encuesta_relacionada === true || req.body.encuesta_relacionada === 'true' ? 1 : 0,
                 isSurveyProgrammed ? encuesta_destinatario : null,
                 texto_previo || null,
-                link_video || null
+                link_video || null,
+                isRetroactiva ? 1 : 0
             ];
             await db.query(sqlInsert, valuesInsert);
         }
@@ -624,7 +659,7 @@ exports.crearReunion = async (req, res) => {
 
                 const isSoloGuardar = req.body.solo_guardar === 'true' || req.body.solo_guardar === true;
 
-                if (!isSoloGuardar) {
+                if (!isSoloGuardar && !isRetroactiva) {
                     enviarCorreo({
                         to: correoToFinal,
                         cc: correosCcFinal,
@@ -653,7 +688,7 @@ exports.crearReunion = async (req, res) => {
 
                 // Registrar en audit log
                 registrarAudit({
-                    accion: isSoloGuardar ? 'minuta_guardada' : (isDraft ? 'minuta_borrador' : (isUpdate ? 'minuta_actualizada' : 'minuta_enviada')),
+                    accion: isRetroactiva ? 'minuta_retroactiva' : (isSoloGuardar ? 'minuta_guardada' : (isDraft ? 'minuta_borrador' : (isUpdate ? 'minuta_actualizada' : 'minuta_enviada'))),
                     entidad: 'minuta',
                     entidad_id: final_id_minuta,
                     usuario_id: req.usuario?.id || parseInt(enviado_por_id),
@@ -680,8 +715,13 @@ exports.crearReunion = async (req, res) => {
         }
 
         const isSoloGuardar = req.body.solo_guardar === 'true' || req.body.solo_guardar === true;
+        let responseMsg = "Minuta creada y enviada";
+        if (isRetroactiva) responseMsg = "Minuta retroactiva registrada correctamente (no se envió correo)";
+        else if (isSoloGuardar) responseMsg = "Borrador guardado sin enviar correo";
+        else if (isDraft) responseMsg = "Borrador guardado y enviado a su correo";
+
         res.json({ 
-            msg: isSoloGuardar ? "Borrador guardado sin enviar correo" : (isDraft ? "Borrador guardado y enviado a su correo" : "Minuta creada y enviada"),
+            msg: responseMsg,
             id_reunion: final_id_minuta 
         });
 

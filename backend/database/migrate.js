@@ -228,6 +228,7 @@ async function runMigrations() {
 
     await addColIfMissing('minutas', 'texto_previo', 'TEXT DEFAULT NULL');
     await addColIfMissing('minutas', 'link_video', 'TEXT DEFAULT NULL');
+    await addColIfMissing('minutas', 'es_retroactiva', 'TINYINT(1) DEFAULT 0');
 
     // ============================================================
     // 12. Tabla sync_log (control de sincronizaciones diarias)

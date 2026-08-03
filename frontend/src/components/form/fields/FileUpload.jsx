@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import Swal from "sweetalert2";
 
-function FileUpload({ archivos = [], setFiles }) {
+function FileUpload({ archivos = [], setFiles, archivosPrevios = [] }) {
   const inputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -98,6 +98,28 @@ function FileUpload({ archivos = [], setFiles }) {
           style={{ display: "none" }}
         />
       </div>
+
+      {archivosPrevios.length > 0 && (
+        <div style={{ marginTop: "15px", marginBottom: "15px" }}>
+          <p style={{ fontSize: "13px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "8px" }}>
+            Archivos previamente subidos (se conservarán):
+          </p>
+          <div className="file-upload-list">
+            {archivosPrevios.map((filename, index) => (
+              <div key={`prev-${index}`} className="file-upload-item" style={{ background: "#f1f5f9", borderColor: "#cbd5e1" }}>
+                <div className="file-upload-item-name" style={{ color: "#475569" }}>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, color: "#94a3b8" }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                  <span>
+                    {filename.split('-').slice(2).join('-') || filename}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {archivos.length > 0 && (
         <div className="file-upload-list">

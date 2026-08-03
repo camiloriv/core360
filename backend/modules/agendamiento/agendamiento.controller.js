@@ -257,11 +257,15 @@ const anularReunionTeams = async (req, res) => {
             );
         }
 
-        // Determinar empresa_id desde teams_eventos si no vino en body
+        // Determinar empresa_id y fecha desde teams_eventos si no vino en body
         let empId = empresa_id;
-        if (!empId && teEvt.length > 0) {
-            const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
-            if (teData.length > 0) empId = teData[0].empresa_id;
+        let eventFecha = null;
+        if (teEvt.length > 0) {
+            const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
+            if (teData.length > 0) {
+                if (!empId) empId = teData[0].empresa_id;
+                eventFecha = teData[0].fecha;
+            }
         }
 
         if (empId) {
@@ -276,7 +280,10 @@ const anularReunionTeams = async (req, res) => {
                 asuntoCancelacion += ` - Motivo: ${motivo.trim()}`;
             }
 
-            const fechaVal = new Date().toISOString().split('T')[0];
+            // Usar la fecha original del evento si está disponible, sino la actual
+            const fechaVal = eventFecha 
+                ? new Date(eventFecha).toISOString().split('T')[0] 
+                : new Date().toISOString().split('T')[0];
 
             await db.query(
                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
@@ -302,13 +309,14 @@ const marcarReagendada = async (req, res) => {
             return res.status(400).json({ error: "Faltan parámetros." });
         }
 
-        // Determinar empresa_id desde teams_eventos
-        const [teData] = await db.query("SELECT empresa_id FROM teams_eventos WHERE event_id = ?", [eventId]);
+        // Determinar empresa_id y fecha desde teams_eventos
+        const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
         if (teData.length === 0 || !teData[0].empresa_id) {
             return res.status(400).json({ error: "No se puede registrar motivo en una reunión sin empresa vinculada." });
         }
         
         const empId = teData[0].empresa_id;
+        const eventFecha = teData[0].fecha;
 
         const [prevLog] = await db.query(
             "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
@@ -321,7 +329,10 @@ const marcarReagendada = async (req, res) => {
             asuntoReagendada += ` - Motivo: ${motivo.trim()}`;
         }
 
-        const fechaVal = new Date().toISOString().split('T')[0];
+        // Usar la fecha original del evento si está disponible, sino la actual
+        const fechaVal = eventFecha 
+            ? new Date(eventFecha).toISOString().split('T')[0] 
+            : new Date().toISOString().split('T')[0];
 
         await db.query(
             "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
@@ -556,8 +567,8 @@ const syncEventosPasados = async (req, res) => {
                 const organizerName = event.organizer?.emailAddress?.name || '';
                 const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
-                // Extraer preview del cuerpo
-                const bodyPreview = event.bodyPreview || '';
+                // Extraer preview del cuerpo (usamos body.content para no perder los enlaces de grabación)
+                const bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
 
                 if (emails.length === 0) {
                     // Sin asistentes → ignorar
@@ -607,13 +618,16 @@ const syncEventosPasados = async (req, res) => {
                     }
                 }
 
-                // Si todos los asistentes y el organizador son internos (proforma.cl o oticproforma.cl), es una reunión Proforma Interna
                 const PROFORMA_DOMAINS = ['@proforma.cl', '@oticproforma.cl'];
                 const allEmailsForProformaCheck = [...emails];
                 if (organizerEmail) allEmailsForProformaCheck.push(organizerEmail);
 
+                // Obtener todos los correos del sistema
+                const [systemUsers] = await db.query("SELECT correo FROM usuarios WHERE correo IS NOT NULL AND estado = 'activo'");
+                const systemEmails = new Set(systemUsers.map(u => u.correo.toLowerCase().trim()));
+
                 const isPurelyProforma = allEmailsForProformaCheck.length > 0 && allEmailsForProformaCheck.every(email => 
-                    PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d))
+                    PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d)) || systemEmails.has(email.toLowerCase())
                 );
 
                 if (isPurelyProforma && proformaEmpId) {
@@ -779,9 +793,9 @@ const getTeamsEventos = async (req, res) => {
         let params = [usuarioId];
 
         if (rol === 'ejecutiva') {
-            // Solo sus propios eventos o donde es invitado
-            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?))";
-            params.push(usuarioId);
+            // Solo sus propios eventos, donde es invitado, o de su jefatura
+            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?) OR te.usuario_id = (SELECT jefatura_id FROM usuarios WHERE id = ?))";
+            params.push(usuarioId, usuarioId);
         } else if (rol === 'jefatura') {
             whereExtra = `AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?))`;
             params.push(usuarioId);
@@ -982,6 +996,9 @@ const desvincularEmpresaDeEvento = async (req, res) => {
 
         // Si hay una minuta borrador vinculada, eliminarla
         await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [evento.id]);
+
+        // Limpiar el historial fantasma de la línea de tiempo
+        await db.query("DELETE FROM empresa_seguimiento_log WHERE reunion_id = ? AND empresa_id = ?", [evento.event_id, empresa_id]);
 
         // Quitar empresa del evento
         await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [evento.id]);

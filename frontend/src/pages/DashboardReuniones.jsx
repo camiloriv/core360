@@ -308,8 +308,6 @@ export default function DashboardReuniones() {
             setShowEmpresaDropdown(false);
             setIsAssignModalOpen(true);
           });
-        } else if (reunion._isProforma) {
-          createBtn('🔍 Ver Detalle', '#e2e8f0', '#1e293b', () => handleVerDetalleProforma(reunion));
         } else if (reunion._isExcluida || reunion.estado_envio === "no_aplica") {
           createBtn('Revertir No Aplica', '#eff6ff', '#3b82f6', () => {
             const isTeOnly = !reunion.minuta_row_id;
@@ -323,6 +321,7 @@ export default function DashboardReuniones() {
             const isTeOnly = !reunion.minuta_row_id;
             handleMarcarNoAplica(reunion.id_reunion, isTeOnly, false);
           });
+          createBtn('Desvincular', '#ffe4e6', '#be123c', () => handleDesvincular(reunion));
         } else if (reunion.estado_envio === "enviado" || reunion.estado_envio === "programado") {
           createBtn('🔍 Ver Minuta', '#f1f5f9', 'var(--secondary-color)', () => handleVerMinuta(reunion));
           createBtn('Desvincular', '#ffe4e6', '#be123c', () => handleDesvincular(reunion));
@@ -1672,7 +1671,8 @@ export default function DashboardReuniones() {
                   <th style={{...styles.thCell, width: "13%"}}>AGENDA</th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA / ID</th>
                   <th style={{...styles.thCell, width: "20%"}}>EMPRESA</th>
-                  <th style={{...styles.thCell, width: "24%"}}>TIPO / MOTIVO</th>
+                  <th style={{...styles.thCell, width: "12%"}}>TIPO</th>
+                  <th style={{...styles.thCell, width: "12%"}}>MOTIVO</th>
                   <th style={{...styles.thCell, width: "17%", textAlign: "center"}}>MINUTA</th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA DE ENVÍO</th>
                   <th style={{...styles.thCell, width: "8%"}}>ADJUNTOS</th>
@@ -1782,13 +1782,21 @@ export default function DashboardReuniones() {
                           )}
                         </div>
                       </td>
-                      <td style={styles.tdCell} data-label="TIPO / MOTIVO">
+                      <td style={styles.tdCell} data-label="TIPO">
+                        <div 
+                          style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}
+                          title={r.tipo_reu || 'No asignado'}
+                        >
+                          {r.tipo_reu || 'No asignado'}
+                        </div>
+                      </td>
+                      <td style={styles.tdCell} data-label="MOTIVO">
                         <div>
                           <div 
-                            style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "250px" }}
+                            style={{ fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "350px", display: "flex", alignItems: "center", gap: "6px" }}
                             title={r.asunto_teams || r.motivo_reu || 'Sin asunto'}
                           >
-                            {r.asunto_teams || r.motivo_reu || 'Sin asunto'}
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.asunto_teams || r.motivo_reu || 'Sin asunto'}</span>
                           </div>
                           {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (r.asunto_teams && r.asunto_teams !== r.motivo_reu) && (
                             <div
@@ -1800,24 +1808,9 @@ export default function DashboardReuniones() {
                                 textOverflow: "ellipsis",
                                 maxWidth: "250px",
                               }}
-                              title={`${r.tipo_reu || ''} - ${r.motivo_reu || ''}`}
+                              title={r.motivo_reu || ''}
                             >
-                              {r.tipo_reu ? `${r.tipo_reu} - ${r.motivo_reu}` : r.motivo_reu}
-                            </div>
-                          )}
-                          {(r.estado_envio === 'enviado' || r.estado_envio === 'programado') && (!r.asunto_teams || r.asunto_teams === r.motivo_reu) && r.tipo_reu && (
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "var(--text-muted)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                maxWidth: "250px",
-                              }}
-                              title={r.tipo_reu}
-                            >
-                              {r.tipo_reu}
+                              {r.motivo_reu}
                             </div>
                           )}
                         </div>
@@ -1839,22 +1832,6 @@ export default function DashboardReuniones() {
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span style={{ color: "var(--text-muted)" }}>-</span>
                             </div>
-                          ) : r._isProforma ? (
-                            <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
-                              <div
-                                onClick={() => handleVerDetalleProforma(r)}
-                                style={{
-                                  color: "#1e293b", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                  background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#cbd5e1")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#e2e8f0")}
-                                title="Ver Detalle de Reunión Interna"
-                              >
-                                🔍 Ver Detalle
-                              </div>
-                            </div>
                           ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
                               <span
@@ -1873,19 +1850,19 @@ export default function DashboardReuniones() {
                             </div>
 
                           ) : r.estado_envio === "borrador" ? (
-                            <div style={{ display: "flex", flexDirection: "row", gap: "8px", alignItems: "center", justifyContent: "center" }}>
+                            <div style={{ display: "flex", flexDirection: "row", gap: "4px", alignItems: "center", justifyContent: "center" }}>
                               <div
                                 onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
                                 style={{
-                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                  background: "#fef08a", padding: "4px 8px", borderRadius: "4px",
+                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
+                                  background: "#fef08a", padding: "4px 6px", borderRadius: "4px",
                                   display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
                                 }}
                                 onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
                                 title={r.tiene_minuta ? "Editar Borrador" : "Redactar Minuta"}
                               >
-                                {r.tiene_minuta ? "📝 En Borrador" : "✍️ Pendiente de Minuta"}
+                                {r.tiene_minuta ? "📝 Borrador" : "✍️ Pendiente"}
                               </div>
                               {!r.tiene_minuta && (
                                 <button
@@ -1899,16 +1876,17 @@ export default function DashboardReuniones() {
                                     color: "#ef4444",
                                     border: "none",
                                     borderRadius: "4px",
-                                    width: "24px",
-                                    height: "24px",
+                                    width: "20px",
+                                    height: "20px",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
                                     cursor: "pointer",
-                                    fontSize: "12px",
+                                    fontSize: "10px",
                                     fontWeight: "bold",
                                     padding: 0,
-                                    transition: "all 0.2s"
+                                    transition: "all 0.2s",
+                                    flexShrink: 0
                                   }}
                                   onMouseEnter={(e) => {
                                     e.currentTarget.style.background = "#fca5a5";
@@ -1957,7 +1935,7 @@ export default function DashboardReuniones() {
                                 onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
                                 onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
                               >
-                                ✅ Minuta Enviada 📄
+                                {r.es_retroactiva === 1 ? "✅ Minuta Retroactiva 📋" : "✅ Minuta Enviada 📄"}
                               </div>
                               <span
                                 onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
@@ -2186,7 +2164,7 @@ export default function DashboardReuniones() {
                     </tr>
                     {isExpanded && (
                       <tr className="meeting-details-row mobile-only-row" onClick={(e) => e.stopPropagation()}>
-                        <td colSpan={7} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0' }}>
+                        <td colSpan={8} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '11px', textAlign: 'left' }}>
                             <div>
                               <strong>Ejecutivo Responsable:</strong> {rowOwner?.nombre || 'No asignado'} ({rowJefaturaName})
@@ -2219,16 +2197,6 @@ export default function DashboardReuniones() {
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                                 {r.estado_envio === "huerfana" ? (
                                   <span style={{ color: '#64748b' }}>Sin acciones disponibles (Reunión Huérfana)</span>
-                                ) : r._isProforma ? (
-                                  <div
-                                    onClick={() => handleVerDetalleProforma(r)}
-                                    style={{
-                                      color: "#1e293b", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
-                                      background: "#e2e8f0", padding: "4px 8px", borderRadius: "4px"
-                                    }}
-                                  >
-                                    🔍 Ver Detalle
-                                  </div>
                                 ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
                                   <span
                                     onClick={() => { 
@@ -2243,28 +2211,43 @@ export default function DashboardReuniones() {
                                     Revertir No Aplica
                                   </span>
                                 ) : r.estado_envio === "borrador" ? (
-                                  <div style={{ display: "flex", gap: "8px" }}>
+                                  <div style={{ display: "flex", gap: "4px" }}>
                                     <div
                                       onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
                                       style={{
                                         color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
-                                        background: "#fef08a", padding: "4px 8px", borderRadius: "4px"
+                                        background: "#fef08a", padding: "4px 6px", borderRadius: "4px"
                                       }}
                                     >
-                                      {r.tiene_minuta ? "📝 En Borrador" : "✍️ Pendiente de Minuta"}
+                                      {r.tiene_minuta ? "📝 Borrador" : "✍️ Pendiente"}
                                     </div>
-                                    <button
-                                      onClick={() => { 
-                                        const isTeOnly = !r.minuta_row_id;
-                                        handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
-                                      }}
+                                    {!r.tiene_minuta && (
+                                      <button
+                                        onClick={() => { 
+                                          const isTeOnly = !r.minuta_row_id;
+                                          handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
+                                        }}
+                                        style={{
+                                          background: "#fee2e2", color: "#ef4444", border: "none", borderRadius: "4px",
+                                          width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center",
+                                          cursor: "pointer", fontSize: "11px", fontWeight: "bold", padding: 0
+                                        }}
+                                        title="No aplica enviar minuta"
+                                      >
+                                        ❌
+                                      </button>
+                                    )}
+                                    <div
+                                      onClick={() => handleDesvincular(r)}
                                       style={{
-                                        background: "#fee2e2", color: "#ef4444", border: "none", borderRadius: "4px",
-                                        padding: "4px 8px", cursor: "pointer", fontSize: "11px", fontWeight: "bold"
+                                        color: "#be123c", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
+                                        background: "#ffe4e6", padding: "4px 6px", borderRadius: "4px",
+                                        display: "flex", alignItems: "center", justifyContent: "center"
                                       }}
+                                      title="Desvincular reunión"
                                     >
-                                      Marcar No Aplica
-                                    </button>
+                                      Desvincular
+                                    </div>
                                   </div>
                                 ) : r.estado_envio === "enviado" || r.estado_envio === "programado" ? (
                                   <div style={{ display: "flex", gap: "8px" }}>

@@ -1,4 +1,22 @@
-function FormActions({ loading }) {
+function FormActions({ loading, esRetroactiva }) {
+  if (esRetroactiva) {
+    return (
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'flex-end', marginTop: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+          <button 
+            type="submit" 
+            name="enviar"
+            className="btn" 
+            disabled={loading}
+            style={{ padding: '10px 30px', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px', height: '44px', width: '100%', margin: 0, background: '#10b981', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+          >
+            📋 {loading ? "Registrando..." : "Registrar Minuta Retroactiva"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'flex-end', marginTop: '20px' }}>
       

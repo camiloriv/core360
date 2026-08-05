@@ -18,17 +18,33 @@ const buildRoleWhereClause = (usuario_id, rol) => {
         // Ve todo
     } else if (rol === 'gerencia') {
         whereClause += ` AND (
-            te.usuario_id = ?
-            OR te.usuario_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
-            OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
+            (te.empresa_id IS NOT NULL AND (
+                emp.jefatura_id = ? 
+                OR emp.jefatura_id IN (
+                    SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
+                    UNION
+                    SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+                        SELECT ug.usuario_id FROM usuario_gerencias ug 
+                        JOIN usuarios u ON ug.usuario_id = u.id 
+                        WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
+                    )
+                )
+            ))
+            OR 
+            (te.empresa_id IS NULL AND (
+                te.usuario_id = ?
+                OR te.usuario_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
+                OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
+            ))
         )`;
-        params.push(usuario_id, usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id, usuario_id, usuario_id, usuario_id);
     } else if (rol === 'jefatura') {
         whereClause += ` AND (
-            te.usuario_id = ?
-            OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)
+            (te.empresa_id IS NOT NULL AND emp.jefatura_id = ?)
+            OR 
+            (te.empresa_id IS NULL AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)))
         )`;
-        params.push(usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id);
     } else if (rol === 'ejecutiva') {
         whereClause += ` AND (
             te.usuario_id = ?
@@ -174,7 +190,11 @@ const BASE_MINUTA_STANDALONE_SQL = `
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
-    const whereM = whereClause.replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL').replace(/te\.usuario_id/g, 'm.ejecutiva_id').replace(/te\.asistentes/g, 'm.participantes');
+    const whereM = whereClause
+        .replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL')
+        .replace(/te\.usuario_id/g, 'm.ejecutiva_id')
+        .replace(/te\.asistentes/g, 'm.participantes')
+        .replace(/te\.empresa_id/g, 'm.empresa_id');
 
     const sql = `
         SELECT * FROM (

@@ -18,17 +18,33 @@ const buildRoleWhereClause = (usuario_id, rol) => {
         // Ve todo
     } else if (rol === 'gerencia') {
         whereClause += ` AND (
-            te.usuario_id = ?
-            OR te.usuario_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
-            OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
+            (COALESCE(te.empresa_id, 0) != 0 AND (
+                emp.jefatura_id = ? 
+                OR emp.jefatura_id IN (
+                    SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?
+                    UNION
+                    SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+                        SELECT ug.usuario_id FROM usuario_gerencias ug 
+                        JOIN usuarios u ON ug.usuario_id = u.id 
+                        WHERE ug.gerencia_id = ? AND u.permisos = 'gerencia'
+                    )
+                )
+            ))
+            OR 
+            (COALESCE(te.empresa_id, 0) = 0 AND (
+                te.usuario_id = ?
+                OR te.usuario_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?)
+                OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id IN (SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = ?))
+            ))
         )`;
-        params.push(usuario_id, usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id, usuario_id, usuario_id, usuario_id);
     } else if (rol === 'jefatura') {
         whereClause += ` AND (
-            te.usuario_id = ?
-            OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)
+            (COALESCE(te.empresa_id, 0) != 0 AND emp.jefatura_id = ?)
+            OR 
+            (COALESCE(te.empresa_id, 0) = 0 AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?)))
         )`;
-        params.push(usuario_id, usuario_id);
+        params.push(usuario_id, usuario_id, usuario_id);
     } else if (rol === 'ejecutiva') {
         whereClause += ` AND (
             te.usuario_id = ?
@@ -94,15 +110,15 @@ const BASE_REUNION_SQL = `
             WHEN m.estado_envio = 'enviado'   THEN 'enviado'
             WHEN m.estado_envio = 'no_aplica' THEN 'no_aplica'
             WHEN m.estado_envio = 'borrador'  THEN 'borrador'
-            WHEN te.empresa_id IS NULL        THEN 'huerfana'
+            WHEN COALESCE(te.empresa_id, 0) = 0 THEN 'huerfana'
             WHEN te.estado = 'pasada'         THEN 'borrador'
             ELSE te.estado
         END                             AS estado_envio,
 
         te.estado                       AS te_estado,
-        (te.empresa_id IS NULL AND te.estado != 'excluida') AS is_huerfana,
+        (COALESCE(te.empresa_id, 0) = 0 AND te.estado != 'excluida') AS is_huerfana,
         (m.id IS NOT NULL)              AS tiene_minuta,
-        (te.empresa_id IS NOT NULL)     AS tiene_empresa
+        (COALESCE(te.empresa_id, 0) != 0)     AS tiene_empresa
 
     FROM teams_eventos te
     LEFT JOIN empresas emp ON te.empresa_id = emp.id
@@ -160,7 +176,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
         'borrador'                      AS te_estado,
         0                               AS is_huerfana,
         1                               AS tiene_minuta,
-        (m.empresa_id IS NOT NULL)      AS tiene_empresa
+        (COALESCE(m.empresa_id, 0) != 0)      AS tiene_empresa
 
     FROM minutas m
     LEFT JOIN empresas emp ON m.empresa_id = emp.id
@@ -174,7 +190,11 @@ const BASE_MINUTA_STANDALONE_SQL = `
 exports.listarReuniones = async (req, res) => {
     const { usuario_id, rol } = req.query;
     const { whereClause, params } = buildRoleWhereClause(usuario_id, rol);
-    const whereM = whereClause.replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL').replace(/te\.usuario_id/g, 'm.ejecutiva_id').replace(/te\.asistentes/g, 'm.participantes');
+    const whereM = whereClause
+        .replace(/WHERE 1=1/g, 'WHERE m.teams_evento_id IS NULL')
+        .replace(/te\.usuario_id/g, 'm.ejecutiva_id')
+        .replace(/te\.asistentes/g, 'm.participantes')
+        .replace(/te\.empresa_id/g, 'm.empresa_id');
 
     const sql = `
         SELECT * FROM (

@@ -1029,3 +1029,50 @@ exports.obtenerReunionPorId = async (req, res) => {
         return res.status(500).json({ error: "Error en la BD" });
     }
 };
+
+// ============================================================
+// POST /reuniones/resolver-participantes
+// ============================================================
+exports.resolverParticipantes = async (req, res) => {
+    const { empresa_id, asistentes } = req.body;
+
+    if (!empresa_id || !Array.isArray(asistentes)) {
+        return res.status(400).json({ error: "Datos incompletos" });
+    }
+
+    try {
+        const nombresParticipantes = [];
+
+        for (const participante of asistentes) {
+            const email = (participante.email || participante.correo || "").trim();
+            let nombreTeams = (participante.name || participante.nombre || "").trim();
+
+            if (!email) continue;
+
+            const [contactos] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ? LIMIT 1", [empresa_id, email]);
+
+            if (contactos.length > 0) {
+                // Existe en la base de datos para esta empresa
+                if (contactos[0].nombre) {
+                    nombresParticipantes.push(contactos[0].nombre);
+                } else if (nombreTeams) {
+                    // No tenía nombre guardado, lo actualizamos con el de Teams
+                    await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [nombreTeams, contactos[0].id]);
+                    nombresParticipantes.push(nombreTeams);
+                } else {
+                    nombresParticipantes.push(email);
+                }
+            } else {
+                // No existe, crearlo
+                let nombreFinal = nombreTeams || null;
+                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, nombreFinal]);
+                nombresParticipantes.push(nombreFinal || email);
+            }
+        }
+
+        res.json({ participantesStr: nombresParticipantes.join(", ") });
+    } catch (err) {
+        console.error("Error en resolverParticipantes:", err);
+        res.status(500).json({ error: "Error en la BD al resolver participantes" });
+    }
+};

@@ -596,8 +596,9 @@ const syncEventosPasados = async (req, res) => {
                 const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
                 const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
 
-                // Solo procesar reuniones Teams (online o presencial marcado)
-                if (!hasOnlineLink && !isPresencial) continue;
+                // SE ELIMINÓ EL FILTRO RESTRICTIVO:
+                // Ahora se procesan todas las reuniones de Outlook, no solo las que tienen link de Teams.
+                // El filtro real se hace más abajo (si no tiene asistentes externos se marca como 'excluida')
 
                 // Resolver asistentes
                 const attendees = event.attendees || [];

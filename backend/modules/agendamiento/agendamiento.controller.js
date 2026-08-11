@@ -492,6 +492,11 @@ const syncEventosPasados = async (req, res) => {
         const [proformaEmp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA' LIMIT 1");
         const proformaEmpId = proformaEmp.length > 0 ? proformaEmp[0].id : null;
 
+        // Obtener todos los correos del sistema UNA SOLA VEZ (fuera del loop)
+        // NOTA: la tabla 'usuarios' no tiene columna 'estado', se filtra solo por correo no nulo
+        const [systemUsersRows] = await db.query("SELECT correo FROM usuarios WHERE correo IS NOT NULL");
+        const systemEmails = new Set(systemUsersRows.map(u => u.correo.toLowerCase().trim()));
+
         const todayStr = now.toISOString().split('T')[0];
         let procesados = 0;
 
@@ -622,10 +627,7 @@ const syncEventosPasados = async (req, res) => {
                 const allEmailsForProformaCheck = [...emails];
                 if (organizerEmail) allEmailsForProformaCheck.push(organizerEmail);
 
-                // Obtener todos los correos del sistema
-                const [systemUsers] = await db.query("SELECT correo FROM usuarios WHERE correo IS NOT NULL AND estado = 'activo'");
-                const systemEmails = new Set(systemUsers.map(u => u.correo.toLowerCase().trim()));
-
+                // systemEmails ya fue cargado antes del loop (evita query por cada evento)
                 const isPurelyProforma = allEmailsForProformaCheck.length > 0 && allEmailsForProformaCheck.every(email => 
                     PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d)) || systemEmails.has(email.toLowerCase())
                 );

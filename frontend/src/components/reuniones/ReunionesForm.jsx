@@ -255,12 +255,39 @@ function ReunionesForm({ onSuccess }) {
     if (!form.hora) missingFields.push("Hora");
     if (!form.lugar) missingFields.push("Lugar");
 
+    // 🔹 VALIDACIÓN DE FORMATO DE CORREOS
+    const validateEmails = (emailString) => {
+      if (!emailString) return null;
+      const emails = emailString.split(",").map(e => e.trim());
+      if (emails.some(e => e === "")) return "No deben haber comas extra ni correos vacíos (ej. al final de la lista).";
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = emails.filter(e => !emailRegex.test(e));
+      if (invalidEmails.length > 0) return `Correos inválidos: ${invalidEmails.join(", ")}`;
+      return null;
+    };
+
+    const emailErrors = [];
+    const enviadoAError = validateEmails(form.enviado_a);
+    if (enviadoAError) emailErrors.push(`<b>Enviar a:</b> ${enviadoAError}`);
+    
+    const ccError = validateEmails(form.correos_cc);
+    if (ccError) emailErrors.push(`<b>CC:</b> ${ccError}`);
+
     if (missingFields.length > 0) {
       return Swal.fire({
         icon: "warning",
         title: "Campos Incompletos",
         html: `<div style="text-align: left;">Por favor completa los siguientes campos obligatorios:<br><br><b>${missingFields.join(", ")}</b></div>`,
         confirmButtonColor: "#3085d6",
+      });
+    }
+
+    if (emailErrors.length > 0) {
+      return Swal.fire({
+        icon: "error",
+        title: "Error en los correos",
+        html: `<div style="text-align: left;">Hay un problema con los destinatarios:<br><br>${emailErrors.join("<br><br>")}</div>`,
+        confirmButtonColor: "#d33",
       });
     }
 

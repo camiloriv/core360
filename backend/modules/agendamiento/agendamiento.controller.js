@@ -451,15 +451,43 @@ const syncEventosPasados = async (req, res) => {
         }
 
         const now = new Date();
-        const start = "2026-01-01T00:00:00.000Z";
         const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();
+
+        // Calcular fecha y hora actual en Santiago (para isEventPast sin bug de timezone)
+        const chileDateParts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(now);
+        const todayStrSantiago = `${chileDateParts.find(p => p.type === 'year').value}-${chileDateParts.find(p => p.type === 'month').value}-${chileDateParts.find(p => p.type === 'day').value}`;
+        const currentTimeSantiago = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(now);
 
         const accessToken = await getGraphToken();
 
-        let endpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView?startDateTime=${start}&endDateTime=${end}&$top=100`;
+        // ============================================================
+        // DELTA QUERIES: leer token guardado del usuario
+        // Si tiene token → solo cambios desde la última sync (rápido)
+        // Si no tiene token → primera sync completa (obtiene token inicial)
+        // ============================================================
+        const [userRow] = await db.query(
+            "SELECT sync_delta_token FROM usuarios WHERE id = ? LIMIT 1",
+            [usuarioId]
+        );
+        const savedDeltaToken = userRow[0]?.sync_delta_token || null;
+
+        let currentEndpoint;
+        if (savedDeltaToken) {
+            // Sync delta: solo eventos nuevos/modificados/eliminados desde la última sync
+            currentEndpoint = savedDeltaToken;
+            console.log(`🔄 Delta sync para ${usuarioCorreo} (token existente)`);
+        } else {
+            // Primera sync: descarga completa del rango y obtiene token inicial
+            currentEndpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=2026-01-01T00:00:00.000Z&endDateTime=${end}&$top=100`;
+            console.log(`📥 Primera sync completa para ${usuarioCorreo} (sin token delta)`);
+        }
 
         let allRawEvents = [];
-        let currentEndpoint = endpoint;
+        let deltaLink = null;
 
         while (currentEndpoint) {
             const response = await fetch(currentEndpoint, {
@@ -471,6 +499,13 @@ const syncEventosPasados = async (req, res) => {
             });
 
             if (!response.ok) {
+                const errText = await response.text();
+                console.error(`Error Graph API (${response.status}):`, errText);
+                // Si el token delta expiró (410 Gone), limpiar token y pedir re-sync
+                if (response.status === 410) {
+                    await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
+                    console.warn(`⚠️ Delta token expirado para ${usuarioCorreo}. Se reseteó para próxima sync completa.`);
+                }
                 if (!res.headersSent) {
                     return res.status(200).json({ success: true, message: "No se pudo sincronizar.", procesados: 0 });
                 }
@@ -480,10 +515,22 @@ const syncEventosPasados = async (req, res) => {
             const data = await response.json();
             if (data.value && data.value.length > 0) allRawEvents.push(...data.value);
 
+            // La última página trae deltaLink (no nextLink)
+            if (data['@odata.deltaLink']) {
+                deltaLink = data['@odata.deltaLink'];
+            }
             currentEndpoint = data['@odata.nextLink'] || null;
         }
 
-        await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
+        // Guardar el nuevo delta token y actualizar ultima_sincronizacion
+        if (deltaLink) {
+            await db.query(
+                "UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?",
+                [deltaLink, usuarioId]
+            );
+        } else {
+            await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
+        }
 
         // Cargar dominios conocidos para matching
         const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
@@ -525,11 +572,12 @@ const syncEventosPasados = async (req, res) => {
                 const fecha = formatDate(event.start.dateTime);
                 const hora = formatTime(event.start.dateTime);
                 const horaFin = formatTime(event.end.dateTime);
-                const isEventPast = new Date(event.end.dateTime + "Z") < now;
+                // isEventPast: comparar usando fecha/hora en Santiago (sin bug de +Z que trata hora local como UTC)
+                const isEventPast = fecha < todayStrSantiago || (fecha === todayStrSantiago && horaFin <= currentTimeSantiago);
                 const isCancelled = event.isCancelled || false;
 
                 // Forzar límite: ignorar cualquier evento antes del 1 de enero de 2026
-                if (new Date(event.start.dateTime) < new Date("2026-01-01T00:00:00Z")) {
+                if (new Date(event.start.dateTime) < new Date("2026-01-01T00:00:00")) {
                     continue;
                 }
 

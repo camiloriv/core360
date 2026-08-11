@@ -143,6 +143,41 @@ const runDailySync = async () => {
 };
 
 // ============================================================
+// ACTUALIZAR ESTADOS PASADOS: cada 15 minutos
+// Marca como 'pasada' cualquier reunión cuya hora_fin ya pasó
+// No hace llamadas a Graph API — solo actualiza la BD local
+// ============================================================
+const actualizarEstadosPasados = async () => {
+    try {
+        const now = new Date();
+
+        // Calcular fecha y hora actual en zona horaria de Santiago
+        const chileDateParts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Santiago',
+            year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(now);
+        const currentDateChile = `${chileDateParts.find(p => p.type === 'year').value}-${chileDateParts.find(p => p.type === 'month').value}-${chileDateParts.find(p => p.type === 'day').value}`;
+        const currentTimeChile = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'America/Santiago',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(now);
+
+        const [result] = await db.query(`
+            UPDATE teams_eventos
+            SET estado = 'pasada'
+            WHERE estado = 'agendada'
+              AND (fecha < ? OR (fecha = ? AND (hora_fin IS NULL OR hora_fin <= ?)))
+        `, [currentDateChile, currentDateChile, currentTimeChile]);
+
+        if (result.affectedRows > 0) {
+            console.log(`🕐 Estado actualizado: ${result.affectedRows} reunión(es) marcada(s) como 'pasada'.`);
+        }
+    } catch (error) {
+        console.error('❌ Error en actualizarEstadosPasados:', error);
+    }
+};
+
+// ============================================================
 // LIMPIEZA DE UPLOADS: todos los días a las 4:00 AM
 // Elimina archivos mayores a 7 días en la carpeta uploads
 // ============================================================
@@ -183,18 +218,25 @@ const startScheduler = () => {
         checkAndSendScheduledEmails();
     }, { timezone: 'America/Santiago' });
 
-    // 2. Sincronización Teams: todos los días a las 3:00 AM (hora de Santiago)
+    // 2. Actualizar estados 'pasada' en tiempo real: cada 15 minutos
+    // Marca como 'pasada' cualquier reunión cuya hora_fin ya pasó
+    cron.schedule('*/15 * * * *', () => {
+        actualizarEstadosPasados();
+    }, { timezone: 'America/Santiago' });
+
+    // 3. Sincronización Teams: todos los días a las 3:00 AM (hora de Santiago)
     cron.schedule('0 3 * * *', () => {
         runDailySync();
     }, { timezone: 'America/Santiago' });
 
-    // 3. Limpieza de archivos temporales: todos los días a las 4:00 AM
+    // 4. Limpieza de archivos temporales: todos los días a las 4:00 AM
     cron.schedule('0 4 * * *', () => {
         cleanOldUploads();
     }, { timezone: 'America/Santiago' });
 
     console.log("⏰ Schedulers iniciados:");
     console.log("   👉 Encuestas programadas: cada minuto");
+    console.log("   🕐 Estado 'pasada' en tiempo real: cada 15 minutos (America/Santiago)");
     console.log("   👉 Sync Teams → teams_eventos: diariamente a las 3:00 AM (America/Santiago)");
     console.log("   🧹 Limpieza de uploads > 7 días: diariamente a las 4:00 AM (America/Santiago)");
 };

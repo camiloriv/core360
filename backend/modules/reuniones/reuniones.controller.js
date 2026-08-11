@@ -221,7 +221,7 @@ exports.listarReuniones = async (req, res) => {
             UPDATE teams_eventos 
             SET estado = 'pasada' 
             WHERE estado = 'agendada' 
-              AND (fecha < ? OR (fecha = ? AND hora_fin <= ?))
+              AND (fecha < ? OR (fecha = ? AND (hora_fin IS NULL OR hora_fin <= ?)))
         `, [currentDateChile, currentDateChile, currentTimeChile]);
         // --- FIN HOTFIX ---
 

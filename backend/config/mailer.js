@@ -92,7 +92,8 @@ if (process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZ
                 return formatted;
             }).filter(att => att.contentBytes); // Ensure we only send valid attachments
             
-            const toArray = Array.isArray(to) ? to : to.split(",").map(e => e.trim());
+            const rawTo = Array.isArray(to) ? to : (to || "").split(",");
+            const toArray = rawTo.map(e => e.trim()).filter(e => e);
             
             let mailFrom = process.env.SMTP_USER;
             if (from) {
@@ -100,7 +101,6 @@ if (process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZ
                 const emailMatch = from.match(/<(.+)>/);
                 mailFrom = emailMatch ? emailMatch[1] : from;
             }
-
 
             // Excluir al remitente de las copias (ya que queda en su carpeta de "Elementos enviados")
             const rawCc = cc ? (Array.isArray(cc) ? cc : cc.split(",").map(e => e.trim())) : [];

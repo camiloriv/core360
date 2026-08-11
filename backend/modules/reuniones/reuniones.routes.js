@@ -39,5 +39,6 @@ router.get("/", reunionesController.listarReuniones);
 router.post("/", upload.array("archivos", 5), reunionesController.crearReunion);
 router.get("/detail/:id_reunion", reunionesController.obtenerReunionPorId);
 router.put("/:id/no-aplica", reunionesController.marcarNoAplica);
+router.post("/resolver-participantes", reunionesController.resolverParticipantes);
 
 module.exports = router;

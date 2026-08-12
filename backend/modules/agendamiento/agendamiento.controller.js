@@ -482,7 +482,7 @@ const syncEventosPasados = async (req, res) => {
             console.log(`🔄 Delta sync para ${usuarioCorreo} (token existente)`);
         } else {
             // Primera sync: descarga completa del rango y obtiene token inicial
-            currentEndpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=2026-01-01T00:00:00.000Z&endDateTime=${end}&$top=100`;
+            currentEndpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=2026-01-01T00:00:00.000Z&endDateTime=${end}`;
             console.log(`📥 Primera sync completa para ${usuarioCorreo} (sin token delta)`);
         }
 
@@ -494,7 +494,7 @@ const syncEventosPasados = async (req, res) => {
                 method: "GET",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
-                    "Prefer": "outlook.timezone=\"America/Santiago\""
+                    "Prefer": "outlook.timezone=\"America/Santiago\", odata.maxpagesize=100"
                 }
             });
 

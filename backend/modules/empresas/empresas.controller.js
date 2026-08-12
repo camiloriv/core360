@@ -171,6 +171,37 @@ exports.eliminarSeguimientoLog = async (req, res) => {
   }
 };
 
+exports.actualizarLogSeguimiento = async (req, res) => {
+  const { reunionId, logIds, estado, fecha } = req.body;
+  if (!logIds && !reunionId) {
+    return res.status(400).json({ error: "Faltan parámetros de identificación" });
+  }
+  try {
+    const ids = logIds ? logIds.split(',').filter(id => id.trim()) : [];
+    
+    // Primero, si tenemos reunionId, intentamos actualizar todos los logs de esa reunión
+    if (reunionId) {
+       await db.query(
+         "UPDATE empresa_seguimiento_log SET estado = ?, fecha = COALESCE(?, fecha) WHERE reunion_id = ?",
+         [estado, fecha || null, reunionId]
+       );
+    }
+    
+    // Luego actualizamos por IDs explícitos (por si hay registros manuales que agruparon en el frontend)
+    if (ids.length > 0) {
+       await db.query(
+         "UPDATE empresa_seguimiento_log SET estado = ?, fecha = COALESCE(?, fecha) WHERE id IN (?)",
+         [estado, fecha || null, ids]
+       );
+    }
+    
+    res.json({ msg: "Eventos de seguimiento actualizados exitosamente" });
+  } catch (err) {
+    console.error("Error actualizando logs de seguimiento:", err);
+    res.status(500).json({ error: "Error en la BD" });
+  }
+};
+
 // Obtener historial de seguimiento de una empresa
 exports.obtenerHistorialSeguimiento = async (req, res) => {
   const { id } = req.params;

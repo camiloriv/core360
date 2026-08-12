@@ -231,7 +231,7 @@ const MenuBar = ({ editor }) => {
   };
 
   const fontFamilies = [
-    { name: 'Calibri Light', value: '"Calibri Light", Calibri, "Segoe UI", sans-serif' },
+    { name: 'Calibri Light', value: '\"Calibri Light\", sans-serif' },
     { name: 'Calibri', value: 'Calibri, "Segoe UI", sans-serif' },
     { name: 'Inter', value: 'Inter, sans-serif' },
     { name: 'Arial', value: 'Arial, sans-serif' },

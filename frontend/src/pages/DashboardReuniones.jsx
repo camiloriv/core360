@@ -1668,7 +1668,9 @@ export default function DashboardReuniones() {
             <table className="reuniones-table" style={{ ...styles.table }}>
               <thead>
                 <tr style={styles.th}>
-                  <th style={{...styles.thCell, width: "13%"}}>AGENDA</th>
+                  <th style={{...styles.thCell, width: "13%"}}>
+                    {userRol === 'gerencia_general' || userRol === 'admin' ? 'EJECUTIVA' : 'AGENDADO'}
+                  </th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA / ID</th>
                   <th style={{...styles.thCell, width: "20%"}}>EMPRESA</th>
                   <th style={{...styles.thCell, width: "12%"}}>TIPO</th>
@@ -1695,15 +1697,45 @@ export default function DashboardReuniones() {
                         className="meeting-row"
                         style={styles.tr}
                       >
-                      <td style={styles.tdCell} data-label="AGENDA">
+                      <td style={styles.tdCell} data-label={userRol === 'gerencia_general' || userRol === 'admin' ? "EJECUTIVA" : "AGENDADO"}>
                         <div>
-                          <div style={{ fontSize: "12px", fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Equipo: ${rowJefaturaName}`}>
-                            👥 {rowJefaturaName}
-                          </div>
-                          {rowOwner?.nombre && (
-                            <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Ejecutivo: ${rowOwner.nombre}`}>
-                              👤 {rowOwner.nombre}
-                            </div>
+                          {(userRol === 'gerencia_general' || userRol === 'admin') ? (
+                            <>
+                              <div style={{ fontSize: "12px", fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Equipo: ${rowJefaturaName}`}>
+                                👥 {rowJefaturaName}
+                              </div>
+                              {rowOwner?.nombre && (
+                                <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Ejecutivo: ${rowOwner.nombre}`}>
+                                  👤 {rowOwner.nombre}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            (() => {
+                              let schedulerName = "Desconocido";
+                              if (r.organizador) {
+                                try {
+                                  const org = typeof r.organizador === 'string' ? JSON.parse(r.organizador) : r.organizador;
+                                  if (org.email && user?.correo && org.email.toLowerCase() === user.correo.toLowerCase()) {
+                                    schedulerName = org.name || "Yo";
+                                  } else if (org.email && (org.email.toLowerCase().endsWith("@proforma.cl") || org.email.toLowerCase().endsWith("@oticproforma.cl"))) {
+                                    schedulerName = org.name ? org.name : "Persona proforma";
+                                  } else {
+                                    schedulerName = "Asociado";
+                                  }
+                                } catch (e) {
+                                  schedulerName = "Desconocido";
+                                }
+                              } else {
+                                schedulerName = rowOwner?.nombre || "Manual";
+                              }
+
+                              return (
+                                <div style={{ fontSize: "12px", fontWeight: "bold", color: "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }} title={`Agendado por: ${schedulerName}`}>
+                                  📅 {schedulerName}
+                                </div>
+                              );
+                            })()
                           )}
                         </div>
                       </td>

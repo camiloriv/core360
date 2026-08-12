@@ -5,6 +5,10 @@ require("dotenv").config();
 
 const app = express();
 
+// ✅ Trust proxy: necesario en Railway/Render para que express-rate-limit
+// pueda identificar correctamente la IP real del usuario desde X-Forwarded-For
+app.set('trust proxy', 1);
+
 // ✅ Seguridad: Cabeceras HTTP protegidas
 try {
   const helmet = require("helmet");

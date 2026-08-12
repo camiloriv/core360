@@ -622,7 +622,11 @@ const syncEventosPasados = async (req, res) => {
                 const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
                 // Extraer preview del cuerpo (usamos body.content para no perder los enlaces de grabación)
-                const bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
+                let bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
+                // MySQL TEXT column limit is 65535 bytes. Truncate to avoid ER_DATA_TOO_LONG, specially with embedded base64 images
+                if (bodyPreview && bodyPreview.length > 60000) {
+                    bodyPreview = bodyPreview.substring(0, 60000);
+                }
 
                 if (emails.length === 0) {
                     // Sin asistentes → ignorar

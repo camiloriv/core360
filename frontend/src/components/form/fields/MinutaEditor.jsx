@@ -567,7 +567,7 @@ const MenuBar = ({ editor }) => {
         <div className="menubar-table-submenu" style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', flexWrap: 'wrap', gap: '15px', padding: '8px' }}>
           <div className="menubar-table-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <button
-              onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
+              onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run(); }}
               style={{ background: '#dcfce7', color: '#166534', fontSize: '10px', fontWeight: 'bold', width: 'auto', padding: '0 8px' }}
             >+ INSERTAR</button>
             <span style={{ fontSize: '9px', color: '#666' }}>Nueva</span>

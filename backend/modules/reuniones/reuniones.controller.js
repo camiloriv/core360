@@ -79,6 +79,7 @@ const BASE_REUNION_SQL = `
         u.nombre                        AS ejecutiva_nombre,
         j.nombre                        AS jefatura_nombre,
         te.body_preview,
+        te.organizador,
 
         m.id                            AS minuta_row_id,
         COALESCE(m.id_minuta, CAST(te.id AS CHAR)) AS id_reunion,
@@ -147,6 +148,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
         u.nombre                        AS ejecutiva_nombre,
         j.nombre                        AS jefatura_nombre,
         NULL                            AS body_preview,
+        NULL                            AS organizador,
 
         m.id                            AS minuta_row_id,
         m.id_minuta                     AS id_reunion,

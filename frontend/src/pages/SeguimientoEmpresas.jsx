@@ -574,8 +574,44 @@ export default function SeguimientoEmpresas() {
       };
     });
 
+    // Deduplicar timeline visualmente por fecha y asunto
+    const uniqueTimelineMap = new Map();
+
+    timeline.forEach(item => {
+      // Usar la fecha principal de la reunión para agrupar
+      let dateKey = "";
+      if (item.dateAgendadaTarget) dateKey = item.dateAgendadaTarget.toString().substring(0, 10);
+      else if (item.dateRealizacion) dateKey = item.dateRealizacion.toString().substring(0, 10);
+      else if (item.dateSolicitada) dateKey = item.dateSolicitada.toString().substring(0, 10);
+      
+      const key = `${item.asunto?.trim()?.toLowerCase()}_${dateKey}`;
+      
+      if (uniqueTimelineMap.has(key)) {
+        const existing = uniqueTimelineMap.get(key);
+        // Combinar ejecutivas (nombres) si no están ya en la lista
+        if (item.ejecutiva && (!existing.ejecutiva || !existing.ejecutiva.includes(item.ejecutiva))) {
+          existing.ejecutiva = existing.ejecutiva ? `${existing.ejecutiva}, ${item.ejecutiva}` : item.ejecutiva;
+        }
+        // Combinar logIds para que al eliminar/editar se aplique a todos
+        if (item.logIds) {
+          const newLogs = item.logIds.split(',');
+          const existingLogs = existing.logIds ? existing.logIds.split(',') : [];
+          const combinedLogs = [...new Set([...existingLogs, ...newLogs])].filter(Boolean);
+          existing.logIds = combinedLogs.join(',');
+        }
+        if (item.reunionId && !existing.reunionId) {
+          existing.reunionId = item.reunionId;
+        }
+        // Puedes agregar lógica para priorizar el estado si es necesario
+      } else {
+        uniqueTimelineMap.set(key, { ...item });
+      }
+    });
+
+    const finalTimeline = Array.from(uniqueTimelineMap.values());
+
     // Ordenar de más reciente a más antiguo
-    timeline.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+    finalTimeline.sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
 
     const colorMap = {
       enviado: "#10b981",    // verde
@@ -648,16 +684,30 @@ export default function SeguimientoEmpresas() {
                   return `
                     <tr style="border-bottom: 1px solid #f1f5f9; vertical-align: top;">
                       <td style="padding: 10px; word-break: break-word; position: relative;">
-                        <button
-                          data-delete-reunion-id="${item.reunionId || ''}"
-                          data-delete-log-ids="${item.logIds || ''}"
-                          style="position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: #ef4444; font-size: 14px; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;"
-                          onmouseover="this.style.background='#fee2e2'"
-                          onmouseout="this.style.background='transparent'"
-                          title="Eliminar este evento"
-                        >
-                          🗑️
-                        </button>
+                        <div style="position: absolute; top: 10px; right: 10px; display: flex; gap: 4px;">
+                          <button
+                            data-edit-reunion-id="${item.reunionId || ''}"
+                            data-edit-log-ids="${item.logIds || ''}"
+                            data-edit-estado-actual="${item.estado || ''}"
+                            data-edit-asunto="${item.asunto || ''}"
+                            style="background: none; border: none; cursor: pointer; color: #3b82f6; font-size: 14px; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;"
+                            onmouseover="this.style.background='#dbeafe'"
+                            onmouseout="this.style.background='transparent'"
+                            title="Editar estado del evento"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            data-delete-reunion-id="${item.reunionId || ''}"
+                            data-delete-log-ids="${item.logIds || ''}"
+                            style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 14px; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background 0.2s;"
+                            onmouseover="this.style.background='#fee2e2'"
+                            onmouseout="this.style.background='transparent'"
+                            title="Eliminar este evento"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                         <div style="font-weight: 700; color: #1e293b; margin-bottom: 6px; font-size: 12px; line-height: 1.2; padding-right: 24px;">${item.asunto}</div>
                         <div style="margin-bottom: 4px;">
                           ${hasMinuta
@@ -835,6 +885,59 @@ export default function SeguimientoEmpresas() {
       });
     };
 
+    window.__core360_editLogStatus = async (reunionId, logIds, estadoActual, asunto) => {
+      const result = await Swal.fire({
+        title: 'Actualizar Estado',
+        text: `Asunto: ${asunto || 'Reunión'}`,
+        html: `
+          <div style="text-align: left;">
+            <label style="font-size: 13px; font-weight: 600; color: #475569; display: block; margin-bottom: 8px;">Nuevo Estado:</label>
+            <select id="swal-edit-estado" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: border-color 0.2s;">
+              <option value="agendada" ${estadoActual === 'agendada' ? 'selected' : ''}>Agendada</option>
+              <option value="gestionada" ${estadoActual === 'gestionada' || estadoActual === 'concretada' ? 'selected' : ''}>Realizada / Cerrada</option>
+              <option value="reagendada" ${estadoActual === 'reagendada' ? 'selected' : ''}>Reagendada</option>
+              <option value="cancelada" ${estadoActual === 'cancelada' ? 'selected' : ''}>Cancelada</option>
+            </select>
+            <div style="margin-top: 15px;">
+              <label style="font-size: 13px; font-weight: 600; color: #475569; display: block; margin-bottom: 8px;">Fecha del estado (Opcional):</label>
+              <input id="swal-edit-fecha" type="date" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none;">
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#3b82f6',
+        preConfirm: () => {
+          return {
+            estado: document.getElementById('swal-edit-estado').value,
+            fecha: document.getElementById('swal-edit-fecha').value
+          }
+        }
+      });
+
+      if (result.isConfirmed) {
+        try {
+          await api.put('/empresas/logs/actualizar', {
+            reunionId,
+            logIds,
+            estado: result.value.estado,
+            fecha: result.value.fecha
+          });
+          Swal.close();
+          fetchEmpresas();
+          fetchReuniones();
+          fetchSeguimientoLogs();
+          toast.success("Estado actualizado exitosamente");
+          // Re-abrir la modal actualizando la vista
+          setTimeout(() => handleEstadoClick(emp), 300);
+        } catch (e) {
+          console.error("Error actualizando evento:", e);
+          toast.error("Error al actualizar evento");
+        }
+      }
+    };
+
     window.__core360_deleteLog = async (reunionId, logIds) => {
       try {
         const isTeams = !!reunionId;
@@ -928,14 +1031,21 @@ export default function SeguimientoEmpresas() {
             window.__core360_viewMinuta(el.getAttribute('data-minuta-id'));
           });
         });
+        document.querySelectorAll('[data-edit-reunion-id]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const reunionId = e.currentTarget.getAttribute('data-edit-reunion-id');
+            const logIds = e.currentTarget.getAttribute('data-edit-log-ids');
+            const estadoActual = e.currentTarget.getAttribute('data-edit-estado-actual');
+            const asunto = e.currentTarget.getAttribute('data-edit-asunto');
+            window.__core360_editLogStatus(reunionId, logIds, estadoActual, asunto);
+          });
+        });
 
-        // Adjuntar listeners a los botones de eliminar
-        popup.querySelectorAll('[data-delete-log-ids]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            window.__core360_deleteLog(
-              btn.getAttribute('data-delete-reunion-id'),
-              btn.getAttribute('data-delete-log-ids')
-            );
+        document.querySelectorAll('[data-delete-reunion-id]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const reunionId = e.currentTarget.getAttribute('data-delete-reunion-id');
+            const logIds = e.currentTarget.getAttribute('data-delete-log-ids');
+            window.__core360_deleteLog(reunionId, logIds);
           });
         });
       },

@@ -1000,9 +1000,8 @@ function MinutaEditor({ form, setForm }) {
         .preview-section-label { font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 32px 0 12px 0; letter-spacing: 1px; }
         .preview-content-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 60px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
-        .preview-content-box table { border-collapse: collapse; width: auto !important; min-width: 300px; margin: 15px 0; border: 1px solid #cbd5e1 !important; }
-        .preview-content-box table tr:first-child td, .preview-content-box table tr:first-child th { background-color: #2563eb !important; color: #ffffff !important; font-weight: bold !important; text-align: center !important; border: 1px solid #2563eb !important; padding: 10px !important; }
-        .preview-content-box td, .preview-content-box th { border: 1px solid #cbd5e1 !important; padding: 8px 14px !important; color: #334155 !important; vertical-align: middle; line-height: 1.4 !important; }
+        .preview-content-box table { border-collapse: collapse; width: auto !important; min-width: 300px; margin: 15px 0; border: 1px solid #000000 !important; }
+        .preview-content-box td, .preview-content-box th { border: 1px solid #000000 !important; padding: 2px 8px !important; vertical-align: middle; line-height: 1.2 !important; font-weight: normal !important; }
         .preview-content-box p { margin: 0 0 12px 0; }
         .preview-content-box ul, .preview-content-box ol { padding-left: 20px; margin-bottom: 12px; }
         .preview-content-box li { margin-bottom: 6px; }

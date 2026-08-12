@@ -567,7 +567,7 @@ const MenuBar = ({ editor }) => {
         <div className="menubar-table-submenu" style={{ ...groupStyle, borderRight: 'none', background: 'var(--bg-muted)', borderRadius: '8px', flexDirection: 'row', flexWrap: 'wrap', gap: '15px', padding: '8px' }}>
           <div className="menubar-table-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <button
-              onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
+              onClick={(e) => { e.preventDefault(); editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run(); }}
               style={{ background: '#dcfce7', color: '#166534', fontSize: '10px', fontWeight: 'bold', width: 'auto', padding: '0 8px' }}
             >+ INSERTAR</button>
             <span style={{ fontSize: '9px', color: '#666' }}>Nueva</span>
@@ -1000,9 +1000,8 @@ function MinutaEditor({ form, setForm }) {
         .preview-section-label { font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 32px 0 12px 0; letter-spacing: 1px; }
         .preview-content-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 60px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
-        .preview-content-box table { border-collapse: collapse; width: auto !important; min-width: 300px; margin: 15px 0; border: 1px solid #cbd5e1 !important; }
-        .preview-content-box table tr:first-child td, .preview-content-box table tr:first-child th { background-color: #2563eb !important; color: #ffffff !important; font-weight: bold !important; text-align: center !important; border: 1px solid #2563eb !important; padding: 10px !important; }
-        .preview-content-box td, .preview-content-box th { border: 1px solid #cbd5e1 !important; padding: 8px 14px !important; color: #334155 !important; vertical-align: middle; line-height: 1.4 !important; }
+        .preview-content-box table { border-collapse: collapse; width: auto !important; min-width: 300px; margin: 15px 0; border: 1px solid #000000 !important; }
+        .preview-content-box td, .preview-content-box th { border: 1px solid #000000 !important; padding: 2px 8px !important; vertical-align: middle; line-height: 1.2 !important; font-weight: normal !important; }
         .preview-content-box p { margin: 0 0 12px 0; }
         .preview-content-box ul, .preview-content-box ol { padding-left: 20px; margin-bottom: 12px; }
         .preview-content-box li { margin-bottom: 6px; }
@@ -1081,8 +1080,7 @@ function MinutaEditor({ form, setForm }) {
         .tiptap-modal-container .ProseMirror { min-height: 250px; padding: 20px; outline: none; font-size: 14px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         .tiptap p { margin: 0 0 10px 0; text-align: inherit; width: 100%; }
         .tiptap table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin: 15px 0; border: 1px solid #000000; }
-        .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; }
-        .tiptap table tr:first-child td, .tiptap table tr:first-child th { background-color: #e67e22; font-weight: bold; color: #000000; }
+        .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; font-weight: normal; }
         .tiptap .selectedCell:after { z-index: 2; content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: rgba(200, 200, 255, 0.2); pointer-events: none; }
         .tiptap .column-resize-handle {
           position: absolute;

@@ -1081,8 +1081,7 @@ function MinutaEditor({ form, setForm }) {
         .tiptap-modal-container .ProseMirror { min-height: 250px; padding: 20px; outline: none; font-size: 14px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         .tiptap p { margin: 0 0 10px 0; text-align: inherit; width: 100%; }
         .tiptap table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin: 15px 0; border: 1px solid #000000; }
-        .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; }
-        .tiptap table tr:first-child td, .tiptap table tr:first-child th { background-color: #e67e22; font-weight: bold; color: #000000; }
+        .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; font-weight: normal; }
         .tiptap .selectedCell:after { z-index: 2; content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: rgba(200, 200, 255, 0.2); pointer-events: none; }
         .tiptap .column-resize-handle {
           position: absolute;

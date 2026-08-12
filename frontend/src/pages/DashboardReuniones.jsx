@@ -1669,12 +1669,12 @@ export default function DashboardReuniones() {
               <thead>
                 <tr style={styles.th}>
                   <th style={{...styles.thCell, width: "10%"}}>FECHA / ID</th>
-                  <th style={{...styles.thCell, width: "22%"}}>ASUNTO</th>
+                  <th style={{...styles.thCell, width: "26%"}}>ASUNTO</th>
                   <th style={{...styles.thCell, width: "20%"}}>EMPRESA</th>
                   <th style={{...styles.thCell, width: "17%", textAlign: "center"}}>MINUTA</th>
                   <th style={{...styles.thCell, width: "9%"}}>FECHA DE ENVÍO</th>
                   <th style={{...styles.thCell, width: "8%"}}>ADJUNTOS</th>
-                  <th style={{...styles.thCell, width: "14%"}}>TIPO</th>
+                  <th style={{...styles.thCell, width: "10%"}}>TIPO</th>
                 </tr>
               </thead>
               <tbody>
@@ -1713,61 +1713,6 @@ export default function DashboardReuniones() {
                           <div className="desktop-only-block" style={{ ...styles.meetingIdText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={r.id_reunion}>
                             {r.id_reunion.length > 25 ? "En Teams" : r.id_reunion}
                           </div>
-                        </div>
-                      </td>
-                      <td style={styles.tdCell} data-label="EMPRESA">
-                        {/* Collapsed state (small square) - only visible on mobile */}
-                        <div className="mobile-empresa-status-collapsed">
-                          {r.is_huerfana ? (
-                            <span className="color-square red-square" title="Huérfana (Sin vincular)"></span>
-                          ) : (r._isProforma || r.empresa_nombre === "PROFORMA INTERNA") ? (
-                            <span className="color-square gray-square" title="Proforma Interna"></span>
-                          ) : (
-                            <span className="color-square blue-square" title={r.empresa_nombre}></span>
-                          )}
-                        </div>
-
-                        {/* Desktop / Full view */}
-                        <div className="empresa-actions-full">
-                          {r.is_huerfana ? (
-                            <div 
-                              style={{
-                                display: "inline-flex", alignItems: "center", gap: "4px",
-                                padding: "4px 8px", background: "#dbeafe", color: "#1e40af",
-                                borderRadius: "4px", fontSize: "11px", fontWeight: "bold",
-                                cursor: "pointer", border: "1px solid #bfdbfe", transition: "background 0.2s"
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "#bfdbfe"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = "#dbeafe"}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedOrphan(r);
-                                setSelectedOrphanId(r.id_reunion);
-                                setSearchEmpresa("");
-                                setSelectedEmpresaId("");
-                                setShowEmpresaDropdown(false);
-                                setIsAssignModalOpen(true);
-                              }}
-                            >
-                              🔗 Vincular Empresa
-                            </div>
-                          ) : (
-                            <div 
-                              style={{...styles.companyName, cursor: "pointer", textDecoration: "underline"}}
-                              title="Modificar/Desvincular Empresa"
-                              onClick={() => {
-                                setSelectedOrphanId(r.id_reunion);
-                                setSelectedOrphan(r);
-                                setSearchEmpresa("");
-                                setSelectedEmpresaId(r.empresa_id ? String(r.empresa_id) : "");
-                                setShowEmpresaDropdown(false);
-                                setNoAplicaEmpresa(false);
-                                setIsAssignModalOpen(true);
-                              }}
-                            >
-                              {r.empresa_nombre}
-                            </div>
-                          )}
                         </div>
                       </td>
                       <td style={styles.tdCell} data-label="ASUNTO">
@@ -1823,6 +1768,61 @@ export default function DashboardReuniones() {
                               </div>
                             );
                           })()}
+                        </div>
+                      </td>
+                      <td style={styles.tdCell} data-label="EMPRESA">
+                        {/* Collapsed state (small square) - only visible on mobile */}
+                        <div className="mobile-empresa-status-collapsed">
+                          {r.is_huerfana ? (
+                            <span className="color-square red-square" title="Huérfana (Sin vincular)"></span>
+                          ) : (r._isProforma || r.empresa_nombre === "PROFORMA INTERNA") ? (
+                            <span className="color-square gray-square" title="Proforma Interna"></span>
+                          ) : (
+                            <span className="color-square blue-square" title={r.empresa_nombre}></span>
+                          )}
+                        </div>
+
+                        {/* Desktop / Full view */}
+                        <div className="empresa-actions-full">
+                          {r.is_huerfana ? (
+                            <div 
+                              style={{
+                                display: "inline-flex", alignItems: "center", gap: "4px",
+                                padding: "4px 8px", background: "#dbeafe", color: "#1e40af",
+                                borderRadius: "4px", fontSize: "11px", fontWeight: "bold",
+                                cursor: "pointer", border: "1px solid #bfdbfe", transition: "background 0.2s"
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = "#bfdbfe"}
+                              onMouseLeave={(e) => e.currentTarget.style.background = "#dbeafe"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrphan(r);
+                                setSelectedOrphanId(r.id_reunion);
+                                setSearchEmpresa("");
+                                setSelectedEmpresaId("");
+                                setShowEmpresaDropdown(false);
+                                setIsAssignModalOpen(true);
+                              }}
+                            >
+                              🔗 Vincular Empresa
+                            </div>
+                          ) : (
+                            <div 
+                              style={{...styles.companyName, cursor: "pointer", textDecoration: "underline"}}
+                              title="Modificar/Desvincular Empresa"
+                              onClick={() => {
+                                setSelectedOrphanId(r.id_reunion);
+                                setSelectedOrphan(r);
+                                setSearchEmpresa("");
+                                setSelectedEmpresaId(r.empresa_id ? String(r.empresa_id) : "");
+                                setShowEmpresaDropdown(false);
+                                setNoAplicaEmpresa(false);
+                                setIsAssignModalOpen(true);
+                              }}
+                            >
+                              {r.empresa_nombre}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td style={{...styles.tdCell, textAlign: "center"}} data-label="MINUTA">

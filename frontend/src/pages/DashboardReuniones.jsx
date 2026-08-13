@@ -58,7 +58,7 @@ const TYPE_COLORS = {
 
 const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // Default gris claro
 
-const MinutaComentarioModal = ({ isOpen, onClose, onSave, defaultValue }) => {
+const MinutaComentarioModal = ({ isOpen, onClose, onSave, defaultValue, readOnly }) => {
   const [comentario, setComentario] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -84,15 +84,34 @@ const MinutaComentarioModal = ({ isOpen, onClose, onSave, defaultValue }) => {
           value={comentario}
           onChange={(e) => setComentario(e.target.value)}
           placeholder="Escribe tu observación o comentario aquí..."
-          style={{ width: "100%", height: "120px", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", resize: "vertical", marginBottom: "15px", fontFamily: "inherit" }}
+          disabled={readOnly}
+          style={{ width: "100%", height: "120px", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", resize: "vertical", marginBottom: "15px", fontFamily: "inherit", background: readOnly ? "#f8fafc" : "white" }}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: "bold" }}>Cancelar</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold" }}>{saving ? "Guardando..." : "Guardar"}</button>
+          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: "bold" }}>
+            {readOnly ? "Cerrar" : "Cancelar"}
+          </button>
+          {!readOnly && (
+            <button onClick={handleSave} disabled={saving} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold" }}>{saving ? "Guardando..." : "Guardar"}</button>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+export const getStatusLabel = (r) => {
+  if (r.estado_envio === "huerfana") return { label: "-", icon: "" };
+  if (r._isExcluida || r.estado_envio === "no_aplica") return { label: "No requiere", icon: "" };
+  if (r.estado_envio === "borrador" && r.tiene_minuta) return { label: "Borrador", icon: "" };
+  if (r.estado_envio === "borrador" && !r.tiene_minuta) return { label: "Pendiente", icon: "" };
+  if (r.estado_envio === "enviado" || r.estado_envio === "gestionada") {
+    if (r.es_retroactiva === 1) return { label: "Retroactiva", icon: "" };
+    if (r.es_retroactiva === 2) return { label: "Comentada", icon: "💬" };
+    return { label: "Enviada", icon: "" };
+  }
+  if (r.estado_envio === "agendada") return { label: "Pendiente", icon: "🗓️" };
+  return { label: r.estado_envio || "-", icon: "" };
 };
 
 const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioModal, openDropdownId, setOpenDropdownId, isLastRows }) => {
@@ -102,33 +121,33 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
     setOpenDropdownId(isOpen ? null : r.id_reunion);
   };
 
-  let badgeLabel = "-";
-  let badgeIcon = "";
+  const { label: badgeLabel, icon: badgeIcon } = getStatusLabel(r);
 
-  if (r.estado_envio === "huerfana") {
+  if (badgeLabel === "-") {
     return <span style={{ color: "var(--text-muted)", fontSize: "12px", fontWeight: "bold" }}>-</span>;
   }
-  
-  if (r._isExcluida || r.estado_envio === "no_aplica") {
-    badgeLabel = "No requiere";
-  } else if (r.estado_envio === "borrador" && r.tiene_minuta) {
-    badgeLabel = "Borrador";
-  } else if (r.estado_envio === "borrador" && !r.tiene_minuta) {
-    badgeLabel = "Pendiente";
-  } else if (r.estado_envio === "enviado" || r.estado_envio === "gestionada") {
-    badgeLabel = r.es_retroactiva === 1 ? "Retroactiva" : "Enviada";
-    badgeIcon = "✅";
-  } else if (r.estado_envio === "agendada") {
-    badgeLabel = "Agendada";
-    badgeIcon = "🗓️";
-  }
+
+  const isFinalState = ["Enviada", "Retroactiva", "Comentada", "No requiere"].includes(badgeLabel);
+
+  const handleClickAction = (e) => {
+    e.stopPropagation();
+    if (isFinalState) {
+      if (badgeLabel === "Enviada" || badgeLabel === "Retroactiva") {
+        navigate(`/minuta/${r.id_reunion}`, { state: { draft: r, modo: 'normal' } });
+      } else if (badgeLabel === "Comentada") {
+        setComentarioModal({ isOpen: true, reunion: r, text: r.minuta || '', readOnly: true });
+      }
+      return;
+    }
+    setOpenDropdownId(isOpen ? null : r.id_reunion);
+  };
 
   const isReadOnly = (r.estado_envio === "enviado" && r.es_retroactiva !== 1 && badgeLabel === "Enviada"); // Si es enviada normal, quizá ya no se pueda comentar, pero permitiremos opciones igual
 
   return (
     <div style={{ position: "relative", display: "inline-block" }} onMouseLeave={() => setOpenDropdownId(null)}>
       <div
-        onClick={toggleDropdown}
+        onClick={handleClickAction}
         style={{
           background: "#f1f5f9",
           color: "#334155",
@@ -136,7 +155,7 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
           borderRadius: "6px",
           fontSize: "12px",
           fontWeight: "bold",
-          cursor: "pointer",
+          cursor: (isFinalState && badgeLabel === "No requiere") ? "default" : "pointer",
           display: "flex",
           alignItems: "center",
           gap: "4px",
@@ -146,10 +165,10 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
         onMouseEnter={(e) => (e.currentTarget.style.background = "#e2e8f0")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "#f1f5f9")}
       >
-        {badgeIcon} {badgeLabel} <span style={{ fontSize: "10px" }}>▾</span>
+        {badgeIcon} {badgeLabel} {!isFinalState && <span style={{ fontSize: "10px" }}>▾</span>}
       </div>
 
-      {isOpen && (
+      {!isFinalState && isOpen && (
         <div style={{
           position: "absolute",
           top: isLastRows ? "auto" : "100%",
@@ -240,14 +259,14 @@ export default function DashboardReuniones() {
   const navigate = useNavigate();
 
   const [loadingSync, setLoadingSync] = useState(true);
-  const [comentarioModal, setComentarioModal] = useState({ isOpen: false, reunion: null, text: '' });
+  const [comentarioModal, setComentarioModal] = useState({ isOpen: false, reunion: null, text: '', readOnly: false });
 
   const handleGuardarComentario = async (texto) => {
     if (!comentarioModal.reunion) return;
     try {
       await guardarComentario(comentarioModal.reunion.id_reunion, texto);
       Swal.fire({ icon: 'success', title: 'Comentario guardado', timer: 1500, showConfirmButton: false });
-      setComentarioModal({ isOpen: false, reunion: null, text: '' });
+      setComentarioModal({ isOpen: false, reunion: null, text: '', readOnly: false });
       refetch();
     } catch (e) {
       Swal.fire('Error', 'No se pudo guardar el comentario', 'error');
@@ -1120,19 +1139,82 @@ export default function DashboardReuniones() {
   }, [realizedReuniones]);
 
   const handleExport = () => {
-    const dataToExport = filteredReuniones.map((r) => ({
-      ID: r.id_reunion,
-      Fecha: new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" }),
-      Hora: r.hora,
-      Tipo: r.tipo_reu,
-      Motivo: r.motivo_reu,
-      Empresa: r.empresa_nombre,
-      "Usuario Creador": r.ejecutiva_nombre,
-      "Jefatura Responsable": r.jefatura_nombre,
-      Modalidad: r.lugar === "Presencial" || Number(r.es_online) === 0 ? "Presencial" : (r.lugar || "Online"),
-      Participantes: r.participantes,
-      "Estado Minuta": r.estado_envio,
-    }));
+    const formatParticipantes = (raw) => {
+      if (!raw) return "-";
+      let parsed = raw;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {}
+      }
+      if (Array.isArray(parsed)) {
+        return parsed.map(p => p.name || p.email || "").filter(Boolean).join(", ");
+      }
+      return typeof raw === 'string' ? raw : "-";
+    };
+
+    const formatOrganizador = (raw) => {
+      if (!raw) return null;
+      let parsed = raw;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {
+          return raw; // it's just a regular string
+        }
+      }
+      
+      if (typeof parsed === 'object' && parsed !== null) {
+        if (parsed.emailAddress) {
+          return parsed.emailAddress.name || parsed.emailAddress.address || null;
+        }
+        return parsed.name || parsed.email || null;
+      }
+      return raw;
+    };
+
+    const isInternalUser = (raw) => {
+      if (!raw) return true;
+      let val = "";
+      if (typeof raw === 'object') {
+        val = (raw.emailAddress?.address || raw.email || raw.name || "").toLowerCase();
+      } else {
+        val = String(raw).toLowerCase();
+      }
+      return val.includes("@proforma.cl") || val.includes("@ecologica.cl");
+    };
+
+    const dataToExport = filteredReuniones.map((r) => {
+      let jefaturaResponsable = r.jefatura_nombre; // 1. Prioridad: Jefatura de la empresa
+      
+      if (!jefaturaResponsable) {
+        if (!isInternalUser(r.organizador)) {
+          jefaturaResponsable = "Esperando asociación";
+        } else {
+          if (r.ejecutiva_permisos === 'ejecutiva') {
+             jefaturaResponsable = r.ejecutiva_jefatura_nombre || "Sin Jefatura asignada";
+          } else if (r.ejecutiva_permisos === 'jefatura' || r.ejecutiva_permisos === 'gerencia' || r.ejecutiva_permisos === 'admin') {
+             jefaturaResponsable = r.ejecutiva_nombre;
+          } else {
+             jefaturaResponsable = "-";
+          }
+        }
+      }
+
+      return {
+        ID: r.id_reunion,
+        Fecha: new Date(r.fecha_reu).toLocaleDateString("es-CL", { timeZone: "UTC" }),
+        Hora: r.hora,
+        Tipo: r.tipo_reu,
+        Motivo: r.motivo_reu || r.asunto_teams || "-",
+        Empresa: r.empresa_nombre,
+        "Usuario Creador": formatOrganizador(r.organizador) || r.ejecutiva_nombre || "Desconocido",
+        "Jefatura Responsable": jefaturaResponsable,
+        Modalidad: r.lugar === "Presencial" || Number(r.es_online) === 0 ? "Presencial" : (r.lugar || "Online"),
+        Participantes: r.participantes || formatParticipantes(r.asistentes) || "-",
+        "Estado Minuta": getStatusLabel(r).label,
+      };
+    });
     exportToExcel(
       dataToExport,
       `Reuniones_Core360_${new Date().toISOString().split("T")[0]}`,
@@ -1171,9 +1253,10 @@ export default function DashboardReuniones() {
     >
       <MinutaComentarioModal 
         isOpen={comentarioModal.isOpen} 
-        onClose={() => setComentarioModal({ isOpen: false, reunion: null, text: '' })} 
+        onClose={() => setComentarioModal({ isOpen: false, reunion: null, text: '', readOnly: false })} 
         onSave={handleGuardarComentario} 
         defaultValue={comentarioModal.text} 
+        readOnly={comentarioModal.readOnly}
       />
       <div className="container" style={{ padding: "30px 20px" }}>
         <div style={{ marginBottom: "30px" }}>

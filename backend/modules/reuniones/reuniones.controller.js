@@ -77,7 +77,9 @@ const BASE_REUNION_SQL = `
         te.ultima_sync,
         emp.nombre                      AS empresa_nombre,
         u.nombre                        AS ejecutiva_nombre,
+        u.permisos                      AS ejecutiva_permisos,
         j.nombre                        AS jefatura_nombre,
+        uj.nombre                       AS ejecutiva_jefatura_nombre,
         te.body_preview,
         te.organizador,
 
@@ -125,6 +127,7 @@ const BASE_REUNION_SQL = `
     LEFT JOIN empresas emp ON te.empresa_id = emp.id
     LEFT JOIN usuarios u ON te.usuario_id = u.id
     LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    LEFT JOIN usuarios uj ON u.jefatura_id = uj.id
     LEFT JOIN minutas m ON m.teams_evento_id = te.id
 `;
 
@@ -146,7 +149,9 @@ const BASE_MINUTA_STANDALONE_SQL = `
         NULL                            AS ultima_sync,
         emp.nombre                      AS empresa_nombre,
         u.nombre                        AS ejecutiva_nombre,
+        u.permisos                      AS ejecutiva_permisos,
         j.nombre                        AS jefatura_nombre,
+        uj.nombre                       AS ejecutiva_jefatura_nombre,
         NULL                            AS body_preview,
         NULL                            AS organizador,
 
@@ -184,6 +189,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
     LEFT JOIN empresas emp ON m.empresa_id = emp.id
     LEFT JOIN usuarios u ON m.ejecutiva_id = u.id
     LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    LEFT JOIN usuarios uj ON u.jefatura_id = uj.id
 `;
 
 // ============================================================
@@ -520,7 +526,11 @@ exports.crearReunion = async (req, res) => {
         }
 
         if (!final_id_minuta) {
-            final_id_minuta = await generarIdMinuta();
+            if (teId) {
+                final_id_minuta = `REU-${teId}`;
+            } else {
+                final_id_minuta = await generarIdMinuta();
+            }
         }
 
         if (isUpdate) {
@@ -956,7 +966,7 @@ exports.marcarNoAplica = async (req, res) => {
                 const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
                 if (teRows.length > 0) {
                     const teRow = teRows[0];
-                    const idMinuta = `minuta-${teId}-${Date.now()}`;
+                    const idMinuta = `REU-${teId}`;
                     await db.query(`
                         INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
                         VALUES (?, ?, 'no_aplica', ?, ?, ?, ?, ?)
@@ -1091,7 +1101,7 @@ exports.guardarComentario = async (req, res) => {
         const [minutaRows] = await db.query("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
 
         if (minutaRows.length > 0) {
-            await db.query("UPDATE minutas SET minuta = ?, estado_envio = 'enviado', es_retroactiva = 1 WHERE id_minuta = ?", [comentario, id]);
+            await db.query("UPDATE minutas SET minuta = ?, estado_envio = 'enviado', es_retroactiva = 2 WHERE id_minuta = ?", [comentario, id]);
             
             // Audit log
             registrarAudit({
@@ -1113,10 +1123,10 @@ exports.guardarComentario = async (req, res) => {
             const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
             if (teRows.length > 0) {
                 const teRow = teRows[0];
-                const idMinuta = `minuta-${teId}-${Date.now()}`;
+                const idMinuta = `REU-${teId}`;
                 await db.query(`
                     INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, minuta, es_retroactiva, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
-                    VALUES (?, ?, 'enviado', ?, 1, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, 'enviado', ?, 2, ?, ?, ?, ?, ?)
                 `, [
                     idMinuta, 
                     teId, 

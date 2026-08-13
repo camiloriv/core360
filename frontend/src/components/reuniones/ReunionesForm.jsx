@@ -574,7 +574,7 @@ function ReunionesForm({ onSuccess }) {
           <FormSection
             label={
               <>
-                ENVIAR A <span style={{ color: "red" }}>*</span>
+                {form.es_retroactiva ? "ENVIADO A" : "ENVIAR A"} <span style={{ color: "red" }}>*</span>
               </>
             }
             full

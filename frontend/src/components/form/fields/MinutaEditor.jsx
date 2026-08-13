@@ -112,7 +112,7 @@ const CustomTableHeader = TableHeader.extend({
   },
 });
 
-const templateFranquicia = `<h4>Franquicia Tributaria</h4>
+const templateFranquicia = `<p><strong>Franquicia Tributaria</strong></p>
 <ul>
   <li>Franquicia Tributaria y las oportunidades que nos ofrece.</li>
   <li>Certificación del gasto.</li>
@@ -128,7 +128,7 @@ const templateFranquicia = `<h4>Franquicia Tributaria</h4>
   <li>Viático y Traslado para actividades presenciales.</li>
 </ul>`.trim();
 
-const templateAgoras = `<h4>Inducción Ágoras</h4>
+const templateAgoras = `<p><strong>Inducción Ágoras</strong></p>
 <ol>
   <li><b>Bienvenida:</b> Home de plataforma, en el cual se puede visualizar resumen de indicadores saldos de aportes y excedentes, horas, inversión y participantes, comparativo por años, detalle por meses y año.</li>
   <li><b>Cursos:</b> Detalle de cursos empresa, contrato, precontrato, postcontato; inscripción de cursos, creación de códigos de cursos empresa.</li>
@@ -140,7 +140,13 @@ const templateAgoras = `<h4>Inducción Ágoras</h4>
   <li><b>KPIG:</b> Información más detallada de proveedores, cursos y personas.</li>
 </ol>`.trim();
 
-const templatePreContrato = `<h4>1. PreContratos:</h4><ul><li>Se usa para Capacitar personas que NO pertenecen a la Empresa.</li><li>No existe obligación de Contratar a los Participantes.</li><li>No genera Costo Empresa.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Se pueden Capacitar a personas contratadas en otras Razones Sociales del Holding Sodexo.</li></ul><h4>2. PreContratos Modulares:</h4><ul><li>Se puede realizar más de un Curso.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Todos los Cursos deben ser Inscritos el mismo día y con la misma cantidad de Participantes.</li><li>Toda la Documentación debe ser enviada el ultimo día de Clases del Primer Modulo.</li></ul><h4>3. Consideraciones:</h4><ul><li>Tope de 10% de la Dotación permanente, en caso de super este porcentaje se deberá acreditar vulnerabilidad o discapacidad del Participantes (con Documentación que lo respalde).</li><li>La documentación a enviar es: PreContrato Firmado por ambas partes (Participantes y Empresa), DJ Dotación del mes correspondiente, personeria y/o poderes de firma de quien firma por parte de la emrpesa, cedulas de Identidad vigentes (Participantes y Representante Legal).</li><li>En caso de Capacitar a menores de edad (de 15 hasta menos de 18 años) se deberá adjuntar Autorización y Cedula del Padre o Tutor Legal del Participante.</li><li>Toda la Documentación debe ser enviada a más tardar el último día de Clases o al Termino del Primer Modulo para PreContratos Modulares.</li><li>Todo PreContrato no puede superar el máximo de 60 días corridos de duración.</li></ul>`.trim();
+const templatePreContrato = `<p><strong>1. PreContratos:</strong></p><ul><li>Se usa para Capacitar personas que NO pertenecen a la Empresa.</li><li>No existe obligación de Contratar a los Participantes.</li><li>No genera Costo Empresa.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Se pueden Capacitar a personas contratadas en otras Razones Sociales del Holding Sodexo.</li></ul><p><strong>2. PreContratos Modulares:</strong></p><ul><li>Se puede realizar más de un Curso.</li><li>Tiene una duración máxima de 60 días corridos.</li><li>Todos los Cursos deben ser Inscritos el mismo día y con la misma cantidad de Participantes.</li><li>Toda la Documentación debe ser enviada el ultimo día de Clases del Primer Modulo.</li></ul><p><strong>3. Consideraciones:</strong></p><ul><li>Tope de 10% de la Dotación permanente, en caso de super este porcentaje se deberá acreditar vulnerabilidad o discapacidad del Participantes (con Documentación que lo respalde).</li><li>La documentación a enviar es: PreContrato Firmado por ambas partes (Participantes y Empresa), DJ Dotación del mes correspondiente, personeria y/o poderes de firma de quien firma por parte de la emrpesa, cedulas de Identidad vigentes (Participantes y Representante Legal).</li><li>En caso de Capacitar a menores de edad (de 15 hasta menos de 18 años) se deberá adjuntar Autorización y Cedula del Padre o Tutor Legal del Participante.</li><li>Toda la Documentación debe ser enviada a más tardar el último día de Clases o al Termino del Primer Modulo para PreContratos Modulares.</li><li>Todo PreContrato no puede superar el máximo de 60 días corridos de duración.</li></ul>`.trim();
+
+const DEFAULT_TEMPLATES = [
+  { id: 'default_franquicia', name: 'Franquicia', content: templateFranquicia, bg: '#e0e7ff', color: '#3730a3' },
+  { id: 'default_agoras', name: 'Ágoras', content: templateAgoras, bg: '#dcfce7', color: '#166534' },
+  { id: 'default_precontrato', name: 'Pre-contrato', content: templatePreContrato, bg: '#f5f3ff', color: '#6d28d9' }
+];
 
 const MenuBar = ({ editor }) => {
   if (!editor) return null;
@@ -169,12 +175,15 @@ const MenuBar = ({ editor }) => {
   // States to keep track of current font attributes in active selection
   const [currentFontSize, setCurrentFontSize] = useState("15px");
   const [currentFontFamily, setCurrentFontFamily] = useState("");
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     const updateMenuStates = () => {
       if (!editor) return;
       setCurrentFontSize(editor.getAttributes("textStyle").fontSize || "15px");
       setCurrentFontFamily(editor.getAttributes("textStyle").fontFamily || "");
+      // Forzar re-render para que los botones de negrita/cursiva/etc actualicen su estado visual
+      forceUpdate(c => c + 1);
     };
 
     editor.on("transaction", updateMenuStates);
@@ -231,14 +240,15 @@ const MenuBar = ({ editor }) => {
   };
 
   const fontFamilies = [
-    { name: 'Calibri Light', value: '\"Calibri Light\", sans-serif' },
-    { name: 'Calibri', value: 'Calibri, "Segoe UI", sans-serif' },
-    { name: 'Inter', value: 'Inter, sans-serif' },
-    { name: 'Arial', value: 'Arial, sans-serif' },
-    { name: 'Times New Roman', value: 'Times New Roman, serif' },
-    { name: 'Courier New', value: 'Courier New, monospace' },
-    { name: 'Georgia', value: 'Georgia, serif' },
-    { name: 'Verdana', value: 'Verdana, sans-serif' }
+    { name: 'Calibri', value: 'Calibri' },
+    { name: 'Calibri Light', value: 'Calibri Light' },
+    { name: 'Segoe UI', value: 'Segoe UI' },
+    { name: 'Arial', value: 'Arial' },
+    { name: 'Times New Roman', value: 'Times New Roman' },
+    { name: 'Inter', value: 'Inter' },
+    { name: 'Courier New', value: 'Courier New' },
+    { name: 'Georgia', value: 'Georgia' },
+    { name: 'Verdana', value: 'Verdana' }
   ];
 
   const fontSizes = ['8px', '10px', '11px', '12px', '14px', '15px', '16px', '18px', '20px', '24px', '32px', '48px'];
@@ -767,11 +777,13 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
   );
 };
 
-function MinutaEditor({ form, setForm }) {
+function MinutaEditor({ form, setForm, fieldName = "minuta", label = "Editor de Minuta (Avanzado)", isSmall = false }) {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  
+  const [modalState, setModalState] = useState({ isOpen: false, template: null });
   const settingsDropdownRef = useRef(null);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+
+
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -798,8 +810,8 @@ function MinutaEditor({ form, setForm }) {
       FontSize,
       TextAlign.configure({ types: ['heading', 'paragraph', 'tableCell', 'tableHeader'] }),
     ],
-    content: form.minuta || "",
-    onUpdate: ({ editor }) => { setForm("minuta", editor.getHTML()); },
+    content: form[fieldName] || "",
+    onUpdate: ({ editor }) => { setForm(fieldName, editor.getHTML()); },
     editorProps: {
       attributes: {
         spellcheck: 'true',
@@ -814,21 +826,29 @@ function MinutaEditor({ form, setForm }) {
 
   useEffect(() => {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
-    if (editor && !editor.isDestroyed && form.minuta !== editor.getHTML()) { 
-      editor.commands.setContent(form.minuta || ""); 
+    if (editor && !editor.isDestroyed && form[fieldName] !== editor.getHTML()) { 
+      editor.commands.setContent(form[fieldName] || ""); 
     }
-  }, [form.minuta, editor]);
+  }, [form[fieldName], editor]);
 
-  const [customTemplates, setCustomTemplates] = useState([]);
+  const initializeTemplates = (savedTemplates) => {
+    if (!savedTemplates) savedTemplates = [];
+    const savedMap = new Map(savedTemplates.map(t => [t.id, t]));
+    const mergedDefaults = DEFAULT_TEMPLATES.map(dt => savedMap.has(dt.id) ? { ...dt, ...savedMap.get(dt.id) } : dt);
+    const userCustoms = savedTemplates.filter(t => !DEFAULT_TEMPLATES.some(dt => dt.id === t.id));
+    return [...mergedDefaults, ...userCustoms];
+  };
+
+  const [customTemplates, setCustomTemplates] = useState(() => {
+    const user = JSON.parse(localStorage.getItem("usuario") || "{}");
+    return initializeTemplates(user?.preferencias?.custom_templates);
+  });
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("usuario") || "{}");
-    if (user?.preferencias?.custom_templates) {
-      setCustomTemplates(user.preferencias.custom_templates);
-    }
+    setCustomTemplates(initializeTemplates(user?.preferencias?.custom_templates));
   }, []);
 
-  const [modalState, setModalState] = useState({ isOpen: false, template: null });
 
   const handleAddCustomTemplate = (e) => {
     e.preventDefault();
@@ -867,6 +887,10 @@ function MinutaEditor({ form, setForm }) {
       if (action === 'edit') {
          setModalState({ isOpen: true, template });
       } else if (action === 'delete') {
+         if (template.id.startsWith('default_')) {
+           Swal.fire('Atención', 'Los botones por defecto no se pueden eliminar, pero puedes editar su contenido y nombre.', 'warning');
+           return;
+         }
          const confirmDelete = await Swal.fire({
            title: '¿Estás seguro?',
            text: `Se eliminará el botón "${template.name}".`,
@@ -903,11 +927,12 @@ function MinutaEditor({ form, setForm }) {
 
   const handleEditCustomTemplate = async (e, template) => {
     e.preventDefault(); // Evitar menú contextual del navegador
+    const isDefault = template.id.startsWith('default_');
     const result = await Swal.fire({
       title: 'Opciones de Predefinido',
       text: `¿Qué deseas hacer con el botón "${template.name}"?`,
       showCancelButton: true,
-      showDenyButton: true,
+      showDenyButton: !isDefault, // Ocultar botón eliminar si es por defecto
       confirmButtonText: 'Editar',
       denyButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
@@ -991,7 +1016,7 @@ function MinutaEditor({ form, setForm }) {
     if (!editor) return "";
     return `
       <style>
-        .preview-container { font-family: 'Inter', 'Segoe UI', sans-serif; color: #1e293b; line-height: 1.6; padding: 40px; background: white; }
+        .preview-container { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; line-height: 1.6; padding: 40px; background: white; }
         .preview-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; margin-bottom: 24px; }
         .preview-title { font-size: 28px; font-weight: 800; color: #1e3a8a; margin: 0 0 12px 0; display: inline-block; border-bottom: 3px solid #3498db; padding-bottom: 4px; }
         .preview-info-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -1078,8 +1103,10 @@ function MinutaEditor({ form, setForm }) {
     <div className="field full" style={{ marginBottom: '40px' }}>
       <style dangerouslySetInnerHTML={{
         __html: `
-        .tiptap-editor-container .ProseMirror { min-height: 800px; padding: 40px 60px; outline: none; font-size: 15px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
+        .tiptap-editor-container .ProseMirror { min-height: ${isSmall ? '80px' : '100px'}; padding: ${isSmall ? '10px 15px' : '40px 60px'}; outline: none; font-size: 14px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
         .tiptap-modal-container .ProseMirror { min-height: 250px; padding: 20px; outline: none; font-size: 14px; line-height: 1.2; color: #334155; font-family: 'Segoe UI', Arial, sans-serif; overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; }
+        .tiptap strong, .tiptap b { font-synthesis: weight !important; font-family: inherit !important; }
+        .tiptap em, .tiptap i { font-synthesis: style !important; font-family: inherit !important; }
         .tiptap p { margin: 0 0 10px 0; text-align: inherit; width: 100%; }
         .tiptap table { border-collapse: collapse; table-layout: auto; width: auto; max-width: 100%; margin: 15px 0; border: 1px solid #000000; }
         .tiptap td, .tiptap th { min-width: 1em; border: 1px solid #000000; padding: 2px 8px; vertical-align: middle; position: relative; line-height: 1.2; font-weight: normal; }
@@ -1116,38 +1143,34 @@ function MinutaEditor({ form, setForm }) {
         }
       `}} />
       <div className="editor-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-        <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Editor de Minuta (Avanzado)</label>
+        <label style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{label}</label>
         <div className="flex-wrap-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>
+          {!isSmall && <button onClick={handlePreview} style={btnStyle('var(--bg-muted)', 'var(--text-muted)')}><Eye size={16} style={{ marginRight: '6px' }} /> Vista Previa</button>}
           <button onClick={handleClear} style={btnStyle('#fee2e2', '#991b1b')}>borrar</button>
-          <div style={{ width: '1px', background: '#cbd5e1', margin: '0 4px' }}></div>
-          <button onClick={(e) => insertTemplate(e, templateFranquicia)} style={btnStyle('#e0e7ff', '#3730a3')}>Franquicia</button>
-          <button onClick={(e) => insertTemplate(e, templateAgoras)} style={btnStyle('#dcfce7', '#166534')}>Ágoras</button>
-          <button onClick={(e) => insertTemplate(e, templatePreContrato)} style={btnStyle('#f5f3ff', '#6d28d9')}>Pre-contrato</button>
-          
-          {customTemplates.length > 0 && <div style={{ width: '1px', background: '#cbd5e1', margin: '0 4px' }}></div>}
-          {customTemplates.map((t) => (
-            <button 
-              key={t.id} 
-              onClick={(e) => insertTemplate(e, t.content)} 
-              onContextMenu={(e) => handleEditCustomTemplate(e, t)}
-              style={btnStyle('#fef9c3', '#854d0e')} 
-              title={`${t.name} (Clic derecho para Editar/Eliminar)`}
-            >
-              {t.name}
-            </button>
-          ))}
-          <div ref={settingsDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
-            <button 
-              onClick={(e) => { e.preventDefault(); setShowSettingsMenu(!showSettingsMenu); }} 
-              style={btnStyle('#f1f5f9', '#475569')} 
-              title="Gestionar botones personalizados"
-            >
-              <Settings size={14} style={{ marginRight: '4px' }} /> Herramientas
-            </button>
-            {showSettingsMenu && (
-              <div style={{
-                position: 'absolute',
+          {!isSmall && (
+            <>
+              {customTemplates.map((t) => (
+                <button 
+                  key={t.id} 
+                  onClick={(e) => insertTemplate(e, t.content)} 
+                  onContextMenu={(e) => handleEditCustomTemplate(e, t)}
+                  style={btnStyle(t.bg || '#fef9c3', t.color || '#854d0e')} 
+                  title={`${t.name} (Clic derecho para Editar/Eliminar)`}
+                >
+                  {t.name}
+                </button>
+              ))}
+              <div ref={settingsDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <button 
+                  onClick={(e) => { e.preventDefault(); setShowSettingsMenu(!showSettingsMenu); }} 
+                  style={btnStyle('#f1f5f9', '#475569')} 
+                  title="Gestionar botones personalizados"
+                >
+                  <Settings size={14} style={{ marginRight: '4px' }} /> Herramientas
+                </button>
+                {showSettingsMenu && (
+                  <div style={{
+                    position: 'absolute',
                 top: '100%',
                 right: 0,
                 background: 'white',
@@ -1165,10 +1188,12 @@ function MinutaEditor({ form, setForm }) {
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
       <div className="tiptap-editor-container" style={{
-        background: 'var(--bg-muted)',
+        background: isSmall ? 'transparent' : 'var(--bg-muted)',
         borderRadius: '12px',
         border: '1px solid #e2e8f0',
         display: 'flex',
@@ -1193,16 +1218,16 @@ function MinutaEditor({ form, setForm }) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          padding: '30px 0'
+          padding: isSmall ? '0' : '30px 0'
         }}>
           <div style={{
             width: '100%',
-            maxWidth: '800px',
-            minHeight: '800px',
+            maxWidth: isSmall ? 'none' : '800px',
+            minHeight: isSmall ? 'auto' : '800px',
             background: 'white',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            borderRadius: '4px',
-            marginBottom: '40px',
+            boxShadow: isSmall ? 'none' : '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            borderRadius: isSmall ? '0 0 12px 12px' : '4px',
+            marginBottom: isSmall ? '0' : '40px',
             overflowX: 'auto',
             boxSizing: 'border-box'
           }} spellCheck={true} lang="es-CL">

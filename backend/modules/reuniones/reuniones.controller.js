@@ -1078,3 +1078,75 @@ exports.resolverParticipantes = async (req, res) => {
         res.status(500).json({ error: "Error en la BD al resolver participantes" });
     }
 };
+
+// ============================================================
+// PUT /reuniones/:id/comentario — Guardar un comentario rápido
+// ============================================================
+exports.guardarComentario = async (req, res) => {
+    const { id } = req.params;
+    const { comentario } = req.body;
+
+    try {
+        // Intentar como id_minuta primero
+        const [minutaRows] = await db.query("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
+
+        if (minutaRows.length > 0) {
+            await db.query("UPDATE minutas SET minuta = ?, estado_envio = 'enviado', es_retroactiva = 1 WHERE id_minuta = ?", [comentario, id]);
+            
+            // Audit log
+            registrarAudit({
+                accion: 'minuta_comentario',
+                entidad: 'minuta',
+                entidad_id: id,
+                usuario_id: req.usuario?.id,
+                usuario_nombre: req.usuario?.nombre,
+                detalles: { comentario, teams_evento_id: minutaRows[0].teams_evento_id },
+                ip_address: req.ip || req.connection?.remoteAddress
+            });
+
+            return res.json({ success: true, message: "Comentario guardado" });
+        }
+
+        // Si no existe, es un teams_evento_id
+        const teId = parseInt(id);
+        if (!isNaN(teId)) {
+            const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
+            if (teRows.length > 0) {
+                const teRow = teRows[0];
+                const idMinuta = `minuta-${teId}-${Date.now()}`;
+                await db.query(`
+                    INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, minuta, es_retroactiva, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
+                    VALUES (?, ?, 'enviado', ?, 1, ?, ?, ?, ?, ?)
+                `, [
+                    idMinuta, 
+                    teId, 
+                    comentario,
+                    req.usuario.id, 
+                    teRow.usuario_id || req.usuario.id,
+                    teRow.fecha,
+                    teRow.hora || '00:00',
+                    teRow.empresa_id || null
+                ]);
+
+                // Audit log
+                registrarAudit({
+                    accion: 'reunion_comentario',
+                    entidad: 'reunion',
+                    entidad_id: String(teId),
+                    usuario_id: req.usuario?.id,
+                    usuario_nombre: req.usuario?.nombre,
+                    empresa_id: teRow.empresa_id,
+                    detalles: { comentario, asunto: teRow.asunto, event_id: teRow.event_id },
+                    ip_address: req.ip || req.connection?.remoteAddress
+                });
+                
+                return res.json({ success: true, message: "Comentario guardado" });
+            }
+        }
+        
+        return res.status(404).json({ error: "Reunión no encontrada" });
+    } catch (error) {
+        console.error("Error en guardarComentario:", error);
+        res.status(500).json({ error: "Error al guardar comentario" });
+    }
+};

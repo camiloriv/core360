@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useNavigate } from "react-router-dom";
 import { syncEventosPasados, desvincularBorrador, vincularHuerfana, marcarExcluida, marcarProforma } from "../services/agendamientoService";
-import { marcarNoAplica } from "../services/reunionesService";
+import { marcarNoAplica, guardarComentario } from "../services/reunionesService";
 import {
   BarChart,
   Bar,
@@ -58,6 +58,179 @@ const TYPE_COLORS = {
 
 const getMeetingColor = (type) => TYPE_COLORS[type] || "var(--text-light)"; // Default gris claro
 
+const MinutaComentarioModal = ({ isOpen, onClose, onSave, defaultValue }) => {
+  const [comentario, setComentario] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setComentario(defaultValue || "");
+    }
+  }, [isOpen, defaultValue]);
+
+  if (!isOpen) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(comentario);
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <div style={{ background: "white", padding: "20px", borderRadius: "8px", width: "400px", maxWidth: "90%", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+        <h3 style={{ marginTop: 0, marginBottom: "15px", color: "#334155" }}>💬 Comentario / Minuta Breve</h3>
+        <textarea
+          value={comentario}
+          onChange={(e) => setComentario(e.target.value)}
+          placeholder="Escribe tu observación o comentario aquí..."
+          style={{ width: "100%", height: "120px", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", resize: "vertical", marginBottom: "15px", fontFamily: "inherit" }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: "bold" }}>Cancelar</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 16px", borderRadius: "6px", border: "none", background: "#10b981", color: "white", cursor: "pointer", fontWeight: "bold" }}>{saving ? "Guardando..." : "Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioModal, openDropdownId, setOpenDropdownId, isLastRows }) => {
+  const isOpen = openDropdownId === r.id_reunion;
+  const toggleDropdown = (e) => {
+    e.stopPropagation();
+    setOpenDropdownId(isOpen ? null : r.id_reunion);
+  };
+
+  let badgeLabel = "-";
+  let badgeIcon = "";
+
+  if (r.estado_envio === "huerfana") {
+    return <span style={{ color: "var(--text-muted)", fontSize: "12px", fontWeight: "bold" }}>-</span>;
+  }
+  
+  if (r._isExcluida || r.estado_envio === "no_aplica") {
+    badgeLabel = "No requiere";
+  } else if (r.estado_envio === "borrador" && r.tiene_minuta) {
+    badgeLabel = "Borrador";
+  } else if (r.estado_envio === "borrador" && !r.tiene_minuta) {
+    badgeLabel = "Pendiente";
+  } else if (r.estado_envio === "enviado" || r.estado_envio === "gestionada") {
+    badgeLabel = r.es_retroactiva === 1 ? "Retroactiva" : "Enviada";
+    badgeIcon = "✅";
+  } else if (r.estado_envio === "agendada") {
+    badgeLabel = "Agendada";
+    badgeIcon = "🗓️";
+  }
+
+  const isReadOnly = (r.estado_envio === "enviado" && r.es_retroactiva !== 1 && badgeLabel === "Enviada"); // Si es enviada normal, quizá ya no se pueda comentar, pero permitiremos opciones igual
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }} onMouseLeave={() => setOpenDropdownId(null)}>
+      <div
+        onClick={toggleDropdown}
+        style={{
+          background: "#f1f5f9",
+          color: "#334155",
+          padding: "4px 8px",
+          borderRadius: "6px",
+          fontSize: "12px",
+          fontWeight: "bold",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          border: "1px solid #e2e8f0",
+          transition: "background 0.2s"
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#e2e8f0")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+      >
+        {badgeIcon} {badgeLabel} <span style={{ fontSize: "10px" }}>▾</span>
+      </div>
+
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: isLastRows ? "auto" : "100%",
+          bottom: isLastRows ? "100%" : "auto",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 50,
+          minWidth: "160px",
+          paddingTop: isLastRows ? "0" : "6px",
+          paddingBottom: isLastRows ? "6px" : "0"
+        }}>
+          <div style={{
+            background: "white",
+            border: "1px solid #cbd5e1",
+            borderRadius: "6px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            padding: "4px 0"
+          }}>
+          {r._isExcluida || r.estado_envio === "no_aplica" ? (
+            <div
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setOpenDropdownId(null);
+                handleMarcarNoAplica(r.id_reunion, !r.minuta_row_id, true); 
+              }}
+              style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer", display: "flex", gap: "6px", alignItems: "center" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              🔄 Revertir Estado
+            </div>
+          ) : (
+            <>
+              <div
+                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r, modo: 'normal' } })}
+                style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer", display: "flex", gap: "6px", alignItems: "center" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                📝 Crear Minuta
+              </div>
+              <div
+                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r, modo: 'retroactiva' } })}
+                style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer", display: "flex", gap: "6px", alignItems: "center" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                🕒 Min. Retroactiva
+              </div>
+              <div
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setComentarioModal({ isOpen: true, reunion: r, text: r.minuta || '' });
+                }}
+                style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer", display: "flex", gap: "6px", alignItems: "center" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                💬 Comentar
+              </div>
+              <div
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setOpenDropdownId(null);
+                  handleMarcarNoAplica(r.id_reunion, !r.minuta_row_id, false); 
+                }}
+                style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer", display: "flex", gap: "6px", alignItems: "center", color: "#ef4444" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fee2e2")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                🚫 No Requiere
+              </div>
+            </>
+          )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function DashboardReuniones() {
   const { user, reuniones, jefaturas, empresas, usuarios, loading, refetch } = useDashboardData();
   const userRol = user?.permisos;
@@ -67,6 +240,19 @@ export default function DashboardReuniones() {
   const navigate = useNavigate();
 
   const [loadingSync, setLoadingSync] = useState(true);
+  const [comentarioModal, setComentarioModal] = useState({ isOpen: false, reunion: null, text: '' });
+
+  const handleGuardarComentario = async (texto) => {
+    if (!comentarioModal.reunion) return;
+    try {
+      await guardarComentario(comentarioModal.reunion.id_reunion, texto);
+      Swal.fire({ icon: 'success', title: 'Comentario guardado', timer: 1500, showConfirmButton: false });
+      setComentarioModal({ isOpen: false, reunion: null, text: '' });
+      refetch();
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo guardar el comentario', 'error');
+    }
+  };
 
   useEffect(() => {
     setLoadingSync(false);
@@ -983,6 +1169,12 @@ export default function DashboardReuniones() {
       className="encuesta-page"
       style={{ background: "var(--bg-body)", minHeight: "100vh" }}
     >
+      <MinutaComentarioModal 
+        isOpen={comentarioModal.isOpen} 
+        onClose={() => setComentarioModal({ isOpen: false, reunion: null, text: '' })} 
+        onSave={handleGuardarComentario} 
+        defaultValue={comentarioModal.text} 
+      />
       <div className="container" style={{ padding: "30px 20px" }}>
         <div style={{ marginBottom: "30px" }}>
           <h1
@@ -1688,11 +1880,18 @@ export default function DashboardReuniones() {
                   const rowJefaturaName = rowOwner?.jefatura_nombre || (rowOwner?.permisos === 'jefatura' || rowOwner?.permisos === 'gerencia' ? rowOwner?.nombre : "Sin equipo");
 
                   const isExpanded = expandedMeetingId === r.id_reunion;
+                  
+                  const statusBorderColor = 
+                    r.estado_envio === 'borrador' ? '#eab308' :
+                    (r.estado_envio === 'enviado' || r.estado_envio === 'gestionada' ? '#22c55e' :
+                    ((r.estado_envio === 'no_aplica' || r.estado_envio === 'huerfana' || r._isExcluida) ? '#94a3b8' :
+                    (r.estado_envio === 'agendada' ? '#3b82f6' : 'transparent')));
+
                   return (
                     <React.Fragment key={r.id_reunion}>
                       <tr 
                         className="meeting-row"
-                        style={styles.tr}
+                        style={{ ...styles.tr, borderLeft: `4px solid ${statusBorderColor}` }}
                       >
 
                       <td style={styles.tdCell} data-label="FECHA / ID">
@@ -1837,157 +2036,16 @@ export default function DashboardReuniones() {
                           )}
                         </div>
                         {/* Full action buttons (visible on desktop or when expanded on mobile) */}
-                        <div className="minuta-actions-full" style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }} onMouseLeave={() => setOpenDropdownId(null)}>
-                          {r.estado_envio === "huerfana" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <span style={{ color: "var(--text-muted)" }}>-</span>
-                            </div>
-                          ) : (r._isExcluida || r.estado_envio === "no_aplica") ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <span
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  const isTeOnly = !r.minuta_row_id;
-                                  handleMarcarNoAplica(r.id_reunion, isTeOnly, true); 
-                                }}
-                                style={{
-                                  fontSize: "12px", color: "#3b82f6", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "4px 8px", borderRadius: "4px", background: "#eff6ff"
-                                }}
-                              >
-                                Revertir
-                              </span>
-                            </div>
-
-                          ) : r.estado_envio === "borrador" ? (
-                            <div style={{ display: "flex", flexDirection: "row", gap: "4px", alignItems: "center", justifyContent: "center" }}>
-                              <div
-                                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
-                                style={{
-                                  color: "#854d0e", fontWeight: "bold", cursor: "pointer", fontSize: "11px",
-                                  background: "#fef08a", padding: "4px 6px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fde047")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#fef08a")}
-                                title={r.tiene_minuta ? "Editar Borrador" : "Redactar Minuta"}
-                              >
-                                {r.tiene_minuta ? "📝 Borrador" : "✍️ Pendiente"}
-                              </div>
-                              {!r.tiene_minuta && (
-                                <button
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    const isTeOnly = !r.minuta_row_id;
-                                    handleMarcarNoAplica(r.id_reunion, isTeOnly, false); 
-                                  }}
-                                  style={{
-                                    background: "#fee2e2",
-                                    color: "#ef4444",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    width: "20px",
-                                    height: "20px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: "pointer",
-                                    fontSize: "10px",
-                                    fontWeight: "bold",
-                                    padding: 0,
-                                    transition: "all 0.2s",
-                                    flexShrink: 0
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#fca5a5";
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "#fee2e2";
-                                  }}
-                                  title="No aplica enviar minuta"
-                                >
-                                  ❌
-                                </button>
-                              )}
-                            </div>
-                          ) : r.estado_envio === "agendada" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <div
-                                onClick={() => navigate(`/minuta/${r.id_reunion}`, { state: { draft: r } })}
-                                style={{
-                                  color: "#1e40af", fontWeight: "bold", cursor: "pointer", fontSize: "12px",
-                                  background: "#dbeafe", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-block", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#bfdbfe")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#dbeafe")}
-                              >
-                                🗓️ Agendada
-                              </div>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); handleMarcarNoAplica(r.id_reunion, false, false); }}
-                                style={{
-                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
-                                }}
-                              >🚫 No aplica</span>
-                            </div>
-                          ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-                              <div
-                                onClick={() => handleVerMinuta(r)}
-                                style={{
-                                  color: "#166534", fontWeight: "bold", cursor: "pointer",
-                                  fontSize: "12px", background: "#dcfce7", padding: "4px 8px", borderRadius: "4px",
-                                  display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", transition: "background 0.2s"
-                                }}
-                                title="Ver minuta"
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#bbf7d0")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "#dcfce7")}
-                              >
-                                {r.es_retroactiva === 1 ? "✅ Minuta Retroactiva 📋" : "✅ Minuta Enviada 📄"}
-                              </div>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === r.id_reunion ? null : r.id_reunion); }}
-                                style={{
-                                  fontSize: "10px", color: "#475569", cursor: "pointer", textDecoration: "underline",
-                                  fontWeight: "600", padding: "2px 4px", borderRadius: "3px", background: "#f1f5f9"
-                                }}
-                              >📧 Ver destinatarios</span>
-                            </div>
-                          )}
-
-                          {openDropdownId === r.id_reunion && (
-                            <div style={{
-                              position: "absolute",
-                              left: 0,
-                              top: isLastRows ? "auto" : "100%",
-                              bottom: isLastRows ? "100%" : "auto",
-                              marginTop: 0,
-                              marginBottom: 0,
-                              background: "white",
-                              border: "1px solid #e2e8f0",
-                              borderRadius: "6px",
-                              boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                              padding: "4px 8px",
-                              zIndex: 50,
-                              minWidth: "180px",
-                              maxHeight: "150px",
-                              overflowY: "auto"
-                            }}>
-                              {(r.enviado_a || "No especificado").split(",").map((email, idx, arr) => (
-                                <div key={idx} style={{ 
-                                  padding: "6px 0", 
-                                  fontSize: "11px", 
-                                  color: "#334155", 
-                                  borderBottom: idx < arr.length - 1 ? "1px solid #f1f5f9" : "none",
-                                  wordBreak: "break-all"
-                                }}>
-                                  {email.trim()}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <div className="minuta-actions-full" style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
+                          <MinutaActionBadge
+                            r={r}
+                            navigate={navigate}
+                            handleMarcarNoAplica={handleMarcarNoAplica}
+                            setComentarioModal={setComentarioModal}
+                            openDropdownId={openDropdownId}
+                            setOpenDropdownId={setOpenDropdownId}
+                            isLastRows={isLastRows}
+                          />
                         </div>
                       </td>
                       <td style={styles.tdCell} data-label="FECHA DE ENVÍO">

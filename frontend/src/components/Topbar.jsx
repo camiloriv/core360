@@ -17,6 +17,7 @@ const CALENDAR_THEMES = [
   { id: "cyan",    color: "#06b6d4", label: "Cyan" },
 ];
 
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function Topbar({ user, onMenuOpen }) {
@@ -30,6 +31,7 @@ export default function Topbar({ user, onMenuOpen }) {
       return u?.preferencias?.calendar_theme || "blue";
     } catch { return "blue"; }
   });
+
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -73,9 +75,12 @@ export default function Topbar({ user, onMenuOpen }) {
     // Persistir en BD
     try {
       const u = JSON.parse(localStorage.getItem("usuario") || "{}");
-      if (!u?.id) return;
+      const token = localStorage.getItem("token");
+      if (!u?.id || !token) return;
       const { data } = await axios.patch(`${API_URL}/usuarios/${u.id}/preferencias`, {
         preferencias: { calendar_theme: themeId },
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       // Actualizar el objeto usuario en localStorage con las preferencias nuevas
       const updated = { ...u, preferencias: data.preferencias };
@@ -84,6 +89,8 @@ export default function Topbar({ user, onMenuOpen }) {
       console.error("Error al guardar preferencia de tema:", err);
     }
   };
+
+
 
   const handleOpenPasswordModal = () => {
     setDropdownOpen(false);
@@ -636,6 +643,7 @@ export default function Topbar({ user, onMenuOpen }) {
                     </div>
                   </div>
                 )}
+
 
                 <div className="user-dropdown-divider" />
 

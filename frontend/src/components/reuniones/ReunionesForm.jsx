@@ -166,11 +166,17 @@ function ReunionesForm({ onSuccess }) {
     }
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setField("lugar", draft.lugar || "");
+    if (draft.lugar && draft.lugar.startsWith("Presencial - ")) {
+      setField("lugar", "Presencial");
+      setField("lugar_detalle", draft.lugar.substring(13));
+    } else {
+      setField("lugar", draft.lugar || "");
+      setField("lugar_detalle", "");
+    }
 
     const currentHour = new Date().getHours();
     const greeting = currentHour < 12 ? "buenos días," : "buenas tardes,";
-    const defaultTextoPrevio = `Estimadas/os ${greeting}\n\nEsperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.`;
+    const defaultTextoPrevio = `<p>Estimadas/os ${greeting}</p><p>Esperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.</p>`;
     setField("texto_previo", draft.texto_previo || defaultTextoPrevio);
 
     let extractedVideoLink = draft.link_video || "";
@@ -199,6 +205,11 @@ function ReunionesForm({ onSuccess }) {
   useEffect(() => {
     if (location.state && location.state.draft) {
       populateFromDraft(location.state.draft);
+      if (location.state.modo === "retroactiva") {
+        setField("es_retroactiva", true);
+      } else if (location.state.modo === "normal") {
+        setField("es_retroactiva", false);
+      }
       window.history.replaceState({}, document.title);
     } else if (id_reunion) {
       getReunionPorId(id_reunion)
@@ -465,38 +476,7 @@ function ReunionesForm({ onSuccess }) {
           <p className="page-subtitle">COMPLETA LOS DATOS PARA REGISTRAR LA REUNIÓN</p>
         </div>
 
-        <div style={{
-          marginBottom: "20px",
-          padding: "16px",
-          background: "var(--bg-muted)",
-          borderRadius: "8px",
-          border: "1px solid var(--border-color)",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px"
-        }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: "15px", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "8px" }}>
-              📋 ¿Es una minuta retroactiva?
-            </h3>
-            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--text-muted)" }}>
-              Activa esta opción si estás registrando una minuta que <b>ya fue enviada por correo</b> antes de usar la plataforma. 
-              {form.es_retroactiva && (
-                <span style={{ color: "#10b981", fontWeight: "bold", display: "block", marginTop: "4px" }}>
-                  Al guardar, no se enviará ningún correo y la minuta quedará registrada como "Enviada".
-                </span>
-              )}
-            </p>
-          </div>
-          <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-            <input 
-              type="checkbox" 
-              checked={form.es_retroactiva}
-              onChange={(e) => setField("es_retroactiva", e.target.checked)}
-              style={{ width: "24px", height: "24px", cursor: "pointer", accentColor: "#10b981" }}
-            />
-          </label>
-        </div>
+
 
         <div className="grid">
           {!isSinEmpresa ? (
@@ -594,7 +574,7 @@ function ReunionesForm({ onSuccess }) {
           <FormSection
             label={
               <>
-                ENVIAR A <span style={{ color: "red" }}>*</span>
+                {form.es_retroactiva ? "ENVIADO A" : "ENVIAR A"} <span style={{ color: "red" }}>*</span>
               </>
             }
             full
@@ -711,6 +691,19 @@ function ReunionesForm({ onSuccess }) {
             </FormSection>
           )}
 
+
+          <FormSection
+            label=""
+            full
+          >
+            <MinutaEditor
+              form={form}
+              setForm={setField}
+              fieldName="texto_previo"
+              label="SALUDO EN CUERPO DEL CORREO"
+              isSmall={true}
+            />
+          </FormSection>
 
           <MinutaEditor form={form} setForm={setField} />
               <FileUpload

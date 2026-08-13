@@ -8,3 +8,4 @@ export const getDefaultCc = (empresaId, ejecutivaId, enviadoPor, enviadoPorId) =
 export const marcarNoAplica = (id, isHuerfana, noAplica) => api.put(`/reuniones/${id}/no-aplica`, { isHuerfana, noAplica });
 export const getReunionPorId = (idReunion) => api.get(`/reuniones/detail/${idReunion}`);
 export const resolverParticipantes = (empresaId, asistentes) => api.post("/reuniones/resolver-participantes", { empresa_id: empresaId, asistentes });
+export const guardarComentario = (id, comentario) => api.put(`/reuniones/${id}/comentario`, { comentario });

@@ -69,7 +69,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
 
     const currentHour = new Date().getHours();
     const greeting = currentHour < 12 ? "buenos días," : "buenas tardes,";
-    const defaultTextoPrevio = `Estimadas/os ${greeting}\n\nEsperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.`;
+    const defaultTextoPrevio = `<p>Estimadas/os ${greeting}</p><p>Esperando que se encuentren bien, agradezco la oportunidad de poder reunirnos y mantenernos en contacto. A continuación detallo los puntos tratados.</p>`;
 
     html = html
       .replace(/{{id}}/g, data.id_reunion || "")

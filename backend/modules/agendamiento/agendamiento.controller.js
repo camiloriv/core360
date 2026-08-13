@@ -621,11 +621,13 @@ const syncEventosPasados = async (req, res) => {
                 const organizerName = event.organizer?.emailAddress?.name || '';
                 const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
-                // Extraer preview del cuerpo (usamos body.content para no perder los enlaces de grabación)
+                // Extraer preview del cuerpo: solo texto plano, sin HTML, máx 800 chars para ahorrar espacio en disco
                 let bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
-                // MySQL TEXT column limit is 65535 bytes. Truncate to avoid ER_DATA_TOO_LONG, specially with embedded base64 images
-                if (bodyPreview && bodyPreview.length > 60000) {
-                    bodyPreview = bodyPreview.substring(0, 60000);
+                // Eliminar etiquetas HTML y líneas en blanco
+                bodyPreview = bodyPreview.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                // Truncar a 800 caracteres (suficiente para el asunto/motivo de la reunión)
+                if (bodyPreview.length > 800) {
+                    bodyPreview = bodyPreview.substring(0, 800);
                 }
 
                 if (emails.length === 0) {

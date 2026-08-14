@@ -224,16 +224,3 @@ exports.actualizarPreferencias = async (req, res) => {
     res.status(500).json({ error: "Error al actualizar preferencias" });
   }
 };
-
-exports.fixDb = async (req, res) => {
-  try {
-    await db.query("ALTER TABLE usuarios ADD COLUMN permite_traspaso BOOLEAN DEFAULT FALSE;");
-    res.json({ msg: "Columna agregada exitosamente en la BD remota" });
-  } catch (err) {
-    if (err.code === 'ER_DUP_FIELDNAME') {
-      res.json({ msg: "La columna ya existe en la BD remota" });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
-  }
-};

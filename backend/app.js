@@ -84,6 +84,17 @@ app.use("/empresas", verificarToken, empresasRoutes);
 app.use("/encuestas", encuestasRoutes); // Las encuestas tienen endpoints públicos y protegidos internamente
 app.use("/jefaturas", verificarToken, jefaturasRoutes);
 app.use("/auth", authRoutes);
+
+app.get("/fix-db", async (req, res) => {
+  const db = require("./database/connection");
+  try {
+    await db.query("ALTER TABLE usuarios ADD COLUMN permite_traspaso BOOLEAN DEFAULT FALSE;");
+    res.send("DB arreglada con exito");
+  } catch (e) {
+    res.send("Error o ya existia: " + e.message);
+  }
+});
+
 app.use("/usuarios", verificarToken, usuariosRoutes);
 app.use("/zonas", verificarToken, zonasRoutes);
 app.use("/agendamiento", verificarToken, agendamientoRoutes);

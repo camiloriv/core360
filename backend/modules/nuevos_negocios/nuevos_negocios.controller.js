@@ -2,6 +2,38 @@ const db = require("../../database/connection");
 const XLSX = require("xlsx");
 
 // =============================================
+// Helper: Actualizar Jefatura de la Empresa
+// =============================================
+const updateEmpresaJefatura = async (jefa_cartera, rut, razon_social) => {
+  if (jefa_cartera && jefa_cartera !== 'No Asignado') {
+    try {
+      const [[jefa]] = await db.query("SELECT id FROM usuarios WHERE nombre = ?", [jefa_cartera]);
+      if (jefa) {
+        let query = "SELECT id FROM empresas WHERE ";
+        let params = [];
+        if (rut) {
+          query += "REPLACE(REPLACE(rut, '.', ''), '-', '') = REPLACE(REPLACE(?, '.', ''), '-', '') LIMIT 1";
+          params.push(rut);
+        } else if (razon_social) {
+          query += "razon_social = ? LIMIT 1";
+          params.push(razon_social);
+        } else {
+          return;
+        }
+        
+        const [[empresa]] = await db.query(query, params);
+        if (empresa) {
+          await db.query("UPDATE empresas SET jefatura_id = ? WHERE id = ?", [jefa.id, empresa.id]);
+          console.log(`✅ Empresa ${empresa.id} actualizada con Jefatura ${jefa.id} (${jefa_cartera})`);
+        }
+      }
+    } catch (error) {
+      console.error("Error al actualizar jefatura de la empresa:", error);
+    }
+  }
+};
+
+// =============================================
 // GET /nuevos-negocios — Listar con filtros
 // =============================================
 const listar = async (req, res) => {
@@ -185,6 +217,10 @@ const crear = async (req, res) => {
     );
 
     const [[newRow]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [result.insertId]);
+
+    // Traspasar la jefatura a la empresa automáticamente
+    await updateEmpresaJefatura(newRow.jefa_cartera, newRow.rut, newRow.razon_social);
+
     res.status(201).json(newRow);
   } catch (error) {
     console.error("Error creando negocio:", error);
@@ -261,6 +297,12 @@ const actualizar = async (req, res) => {
     );
 
     const [[updated]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+
+    // Traspasar la jefatura a la empresa automáticamente si fue modificada
+    if (jefa_cartera !== undefined && jefa_cartera !== existing.jefa_cartera) {
+      await updateEmpresaJefatura(updated.jefa_cartera, updated.rut, updated.razon_social);
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Error actualizando negocio:", error);

@@ -72,7 +72,7 @@ const GestionUsuarios = () => {
   const [zonas, setZonas] = useState([]);
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [form, setForm] = useState({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '', vistas_permitidas: getDefaultViewsForRole('ejecutiva') });
+  const [form, setForm] = useState({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '', vistas_permitidas: getDefaultViewsForRole('ejecutiva'), permite_traspaso: false });
   const [isEditing, setIsEditing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
@@ -118,7 +118,8 @@ const GestionUsuarios = () => {
         vistas_permitidas: getDefaultViewsForRole(newRole)
       });
     } else {
-      setForm({ ...form, [e.target.name]: e.target.value });
+      const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+      setForm({ ...form, [e.target.name]: value });
     }
   };
 
@@ -131,7 +132,7 @@ const GestionUsuarios = () => {
       } else {
         await axios.post(`${API_URL}/usuarios`, form);
       }
-      setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '', vistas_permitidas: getDefaultViewsForRole('ejecutiva') });
+      setForm({ id: null, nombre: '', correo: '', contrasena: '', permisos: 'ejecutiva', cargos: '', jefatura_id: '', gerencia_id: '', gerencia_ids: [], zona_id: '', vistas_permitidas: getDefaultViewsForRole('ejecutiva'), permite_traspaso: false });
       setIsEditing(false);
       setIsModalOpen(false);
       fetchData();
@@ -171,7 +172,8 @@ const GestionUsuarios = () => {
       gerencia_id: u.gerencia_id || '',
       gerencia_ids: selectedGerencias,
       zona_id: u.zona_id || '',
-      vistas_permitidas: selectedVistas
+      vistas_permitidas: selectedVistas,
+      permite_traspaso: u.permite_traspaso === 1 || u.permite_traspaso === true
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -948,6 +950,19 @@ const GestionUsuarios = () => {
                     </select>
                   </div>
                 )}
+                
+                <div style={{ gridColumn: 'span 2', marginTop: '5px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#1e293b' }}>
+                    <input 
+                      type="checkbox" 
+                      name="permite_traspaso" 
+                      checked={!!form.permite_traspaso} 
+                      onChange={handleChange} 
+                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--secondary-color)' }}
+                    />
+                    Habilitar acceso al panel de Traspaso Masivo de Carteras
+                  </label>
+                </div>
                 
                 <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
                   {isEditing && (

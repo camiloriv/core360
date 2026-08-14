@@ -928,7 +928,7 @@ export default function GestionEmpresas() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
           {/* PANEL TRASPASO MASIVO (Sección premium con tabs para manual o Excel) */}
-          {(user?.permisos === "admin" || user?.permisos === "ADMIN" || user?.permisos === "gerencia") && (
+          {(user?.permite_traspaso === 1 || user?.permite_traspaso === true || user?.permisos === "admin" || user?.permisos === "ADMIN") && (
             <div
               style={{
                 background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",

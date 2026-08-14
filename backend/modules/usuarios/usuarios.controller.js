@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 exports.obtenerUsuarios = async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT u.id, u.nombre, u.correo, u.permisos, u.cargos, u.jefatura_id, u.gerencia_id, u.zona_id, u.vistas_permitidas,
+      SELECT u.id, u.nombre, u.correo, u.permisos, u.cargos, u.jefatura_id, u.gerencia_id, u.zona_id, u.vistas_permitidas, u.permite_traspaso,
              j.nombre as jefatura_nombre, 
              COALESCE(
                (SELECT GROUP_CONCAT(g2.nombre SEPARATOR ', ')
@@ -51,7 +51,7 @@ exports.obtenerUsuarios = async (req, res) => {
 };
 
 exports.crearUsuario = async (req, res) => {
-  const { nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, gerencia_ids, zona_id, vistas_permitidas } = req.body;
+  const { nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, gerencia_ids, zona_id, vistas_permitidas, permite_traspaso } = req.body;
   if (!nombre || !correo || !contrasena || !permisos) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
@@ -75,8 +75,8 @@ exports.crearUsuario = async (req, res) => {
     const hashedContrasena = await bcrypt.hash(contrasena, 10);
 
     const [result] = await db.query(
-      "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas, requiere_cambio_clave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-      [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas]
+      "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas, requiere_cambio_clave, permite_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+      [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0]
     );
 
     const newUserId = result.insertId;
@@ -98,7 +98,7 @@ exports.crearUsuario = async (req, res) => {
 
 exports.actualizarUsuario = async (req, res) => {
   const { id } = req.params;
-  const { nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, gerencia_ids, zona_id, vistas_permitidas } = req.body;
+  const { nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, gerencia_ids, zona_id, vistas_permitidas, permite_traspaso } = req.body;
   
   try {
     const [existentes] = await db.query("SELECT id FROM usuarios WHERE (correo = ? OR nombre = ?) AND id != ?", [correo, nombre, id]);
@@ -119,13 +119,13 @@ exports.actualizarUsuario = async (req, res) => {
     if (contrasena) {
       const hashedContrasena = await bcrypt.hash(contrasena, 10);
       await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, requiere_cambio_clave = 1 WHERE id = ?",
-        [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, id]
+        "UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, requiere_cambio_clave = 1, permite_traspaso = ? WHERE id = ?",
+        [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0, id]
       );
     } else {
       await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ? WHERE id = ?",
-        [nombre, correo, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, id]
+        "UPDATE usuarios SET nombre = ?, correo = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, permite_traspaso = ? WHERE id = ?",
+        [nombre, correo, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0, id]
       );
     }
 

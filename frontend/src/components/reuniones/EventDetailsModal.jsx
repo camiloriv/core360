@@ -259,7 +259,7 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule, emp
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : event.db_id ? (
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>Vincular Empresa</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
@@ -351,6 +351,16 @@ const EventDetailsModal = ({ event, onClose, onJoin, onCancel, onReschedule, emp
                     >
                       🚫 No Aplica
                     </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>Vincular Empresa</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '16px' }}>🔄</span>
+                  <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+                    Esta reunión aún no se ha sincronizado con la base de datos local. <strong>Sincroniza el calendario</strong> para poder vincularla.
                   </div>
                 </div>
               </div>

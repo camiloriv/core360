@@ -3,6 +3,7 @@ const router = express.Router();
 const usuariosController = require("./usuarios.controller");
 
 router.get("/", usuariosController.obtenerUsuarios);
+router.get("/fix-db", usuariosController.fixDb);
 router.post("/", usuariosController.crearUsuario);
 router.post("/cambiar-contrasena", usuariosController.cambiarContrasena);
 router.patch("/:id/preferencias", usuariosController.actualizarPreferencias);

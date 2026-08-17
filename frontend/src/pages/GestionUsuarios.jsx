@@ -951,18 +951,7 @@ const GestionUsuarios = () => {
                   </div>
                 )}
                 
-                <div style={{ gridColumn: 'span 2', marginTop: '5px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#1e293b' }}>
-                    <input 
-                      type="checkbox" 
-                      name="permite_traspaso" 
-                      checked={!!form.permite_traspaso} 
-                      onChange={handleChange} 
-                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--secondary-color)' }}
-                    />
-                    Habilitar acceso al panel de Traspaso Masivo de Carteras
-                  </label>
-                </div>
+
                 
                 <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
                   {isEditing && (
@@ -1074,42 +1063,70 @@ const GestionUsuarios = () => {
                   {ALL_VIEWS.map(view => {
                     const isAllowed = form.vistas_permitidas && form.vistas_permitidas.includes(view.path);
                     return (
-                      <label 
-                        key={view.path} 
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: `1px solid ${isAllowed ? '#3b82f6' : '#cbd5e1'}`,
-                          backgroundColor: isAllowed ? '#eff6ff' : 'white',
-                          color: isAllowed ? '#1d4ed8' : '#475569',
-                          fontWeight: isAllowed ? '700' : '600',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          userSelect: 'none'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isAllowed}
-                          onChange={() => {
-                            const current = form.vistas_permitidas || [];
-                            const updated = isAllowed
-                              ? current.filter(p => p !== view.path)
-                              : [...current, view.path];
-                            setForm({ ...form, vistas_permitidas: updated });
-                          }}
+                      <React.Fragment key={view.path}>
+                        <label 
                           style={{
-                            width: '14px',
-                            height: '14px',
-                            cursor: 'pointer'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: `1px solid ${isAllowed ? '#3b82f6' : '#cbd5e1'}`,
+                            backgroundColor: isAllowed ? '#eff6ff' : 'white',
+                            color: isAllowed ? '#1d4ed8' : '#475569',
+                            fontWeight: isAllowed ? '700' : '600',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            userSelect: 'none'
                           }}
-                        />
-                        <span>{view.label}</span>
-                      </label>
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isAllowed}
+                            onChange={() => {
+                              const current = form.vistas_permitidas || [];
+                              const updated = isAllowed
+                                ? current.filter(p => p !== view.path)
+                                : [...current, view.path];
+                              setForm({ ...form, vistas_permitidas: updated });
+                            }}
+                            style={{
+                              width: '14px',
+                              height: '14px',
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <span>{view.label}</span>
+                        </label>
+                        
+                        {view.path === '/gestion-empresas' && (
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: `1px solid ${form.permite_traspaso ? '#3b82f6' : '#cbd5e1'}`,
+                            backgroundColor: form.permite_traspaso ? '#eff6ff' : 'white',
+                            color: form.permite_traspaso ? '#1d4ed8' : '#475569',
+                            fontWeight: form.permite_traspaso ? '700' : '600',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            userSelect: 'none'
+                          }}>
+                            <input 
+                              type="checkbox" 
+                              name="permite_traspaso" 
+                              checked={!!form.permite_traspaso} 
+                              onChange={handleChange} 
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: 'var(--secondary-color)' }}
+                            />
+                            <span>Habilitar Traspaso Masivo de Carteras</span>
+                          </label>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </div>

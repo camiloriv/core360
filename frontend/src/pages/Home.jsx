@@ -7,7 +7,7 @@ function Home() {
   }, []);
 
   return (
-    <div className="encuesta-page" style={{ background: 'var(--bg-body)', minHeight: 'calc(100vh - 60px)' }}>
+    <div className="encuesta-page" style={{ background: 'var(--bg-body)', minHeight: 'calc(100vh - 60px)', paddingTop: '15px' }}>
       <ReunionesForm />
     </div>
   );

@@ -263,14 +263,31 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <div className={`sidebar ${isOpen ? "open" : ""}`} style={styles.sidebar}>
-      {/* Mobile close button (solo visible si la clase 'open' está activa en móvil) */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "10px 0" }}>
-        <button className="close-sidebar-btn" onClick={onClose}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+      {isOpen && (
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0" }}>
+          <button className="close-sidebar-btn" onClick={onClose}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Ícono que se revela al ocultarse el Topbar */}
+      <div style={{ height: "60px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <img 
+          src="/icono_negativo.PNG" 
+          alt="CORE 360 Icon" 
+          style={{ 
+            maxHeight: "60px", 
+            maxWidth: "90%", 
+            objectFit: "contain", 
+            opacity: 0.3,
+            marginTop: "10px",
+            marginLeft: "5px"
+          }} 
+        />
       </div>
 
       <nav style={styles.nav} className="sidebar-nav">
@@ -334,13 +351,13 @@ const Sidebar = ({ isOpen, onClose }) => {
 const styles = {
   sidebar: {
     width: "80px",
-    height: "calc(100dvh - 60px)",
+    height: "100dvh",
     background: "var(--primary-color)",
     display: "flex",
     flexDirection: "column",
     position: "fixed",
     left: 0,
-    top: "60px", // Below Topbar
+    top: 0,
     bottom: 0,
     zIndex: 1000,
     boxShadow: "4px 0 10px rgba(0,0,0,0.05)",

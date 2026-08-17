@@ -24,6 +24,7 @@ export default function Topbar({ user, onMenuOpen }) {
   const [timeStr, setTimeStr] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
+  const [isVisible, setIsVisible] = useState(true);
   const [calendarTheme, setCalendarTheme] = useState(() => {
     // Leer desde preferencias del usuario (guardadas en localStorage al login)
     try {
@@ -49,6 +50,23 @@ export default function Topbar({ user, onMenuOpen }) {
     updateTime();
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Controlar visibilidad del Topbar con el scroll (Headroom)
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const controlTopbar = () => {
+      if (window.scrollY > lastScrollY && window.scrollY > 60) {
+        setIsVisible(false); // Scroll hacia abajo
+      } else {
+        setIsVisible(true);  // Scroll hacia arriba
+      }
+      lastScrollY = window.scrollY;
+    };
+
+    window.addEventListener("scroll", controlTopbar);
+    return () => window.removeEventListener("scroll", controlTopbar);
   }, []);
 
   // Cerrar dropdown al hacer clic fuera
@@ -451,9 +469,10 @@ export default function Topbar({ user, onMenuOpen }) {
           padding: "0 16px",
           boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
           position: "fixed",
-          top: 0,
+          top: isVisible ? 0 : "-60px",
           left: 0,
           right: 0,
+          transition: "top 0.3s ease-in-out",
           zIndex: 1100,
           borderBottom: "1px solid #e2e8f0",
         }}

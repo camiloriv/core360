@@ -107,14 +107,14 @@ export const getStatusLabel = (r) => {
   if (r.estado_envio === "borrador" && !r.tiene_minuta) return { label: "Pendiente", icon: "" };
   if (r.estado_envio === "enviado" || r.estado_envio === "gestionada") {
     if (r.es_retroactiva === 1) return { label: "Retroactiva", icon: "" };
-    if (r.es_retroactiva === 2) return { label: "Comentada", icon: "💬" };
+    if (r.es_retroactiva === 2) return { label: "Comentada", icon: "" };
     return { label: "Enviada", icon: "" };
   }
   if (r.estado_envio === "agendada") return { label: "Pendiente", icon: "🗓️" };
   return { label: r.estado_envio || "-", icon: "" };
 };
 
-const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioModal, openDropdownId, setOpenDropdownId, isLastRows }) => {
+const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioModal, openDropdownId, setOpenDropdownId, isLastRows, isRowHovered, softColors, handleVerMinuta }) => {
   const isOpen = openDropdownId === r.id_reunion;
   const toggleDropdown = (e) => {
     e.stopPropagation();
@@ -131,12 +131,15 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
 
   const handleClickAction = (e) => {
     e.stopPropagation();
-    if (isFinalState) {
-      if (badgeLabel === "Enviada" || badgeLabel === "Retroactiva") {
-        navigate(`/minuta/${r.id_reunion}`, { state: { draft: r, modo: 'normal' } });
-      } else if (badgeLabel === "Comentada") {
-        setComentarioModal({ isOpen: true, reunion: r, text: r.minuta || '', readOnly: true });
-      }
+    if (badgeLabel === "Enviada" || badgeLabel === "Retroactiva") {
+      if (handleVerMinuta) handleVerMinuta(r);
+      return;
+    }
+    if (badgeLabel === "Comentada") {
+      setComentarioModal({ isOpen: true, reunion: r, text: r.minuta || '', readOnly: false });
+      return;
+    }
+    if (badgeLabel === "No requiere") {
       return;
     }
     setOpenDropdownId(isOpen ? null : r.id_reunion);
@@ -149,8 +152,8 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
       <div
         onClick={handleClickAction}
         style={{
-          background: "#f1f5f9",
-          color: "#334155",
+          background: softColors?.btn,
+          color: softColors?.text,
           padding: "4px 8px",
           borderRadius: "6px",
           fontSize: "12px",
@@ -159,11 +162,11 @@ const MinutaActionBadge = ({ r, navigate, handleMarcarNoAplica, setComentarioMod
           display: "flex",
           alignItems: "center",
           gap: "4px",
-          border: "1px solid #e2e8f0",
-          transition: "background 0.2s"
+          border: `1px solid ${softColors?.btnHover}`,
+          transition: "all 0.2s"
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "#e2e8f0")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = softColors?.btnHover)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = softColors?.btn)}
       >
         {badgeIcon} {badgeLabel} {!isFinalState && <span style={{ fontSize: "10px" }}>▾</span>}
       </div>
@@ -433,6 +436,26 @@ export default function DashboardReuniones() {
     return 'gray-square';
   };
 
+  const handleDownloadAttachment = async (e, fileName) => {
+    e.preventDefault();
+    const fileUrl = `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/uploads/${fileName}`;
+    try {
+      const response = await fetch(fileUrl, { method: "HEAD" });
+      if (!response.ok) {
+        Swal.fire({
+          icon: "warning",
+          title: "Documento no encontrado",
+          text: "No es posible encontrar el documento.",
+          confirmButtonColor: "#3085d6"
+        });
+      } else {
+        window.open(fileUrl, "_blank");
+      }
+    } catch (error) {
+      window.open(fileUrl, "_blank");
+    }
+  };
+
   const handleShowMobileDetailsModal = (reunion) => {
     const rowOwner = (usuarios || []).find(u => Number(u.id) === Number(reunion.ejecutiva_id));
     const rowJefaturaName = rowOwner?.jefatura_nombre || (rowOwner?.permisos === 'jefatura' || rowOwner?.permisos === 'gerencia' ? rowOwner?.nombre : "Sin equipo");
@@ -699,6 +722,7 @@ export default function DashboardReuniones() {
   }, [filtroMacroZona, filtroJefatura, filtroEmpresa, filtroTipo, filtroEstado, filtroPeriodo]);
   const [openDropdownId, setOpenDropdownId] = useState(null);
   const [expandedMeetingId, setExpandedMeetingId] = useState(null);
+  const [hoveredRowId, setHoveredRowId] = useState(null);
 
   const periodoOptions = useMemo(() => buildPeriodoOptions(), []);
 
@@ -708,7 +732,7 @@ export default function DashboardReuniones() {
   useEffect(() => {
     sessionStorage.setItem('reuniones_page', currentPage);
   }, [currentPage]);
-  const itemsPerPage = 6;
+  const itemsPerPage = 7;
 
   // Solo gerencia_general y admin pueden cambiar el filtro Macro-Zona
   const mostrarFiltroMacroZona = userRol === 'admin' || userRol === 'gerencia_general';
@@ -886,11 +910,13 @@ export default function DashboardReuniones() {
       meetingDate.setHours(0, 0, 0, 0);
 
       const isFuture = meetingDate >= today;
+      const isStrictlyFuture = meetingDate > today;
 
       // Tab filters logic
       if (activeTab === "internas" || activeTab === "proforma") {
         if (!isProforma) return false;
         if (isExcluida) return false;
+        if (isStrictlyFuture) return false;
       }
       if (activeTab === "clientes") {
         if (isProforma || isExcluida) return false;
@@ -898,7 +924,7 @@ export default function DashboardReuniones() {
         if (isUpcoming || r.estado_envio === "cancelada") return false;
       }
       if (activeTab === "proximas") {
-        if (isProforma || isExcluida) return false;
+        if (isExcluida) return false;
         const isUpcoming = (isFuture && r.estado_envio !== "enviado") || r.estado_envio === "agendada";
         if (!isUpcoming) return false;
       }
@@ -1970,11 +1996,28 @@ export default function DashboardReuniones() {
                     ((r.estado_envio === 'no_aplica' || r.estado_envio === 'huerfana' || r._isExcluida) ? '#94a3b8' :
                     (r.estado_envio === 'agendada' ? '#3b82f6' : 'transparent')));
 
+                  const getSoftColors = (estado, isExcluida) => {
+                    if (estado === 'borrador') return { bg: '#fef9c3', btn: '#fef08a', btnHover: '#fde047', text: '#854d0e' };
+                    if (estado === 'enviado' || estado === 'gestionada') return { bg: '#dcfce7', btn: '#bbf7d0', btnHover: '#86efac', text: '#166534' };
+                    if (estado === 'no_aplica' || estado === 'huerfana' || isExcluida) return { bg: '#f8fafc', btn: '#f1f5f9', btnHover: '#e2e8f0', text: '#475569' };
+                    if (estado === 'agendada') return { bg: '#eff6ff', btn: '#dbeafe', btnHover: '#bfdbfe', text: '#1e40af' };
+                    return { bg: '#f8fafc', btn: '#f1f5f9', btnHover: '#e2e8f0', text: '#334155' };
+                  };
+                  const softColors = getSoftColors(r.estado_envio, r._isExcluida);
+                  const isRowHovered = hoveredRowId === r.id_reunion;
+
                   return (
                     <React.Fragment key={r.id_reunion}>
                       <tr 
                         className="meeting-row"
-                        style={{ ...styles.tr, borderLeft: `4px solid ${statusBorderColor}` }}
+                        onMouseEnter={() => setHoveredRowId(r.id_reunion)}
+                        onMouseLeave={() => setHoveredRowId(null)}
+                        style={{ 
+                          ...styles.tr, 
+                          borderLeft: `4px solid ${statusBorderColor}`,
+                          backgroundColor: isRowHovered ? softColors.bg : 'transparent',
+                          transition: 'background-color 0.2s ease'
+                        }}
                       >
 
                       <td style={styles.tdCell} data-label="FECHA / ID">
@@ -2070,12 +2113,16 @@ export default function DashboardReuniones() {
                             <div 
                               style={{
                                 display: "inline-flex", alignItems: "center", gap: "4px",
-                                padding: "4px 8px", background: "#dbeafe", color: "#1e40af",
+                                padding: "4px 8px", 
+                                background: softColors.btn, 
+                                color: softColors.text,
                                 borderRadius: "4px", fontSize: "11px", fontWeight: "bold",
-                                cursor: "pointer", border: "1px solid #bfdbfe", transition: "background 0.2s"
+                                cursor: "pointer", 
+                                border: `1px solid ${softColors.btnHover}`, 
+                                transition: "all 0.2s"
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "#bfdbfe"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = "#dbeafe"}
+                              onMouseEnter={(e) => e.currentTarget.style.background = softColors.btnHover}
+                              onMouseLeave={(e) => e.currentTarget.style.background = softColors.btn}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedOrphan(r);
@@ -2128,6 +2175,9 @@ export default function DashboardReuniones() {
                             openDropdownId={openDropdownId}
                             setOpenDropdownId={setOpenDropdownId}
                             isLastRows={isLastRows}
+                            isRowHovered={isRowHovered}
+                            softColors={softColors}
+                            handleVerMinuta={handleVerMinuta}
                           />
                         </div>
                       </td>
@@ -2234,13 +2284,15 @@ export default function DashboardReuniones() {
                                       href={`${import.meta.env.VITE_API_URL || "http://localhost:8080"}/uploads/${file}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
+                                      onClick={(e) => handleDownloadAttachment(e, file)}
                                       style={{
                                         fontSize: "11px",
                                         color: "var(--secondary-color)",
                                         textDecoration: "none",
                                         borderBottom: "1px solid #f1f5f9",
                                         paddingBottom: "4px",
-                                        whiteSpace: "nowrap"
+                                        whiteSpace: "nowrap",
+                                        cursor: "pointer"
                                       }}
                                     >
                                       📄 {file.split("-").slice(2).join("-") || file}
@@ -2343,7 +2395,8 @@ export default function DashboardReuniones() {
                                       href={`${import.meta.env.VITE_API_URL || "http://localhost:8080"}/uploads/${file}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      style={{ color: 'var(--secondary-color)', textDecoration: 'underline' }}
+                                      onClick={(e) => handleDownloadAttachment(e, file)}
+                                      style={{ color: 'var(--secondary-color)', textDecoration: 'underline', cursor: "pointer" }}
                                     >
                                       📄 {file.split("-").slice(2).join("-") || file}
                                     </a>

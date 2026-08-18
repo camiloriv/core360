@@ -1,6 +1,6 @@
 const app = require("./app");
 const { startScheduler } = require("./services/scheduler/scheduler.service");
-const { runMigrations } = require("./database/migrate");
+const db = require("./database/knex");
 
 if (!process.env.JWT_SECRET) {
   throw new Error("❌ JWT_SECRET no está definido en el archivo .env. Por seguridad, el servidor no puede iniciar.");
@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 8080;
 (async () => {
   try {
     console.log("🚀 Ejecutando migraciones de base de datos en inicio...");
-    await runMigrations();
+    await db.migrate.latest();
   } catch (err) {
     console.error("❌ Fallaron las migraciones de inicio:", err);
   }

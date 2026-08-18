@@ -1,4 +1,4 @@
-const db = require("../../database/connection");
+const db = require("../../database/knex");
 
 /**
  * GET /admin/audit-log
@@ -21,56 +21,50 @@ exports.getAuditLog = async (req, res) => {
         const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
         const offset = (page - 1) * limit;
 
-        let whereClause = "WHERE 1=1";
-        const params = [];
+        const baseQuery = db('audit_log as a');
 
         if (req.query.usuario_id) {
-            whereClause += " AND a.usuario_id = ?";
-            params.push(parseInt(req.query.usuario_id));
+            baseQuery.where('a.usuario_id', parseInt(req.query.usuario_id));
         }
 
         if (req.query.entidad) {
-            whereClause += " AND a.entidad = ?";
-            params.push(req.query.entidad);
+            baseQuery.where('a.entidad', req.query.entidad);
         }
 
         if (req.query.accion) {
-            whereClause += " AND a.accion = ?";
-            params.push(req.query.accion);
+            baseQuery.where('a.accion', req.query.accion);
         }
 
         if (req.query.desde) {
-            whereClause += " AND a.created_at >= ?";
-            params.push(req.query.desde + " 00:00:00");
+            baseQuery.where('a.created_at', '>=', req.query.desde + " 00:00:00");
         }
 
         if (req.query.hasta) {
-            whereClause += " AND a.created_at <= ?";
-            params.push(req.query.hasta + " 23:59:59");
+            baseQuery.where('a.created_at', '<=', req.query.hasta + " 23:59:59");
         }
 
         if (req.query.delegadas === 'true') {
-            whereClause += " AND a.usuario_id IS NOT NULL AND a.ejecutiva_id IS NOT NULL AND a.usuario_id != a.ejecutiva_id";
+            baseQuery.whereNotNull('a.usuario_id')
+                     .whereNotNull('a.ejecutiva_id')
+                     .whereRaw('a.usuario_id != a.ejecutiva_id');
         }
 
         if (req.query.buscar) {
-            whereClause += " AND (a.usuario_nombre LIKE ? OR a.ejecutiva_nombre LIKE ? OR a.empresa_nombre LIKE ? OR a.entidad_id LIKE ?)";
             const searchTerm = `%${req.query.buscar}%`;
-            params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+            baseQuery.where(function() {
+                this.where('a.usuario_nombre', 'LIKE', searchTerm)
+                    .orWhere('a.ejecutiva_nombre', 'LIKE', searchTerm)
+                    .orWhere('a.empresa_nombre', 'LIKE', searchTerm)
+                    .orWhere('a.entidad_id', 'LIKE', searchTerm);
+            });
         }
 
         // Total count
-        const [countResult] = await db.query(
-            `SELECT COUNT(*) as total FROM audit_log a ${whereClause}`,
-            params
-        );
-        const total = countResult[0].total;
+        const countResult = await baseQuery.clone().count('* as total').first();
+        const total = countResult?.total || 0;
 
         // Paginated results
-        const [rows] = await db.query(
-            `SELECT a.* FROM audit_log a ${whereClause} ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,
-            [...params, limit, offset]
-        );
+        const rows = await baseQuery.clone().orderBy('a.created_at', 'desc').limit(limit).offset(offset);
 
         // Parse detalles JSON for each row
         const parsedRows = rows.map(row => ({
@@ -99,9 +93,7 @@ exports.getAuditLog = async (req, res) => {
  */
 exports.getAccionesDisponibles = async (req, res) => {
     try {
-        const [rows] = await db.query(
-            "SELECT DISTINCT accion FROM audit_log ORDER BY accion ASC"
-        );
+        const rows = await db('audit_log').distinct('accion').orderBy('accion', 'asc');
         res.json(rows.map(r => r.accion));
     } catch (err) {
         console.error("Error en getAccionesDisponibles:", err);

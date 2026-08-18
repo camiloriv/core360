@@ -1,66 +1,33 @@
-const db = require("../../database/connection");
+const editorRepository = require("../../database/repositories/encuestas.editor.repository");
 
 // --- GESTIÓN DE TEMPLATES ---
 const listarTemplates = async () => {
-    const [rows] = await db.query("SELECT * FROM encuesta_templates WHERE activo != 2 ORDER BY id DESC");
-    return rows;
+    return await editorRepository.listarTemplates();
 };
 
-
 const crearTemplate = async (nombre) => {
-    const [result] = await db.query("INSERT INTO encuesta_templates (nombre, activo) VALUES (?, 1)", [nombre]);
-    return { id: result.insertId, nombre };
+    return await editorRepository.crearTemplate(nombre);
 };
 
 const actualizarTemplate = async (id, nombre, activo) => {
-    await db.query("UPDATE encuesta_templates SET nombre = ?, activo = ? WHERE id = ?", [nombre, activo, id]);
+    await editorRepository.actualizarTemplate(id, nombre, activo);
 };
 
 // --- GESTIÓN DE DIMENSIONES ---
 const listarDimensiones = async () => {
-    const [rows] = await db.query("SELECT * FROM encuesta_dimensiones ORDER BY nombre ASC");
-    return rows;
+    return await editorRepository.listarDimensiones();
 };
 
 const crearDimension = async (nombre) => {
-    const [result] = await db.query("INSERT INTO encuesta_dimensiones (nombre) VALUES (?)", [nombre]);
-    return { id: result.insertId, nombre };
+    return await editorRepository.crearDimension(nombre);
 };
 
 // --- GESTIÓN DE PREGUNTAS (BIBLIOTECA) ---
 
-/**
- * Lista las preguntas de un template específico uniendo con el catálogo
- */
 const listarPreguntasPorTemplate = async (templateId) => {
-    const [rows] = await db.query(`
-        SELECT 
-            tp.id as assignment_id,
-            tp.template_id,
-            tp.pregunta_id,
-            tp.orden,
-            tp.requerida,
-            p.texto,
-            p.tipo,
-            p.escala,
-            p.es_nps,
-            p.subdimension,
-            p.dimension_id,
-            p.opciones_json,
-            d.nombre as dimension_nombre,
-            (SELECT COUNT(*) FROM encuesta_template_preguntas WHERE pregunta_id = p.id) as shared_count
-        FROM encuesta_template_preguntas tp
-        JOIN encuesta_catalogo_preguntas p ON tp.pregunta_id = p.id
-        LEFT JOIN encuesta_dimensiones d ON p.dimension_id = d.id
-        WHERE tp.template_id = ?
-        ORDER BY tp.orden ASC
-    `, [templateId]);
-    return rows;
+    return await editorRepository.listarPreguntasPorTemplate(templateId);
 };
 
-/**
- * Guarda una pregunta (Crear nueva o Editar existente con lógica de clonación)
- */
 const guardarPregunta = async (data) => {
     const { 
         pregunta_id, 
@@ -74,43 +41,31 @@ const guardarPregunta = async (data) => {
         opciones_json, 
         orden, 
         requerida,
-        solo_este_template // Flag para clonación
+        solo_este_template
     } = data;
 
     let finalPreguntaId = pregunta_id;
 
+    const preguntaData = {
+        dimension_id,
+        subdimension: subdimension || null,
+        texto,
+        tipo,
+        escala: escala || 5,
+        es_nps: es_nps ? 1 : 0,
+        opciones_json: typeof opciones_json === 'string' ? opciones_json : JSON.stringify(opciones_json || [])
+    };
+
     // 1. LÓGICA DE CATÁLOGO (MASTER)
     if (!pregunta_id) {
-        // Crear nueva pregunta en la biblioteca
-        const [res] = await db.query(`
-            INSERT INTO encuesta_catalogo_preguntas (dimension_id, subdimension, texto, tipo, escala, es_nps, opciones_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [dimension_id, subdimension || null, texto, tipo, escala || 5, es_nps || 0, JSON.stringify(opciones_json || [])]);
-        finalPreguntaId = res.insertId;
+        finalPreguntaId = await editorRepository.insertPreguntaCatalogo(preguntaData);
     } 
     else if (solo_este_template) {
-        // CLONACIÓN: Crear una copia para este template específico
-        const [res] = await db.query(`
-            INSERT INTO encuesta_catalogo_preguntas (dimension_id, subdimension, texto, tipo, escala, es_nps, opciones_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [dimension_id, subdimension || null, texto, tipo, escala || 5, es_nps || 0, JSON.stringify(opciones_json || [])]);
-        
-        finalPreguntaId = res.insertId;
-        
-        // Actualizar el vínculo para que apunte a la nueva pregunta clonada
-        await db.query(`
-            UPDATE encuesta_template_preguntas 
-            SET pregunta_id = ? 
-            WHERE template_id = ? AND pregunta_id = ?
-        `, [finalPreguntaId, template_id, pregunta_id]);
+        finalPreguntaId = await editorRepository.insertPreguntaCatalogo(preguntaData);
+        await editorRepository.updateVinculoTemplatePregunta(template_id, pregunta_id, finalPreguntaId);
     }
     else {
-        // ACTUALIZAR MASTER: Modifica la pregunta original en la biblioteca
-        await db.query(`
-            UPDATE encuesta_catalogo_preguntas 
-            SET dimension_id = ?, subdimension = ?, texto = ?, tipo = ?, escala = ?, es_nps = ?, opciones_json = ?
-            WHERE id = ?
-        `, [dimension_id, subdimension || null, texto, tipo, escala || 5, es_nps || 0, JSON.stringify(opciones_json || []), pregunta_id]);
+        await editorRepository.updatePreguntaCatalogo(pregunta_id, preguntaData);
     }
 
     if (!template_id) {
@@ -118,57 +73,44 @@ const guardarPregunta = async (data) => {
     }
 
     // 2. LÓGICA DE ASIGNACIÓN (TEMPLATE-PREGUNTA)
-    // Asegurar que existe el vínculo (para nuevos) o actualizar orden/requerida
     let finalOrden = orden;
     if (!pregunta_id) {
-        const [[lastOrder]] = await db.query("SELECT MAX(orden) as max_o FROM encuesta_template_preguntas WHERE template_id = ?", [template_id]);
-        finalOrden = (lastOrder?.max_o || 0) + 1;
+        finalOrden = (await editorRepository.getMaxOrdenTemplate(template_id)) + 1;
     }
 
-    await db.query(`
-        INSERT INTO encuesta_template_preguntas (template_id, pregunta_id, orden, requerida)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE orden = ?, requerida = ?
-    `, [template_id, finalPreguntaId, finalOrden || 1, requerida !== undefined ? requerida : 1, finalOrden || 1, requerida !== undefined ? requerida : 1]);
+    await editorRepository.upsertTemplatePregunta(
+        template_id, 
+        finalPreguntaId, 
+        finalOrden || 1, 
+        requerida !== undefined ? (requerida ? 1 : 0) : 1
+    );
 
     return { id: finalPreguntaId };
 };
 
 const eliminarPregunta = async (template_id, pregunta_id) => {
-    // Solo eliminamos el vínculo del template. 
-    // La pregunta permanece en la biblioteca (catalogo) a menos que se quiera una limpieza profunda.
-    await db.query("DELETE FROM encuesta_template_preguntas WHERE template_id = ? AND pregunta_id = ?", [template_id, pregunta_id]);
+    await editorRepository.eliminarPreguntaTemplate(template_id, pregunta_id);
 };
 
 const eliminarPreguntaCatalogo = async (preguntaId) => {
-    // Primero eliminamos los vínculos en templates
-    await db.query("DELETE FROM encuesta_template_preguntas WHERE pregunta_id = ?", [preguntaId]);
-    // Luego de la biblioteca maestro, en lugar de eliminar físicamente, marcamos como eliminado (activo = 2)
-    await db.query("UPDATE encuesta_catalogo_preguntas SET activo = 2 WHERE id = ?", [preguntaId]);
+    await editorRepository.unlinkPreguntaFromAllTemplates(preguntaId);
+    await editorRepository.softDeletePreguntaCatalogo(preguntaId);
     return { success: true };
 };
 
 const vincularPreguntaATemplate = async (template_id, pregunta_id) => {
-    // Buscar el último orden para ponerla al final
-    const [[lastOrder]] = await db.query("SELECT MAX(orden) as max_o FROM encuesta_template_preguntas WHERE template_id = ?", [template_id]);
-    const nextOrder = (lastOrder?.max_o || 0) + 1;
-
-    await db.query(`
-        INSERT INTO encuesta_template_preguntas (template_id, pregunta_id, orden, requerida)
-        VALUES (?, ?, ?, 1)
-        ON DUPLICATE KEY UPDATE template_id = template_id
-    `, [template_id, pregunta_id, nextOrder]);
-
+    const nextOrder = (await editorRepository.getMaxOrdenTemplate(template_id)) + 1;
+    await editorRepository.upsertTemplatePregunta(template_id, pregunta_id, nextOrder, 1);
     return { success: true };
 };
 
 const eliminarTemplate = async (id) => {
-    await db.query("UPDATE encuesta_templates SET activo = 2 WHERE id = ?", [id]);
+    await editorRepository.softDeleteTemplate(id);
     return { success: true };
 };
 
 const eliminarDimension = async (id) => {
-    await db.query("DELETE FROM encuesta_dimensiones WHERE id = ?", [id]);
+    await editorRepository.eliminarDimension(id);
     return { success: true };
 };
 

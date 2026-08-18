@@ -1,4 +1,4 @@
-const db = require("../../database/connection");
+const db = require("../../database/knex");
 const { enviarCorreo } = require("../../services/email/email.service");
 const { registrarAudit } = require("../../services/audit/audit.service");
 
@@ -225,7 +225,7 @@ exports.listarReuniones = async (req, res) => {
         const currentDateChile = `${y}-${m}-${d}`;
         const currentTimeChile = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
 
-        await db.query(`
+        await db.raw(`
             UPDATE teams_eventos 
             SET estado = 'pasada' 
             WHERE estado = 'agendada' 
@@ -233,7 +233,7 @@ exports.listarReuniones = async (req, res) => {
         `, [currentDateChile, currentDateChile, currentTimeChile]);
         // --- FIN HOTFIX ---
 
-        const [result] = await db.query(sql, [...params, ...params]);
+        const result = await db.raw(sql, [...params, ...params]);
         res.json(result);
     } catch (err) {
         console.error("Error en listarReuniones:", err);
@@ -252,7 +252,7 @@ exports.obtenerStats = async (req, res) => {
         const stats = {};
 
         // 1. Conteo por tipo de reunión (desde minutas que tienen tipo_reu)
-        const [porTipo] = await db.query(`
+        const porTipo = await db.raw(`
             SELECT m.tipo_reu AS name, COUNT(*) AS value
             FROM teams_eventos te
             LEFT JOIN minutas m ON m.teams_evento_id = te.id
@@ -266,7 +266,7 @@ exports.obtenerStats = async (req, res) => {
         stats.porTipo = porTipo;
 
         // 2. Conteo total de eventos por ejecutiva (todos los eventos de Teams)
-        const [porEjecutiva] = await db.query(`
+        const porEjecutiva = await db.raw(`
             SELECT u.nombre AS name, COUNT(*) AS value
             FROM teams_eventos te
             LEFT JOIN usuarios u ON te.usuario_id = u.id
@@ -279,11 +279,11 @@ exports.obtenerStats = async (req, res) => {
         stats.porEjecutiva = porEjecutiva;
 
         // 3. Resumen general (base: todos los eventos Teams)
-        const [resumen] = await db.query(`
+        const resumen = await db.raw(`
             SELECT
                 COUNT(*)                                                                        AS total_eventos,
-                COUNT(CASE WHEN YEAR(te.fecha) = YEAR(CURDATE()) THEN 1 END)                   AS este_ano,
-                COUNT(CASE WHEN MONTH(te.fecha) = MONTH(CURDATE()) AND YEAR(te.fecha) = YEAR(CURDATE()) THEN 1 END) AS este_mes,
+                COUNT(CASE WHEN YEAR(te.fecha) = YEAR(CAST(GETDATE() AS DATE)) THEN 1 END)                   AS este_ano,
+                COUNT(CASE WHEN MONTH(te.fecha) = MONTH(CAST(GETDATE() AS DATE)) AND YEAR(te.fecha) = YEAR(CAST(GETDATE() AS DATE)) THEN 1 END) AS este_mes,
                 COUNT(CASE WHEN m.id IS NOT NULL AND m.estado_envio = 'enviado' THEN 1 END)    AS con_minuta,
                 COUNT(CASE WHEN te.estado = 'pasada' AND m.id IS NULL AND te.empresa_id IS NOT NULL THEN 1 END) AS pendiente_minuta,
                 COUNT(CASE WHEN te.empresa_id IS NULL AND te.estado != 'cancelada' THEN 1 END) AS sin_empresa
@@ -296,15 +296,15 @@ exports.obtenerStats = async (req, res) => {
         stats.resumen = resumen[0];
 
         // 4. Tendencia últimos 6 meses (por fecha del evento Teams)
-        const [tendencia] = await db.query(`
+        const tendencia = await db.raw(`
             SELECT
-                DATE_FORMAT(te.fecha, '%Y-%m') AS mes,
+                FORMAT(te.fecha, 'yyyy-MM') AS mes,
                 COUNT(*) AS total
             FROM teams_eventos te
             LEFT JOIN empresas emp ON te.empresa_id = emp.id
             ${whereClause}
             AND te.estado NOT IN ('excluida', 'cancelada')
-            AND te.fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+            AND te.fecha >= DATEADD(month, -6, CAST(GETDATE() AS DATE))
             GROUP BY mes
             ORDER BY mes ASC
         `, params);
@@ -323,7 +323,7 @@ exports.obtenerStats = async (req, res) => {
 const generarIdMinuta = async () => {
     const year = new Date().getFullYear();
 
-    const [result] = await db.query(`
+    const result = await db.raw(`
         SELECT id_minuta
         FROM minutas
         WHERE id_minuta LIKE ?
@@ -345,7 +345,7 @@ const generarIdMinuta = async () => {
 // CALCULAR CC POR DEFECTO para envío de minutas
 // ============================================================
 const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, enviado_por_id) => {
-    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+    const gerenteRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE nombre = 'Lilian Ortega'");
     const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
 
     let userPermisos = 'ejecutiva';
@@ -354,8 +354,8 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
     // Unifica la búsqueda del usuario logueado en una sola query (id tiene prioridad sobre correo)
     if (enviado_por_id || enviado_por_correo) {
         const [userRows] = enviado_por_id
-            ? await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE id = ? LIMIT 1", [enviado_por_id])
-            : await db.query("SELECT id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ? LIMIT 1", [enviado_por_correo]);
+            ? await db.raw("SELECT TOP 1 id, permisos, jefatura_id, correo FROM usuarios WHERE id = ?", [enviado_por_id])
+            : await db.raw("SELECT TOP 1 id, permisos, jefatura_id, correo FROM usuarios WHERE correo = ?", [enviado_por_correo]);
         if (userRows.length > 0) { loggedInUser = userRows[0]; userPermisos = loggedInUser.permisos || 'ejecutiva'; }
     }
 
@@ -364,27 +364,27 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
     if (userPermisos === 'ejecutiva') {
         let jefaturaId = loggedInUser?.jefatura_id;
         if (!jefaturaId && ejecutiva_id) {
-            const [ejRows] = await db.query("SELECT jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            const ejRows = await db.raw("SELECT TOP 1 jefatura_id FROM usuarios WHERE id = ?", [ejecutiva_id]);
             jefaturaId = ejRows[0]?.jefatura_id;
         }
         if (jefaturaId) {
-            const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [jefaturaId]);
+            const jefRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE id = ?", [jefaturaId]);
             if (jefRows[0]?.correo) correosCcArray.push(jefRows[0].correo);
         }
         correosCcArray.push(lilianCorreo);
     } else if (userPermisos === 'jefatura') {
         // CC ejecutiva responsable de la reunión
         if (ejecutiva_id) {
-            const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            const ejRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE id = ?", [ejecutiva_id]);
             if (ejRows[0]?.correo) correosCcArray.push(ejRows[0].correo);
         } else if (loggedInUser?.id) {
-            const [ejRows] = await db.query("SELECT correo FROM usuarios WHERE permisos = 'ejecutiva' AND jefatura_id = ? LIMIT 1", [loggedInUser.id]);
+            const ejRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE permisos = 'ejecutiva' AND jefatura_id = ?", [loggedInUser.id]);
             if (ejRows[0]?.correo) correosCcArray.push(ejRows[0].correo);
         }
         
         // CC gerencia desde usuario_gerencias
         if (loggedInUser?.id) {
-            const [gerRows] = await db.query(`
+            const gerRows = await db.raw(`
                 SELECT u.correo FROM usuario_gerencias ug
                 JOIN usuarios u ON ug.gerencia_id = u.id
                 WHERE ug.usuario_id = ? LIMIT 1
@@ -394,27 +394,27 @@ const calcularDefaultCc = async (empresa_id, ejecutiva_id, enviado_por_correo, e
     } else if (userPermisos === 'gerencia') {
         // CC gerencia superior automáticamente si corresponde
         if (loggedInUser?.jefatura_id) {
-            const [supRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [loggedInUser.jefatura_id]);
+            const supRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE id = ?", [loggedInUser.jefatura_id]);
             if (supRows[0]?.correo) correosCcArray.push(supRows[0].correo);
         }
         // CC ejecutiva y su jefatura si se seleccionó una
         if (ejecutiva_id) {
-            const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            const ejRows = await db.raw("SELECT TOP 1 correo, jefatura_id FROM usuarios WHERE id = ?", [ejecutiva_id]);
             if (ejRows[0]) {
                 if (ejRows[0].correo) correosCcArray.push(ejRows[0].correo);
                 if (ejRows[0].jefatura_id) {
-                    const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [ejRows[0].jefatura_id]);
+                    const jefRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE id = ?", [ejRows[0].jefatura_id]);
                     if (jefRows[0]?.correo) correosCcArray.push(jefRows[0].correo);
                 }
             }
         }
     } else {
         if (ejecutiva_id) {
-            const [ejRows] = await db.query("SELECT correo, jefatura_id FROM usuarios WHERE id = ? LIMIT 1", [ejecutiva_id]);
+            const ejRows = await db.raw("SELECT TOP 1 correo, jefatura_id FROM usuarios WHERE id = ?", [ejecutiva_id]);
             if (ejRows[0]) {
                 if (ejRows[0].correo) correosCcArray.push(ejRows[0].correo);
                 if (ejRows[0].jefatura_id) {
-                    const [jefRows] = await db.query("SELECT correo FROM usuarios WHERE id = ? LIMIT 1", [ejRows[0].jefatura_id]);
+                    const jefRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE id = ?", [ejRows[0].jefatura_id]);
                     if (jefRows[0]?.correo) correosCcArray.push(jefRows[0].correo);
                 }
             }
@@ -469,7 +469,7 @@ exports.crearReunion = async (req, res) => {
 
         // Si el body incluye un event_id de Teams (string largo), buscar el registro correspondiente
         if (!teId && req.body.event_id) {
-            const [teRows] = await db.query("SELECT id FROM teams_eventos WHERE event_id = ?", [req.body.event_id]);
+            const teRows = await db.raw("SELECT id FROM teams_eventos WHERE event_id = ?", [req.body.event_id]);
             if (teRows.length > 0) teId = teRows[0].id;
         }
 
@@ -492,7 +492,7 @@ exports.crearReunion = async (req, res) => {
         }
 
         if (reqIdReunion && reqIdReunion.startsWith('REU-')) {
-            const [existing] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE id_minuta = ?", [reqIdReunion]);
+            const existing = await db.raw("SELECT id_minuta, archivos_nombres FROM minutas WHERE id_minuta = ?", [reqIdReunion]);
             if (existing.length > 0) {
                 isUpdate = true;
                 final_id_minuta = existing[0].id_minuta;
@@ -510,7 +510,7 @@ exports.crearReunion = async (req, res) => {
 
         // Si no se encontró por ID de minuta pero hay un ID de evento de Teams, verificar si ya existe minuta para ese evento
         if (!isUpdate && teId) {
-            const [existingTe] = await db.query("SELECT id_minuta, archivos_nombres FROM minutas WHERE teams_evento_id = ?", [teId]);
+            const existingTe = await db.raw("SELECT id_minuta, archivos_nombres FROM minutas WHERE teams_evento_id = ?", [teId]);
             if (existingTe.length > 0) {
                 isUpdate = true;
                 final_id_minuta = existingTe[0].id_minuta;
@@ -563,7 +563,7 @@ exports.crearReunion = async (req, res) => {
                 isRetroactiva ? 1 : 0,
                 final_id_minuta
             ];
-            await db.query(sqlUpdate, valuesUpdate);
+            await db.raw(sqlUpdate, valuesUpdate);
         } else {
             const sqlInsert = `
                 INSERT INTO minutas (
@@ -593,21 +593,21 @@ exports.crearReunion = async (req, res) => {
                 link_video || null,
                 isRetroactiva ? 1 : 0
             ];
-            await db.query(sqlInsert, valuesInsert);
+            await db.raw(sqlInsert, valuesInsert);
         }
 
         // Si viene de un evento Teams, marcar ese evento como 'pasada'
         if (teId) {
-            await db.query("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
+            await db.raw("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
         }
 
         // Registrar en empresa_seguimiento_log (solo si hay empresa)
         if (empresa_id) {
-            await db.query(
+            await db.raw(
                 "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
                 [fecha_reu, empresa_id]
             );
-            await db.query(
+            await db.raw(
                 "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'gestionada', ?, ?, ?, ?)",
                 [empresa_id, fecha_reu, ejecutiva_id, final_id_minuta, motivo_reu || 'Minuta de reunión registrada']
             );
@@ -630,8 +630,7 @@ exports.crearReunion = async (req, res) => {
                         const dominio = '@' + correo.split('@')[1].toLowerCase();
                         const domSinArroba = dominio.substring(1);
                         if (!dominiosGenericos.includes(domSinArroba)) {
-                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dominio]);
-                            await db.query("INSERT IGNORE INTO empresa_contactos (empresa_id, correo) VALUES (?, ?)", [empresa_id, correo.toLowerCase()]);
+                            await db.raw("IF NOT EXISTS (SELECT 1 FROM empresa_contactos WHERE empresa_id = ? AND correo = ?) INSERT INTO empresa_contactos (empresa_id, correo) VALUES (?, ?)", [empresa_id, correo.toLowerCase(), empresa_id, correo.toLowerCase()]);
                         }
                     }
                 }
@@ -641,7 +640,7 @@ exports.crearReunion = async (req, res) => {
         }
 
         // Enviar correo
-        const [result2] = await db.query(`
+        const result2 = await db.raw(`
             SELECT 
                 m.*, 
                 emp.nombre AS empresa_nombre,
@@ -709,7 +708,7 @@ exports.crearReunion = async (req, res) => {
             const enviadoPorIdBody = req.body.enviado_por_id || req.usuario?.id;
             if (enviadoPorIdBody) {
                 try {
-                    const [userRows] = await db.query("SELECT nombre FROM usuarios WHERE id = ? LIMIT 1", [enviadoPorIdBody]);
+                    const userRows = await db.raw("SELECT TOP 1 nombre FROM usuarios WHERE id = ?", [enviadoPorIdBody]);
                     if (userRows.length > 0) {
                         enviadoPorReal = userRows[0].nombre;
                     }
@@ -820,7 +819,7 @@ exports.obtenerDestinatarios = async (req, res) => {
     if (!empresa_id) return res.status(400).json({ error: "empresa_id es requerido" });
 
     try {
-        const [result] = await db.query(
+        const result = await db.raw(
             "SELECT correo FROM empresa_contactos WHERE empresa_id = ? ORDER BY correo ASC",
             [empresa_id]
         );
@@ -836,7 +835,7 @@ exports.obtenerDestinatarios = async (req, res) => {
 // ============================================================
 exports.obtenerTiposReunion = async (req, res) => {
     try {
-        const [result] = await db.query(`
+        const result = await db.raw(`
             SELECT DISTINCT tipo_reu
             FROM minutas
             WHERE tipo_reu IS NOT NULL AND tipo_reu != ''
@@ -927,16 +926,16 @@ exports.marcarNoAplica = async (req, res) => {
 
     try {
         // Intentar como id_minuta primero
-        const [minutaRows] = await db.query("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
+        const minutaRows = await db.raw("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
 
         if (minutaRows.length > 0) {
             const nuevoEstado = noAplica ? 'no_aplica' : 'borrador';
-            await db.query("UPDATE minutas SET estado_envio = ? WHERE id_minuta = ?", [nuevoEstado, id]);
+            await db.raw("UPDATE minutas SET estado_envio = ? WHERE id_minuta = ?", [nuevoEstado, id]);
 
             if (noAplica && minutaRows[0].teams_evento_id) {
-                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, asunto FROM teams_eventos WHERE id = ?", [minutaRows[0].teams_evento_id]);
+                const teRows = await db.raw("SELECT event_id, empresa_id, fecha, asunto FROM teams_eventos WHERE id = ?", [minutaRows[0].teams_evento_id]);
                 if (teRows.length > 0 && teRows[0].empresa_id) {
-                    await db.query(
+                    await db.raw(
                         "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
                         [teRows[0].empresa_id, teRows[0].fecha, req.usuario.id, teRows[0].event_id, teRows[0].asunto || 'Reunión No Aplica']
                     );
@@ -963,11 +962,11 @@ exports.marcarNoAplica = async (req, res) => {
             if (noAplica) {
                 // En lugar de cambiar te.estado a 'excluida' (lo que la borraría de los KPIs),
                 // creamos una minuta con estado_envio = 'no_aplica' para que el evento siga activo y sumando a los KPIs.
-                const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
+                const teRows = await db.raw("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
                 if (teRows.length > 0) {
                     const teRow = teRows[0];
                     const idMinuta = `REU-${teId}`;
-                    await db.query(`
+                    await db.raw(`
                         INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
                         VALUES (?, ?, 'no_aplica', ?, ?, ?, ?, ?)
                     `, [
@@ -981,7 +980,7 @@ exports.marcarNoAplica = async (req, res) => {
                     ]);
 
                     if (teRow.empresa_id) {
-                        await db.query(
+                        await db.raw(
                             "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
                             [teRow.empresa_id, teRow.fecha, req.usuario.id, teRow.event_id, teRow.asunto || 'Reunión No Aplica']
                         );
@@ -1001,7 +1000,7 @@ exports.marcarNoAplica = async (req, res) => {
                 }
             } else {
                 // Si por alguna razón se intentaba revertir un evento puro
-                await db.query("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
+                await db.raw("UPDATE teams_eventos SET estado = 'pasada' WHERE id = ?", [teId]);
             }
 
             return res.json({ success: true, message: "Estado de reunión actualizado (se conservó en los KPIs)" });
@@ -1031,7 +1030,7 @@ exports.obtenerReunionPorId = async (req, res) => {
     `;
 
     try {
-        const [result] = await db.query(sql, [id_reunion, id_reunion]);
+        const result = await db.raw(sql, [id_reunion, id_reunion]);
         if (result.length === 0) {
             return res.status(404).json({ error: "Reunión no encontrada" });
         }
@@ -1061,7 +1060,7 @@ exports.resolverParticipantes = async (req, res) => {
 
             if (!email) continue;
 
-            const [contactos] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ? LIMIT 1", [empresa_id, email]);
+            const contactos = await db.raw("SELECT TOP 1 id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
 
             if (contactos.length > 0) {
                 // Existe en la base de datos para esta empresa
@@ -1069,7 +1068,7 @@ exports.resolverParticipantes = async (req, res) => {
                     nombresParticipantes.push(contactos[0].nombre);
                 } else if (nombreTeams) {
                     // No tenía nombre guardado, lo actualizamos con el de Teams
-                    await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [nombreTeams, contactos[0].id]);
+                    await db.raw("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [nombreTeams, contactos[0].id]);
                     nombresParticipantes.push(nombreTeams);
                 } else {
                     nombresParticipantes.push(email);
@@ -1077,7 +1076,7 @@ exports.resolverParticipantes = async (req, res) => {
             } else {
                 // No existe, crearlo
                 let nombreFinal = nombreTeams || null;
-                await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, nombreFinal]);
+                await db.raw("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, nombreFinal]);
                 nombresParticipantes.push(nombreFinal || email);
             }
         }
@@ -1098,10 +1097,10 @@ exports.guardarComentario = async (req, res) => {
 
     try {
         // Intentar como id_minuta primero
-        const [minutaRows] = await db.query("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
+        const minutaRows = await db.raw("SELECT id, teams_evento_id FROM minutas WHERE id_minuta = ?", [id]);
 
         if (minutaRows.length > 0) {
-            await db.query("UPDATE minutas SET minuta = ?, estado_envio = 'enviado', es_retroactiva = 2 WHERE id_minuta = ?", [comentario, id]);
+            await db.raw("UPDATE minutas SET minuta = ?, estado_envio = 'enviado', es_retroactiva = 2 WHERE id_minuta = ?", [comentario, id]);
             
             // Audit log
             registrarAudit({
@@ -1120,11 +1119,11 @@ exports.guardarComentario = async (req, res) => {
         // Si no existe, es un teams_evento_id
         const teId = parseInt(id);
         if (!isNaN(teId)) {
-            const [teRows] = await db.query("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
+            const teRows = await db.raw("SELECT event_id, empresa_id, fecha, hora, asunto, usuario_id FROM teams_eventos WHERE id = ?", [teId]);
             if (teRows.length > 0) {
                 const teRow = teRows[0];
                 const idMinuta = `REU-${teId}`;
-                await db.query(`
+                await db.raw(`
                     INSERT INTO minutas (id_minuta, teams_evento_id, estado_envio, minuta, es_retroactiva, enviado_por, ejecutiva_id, fecha_reu, hora, empresa_id)
                     VALUES (?, ?, 'enviado', ?, 2, ?, ?, ?, ?, ?)
                 `, [

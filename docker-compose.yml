@@ -3,13 +3,16 @@ services:
     build: ./backend
     ports:
       - "8080:8080"
+    env_file:
+      - ./backend/.env
     environment:
-      - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=root_password
+      - DB_HOST=sqlserver
+      - DB_USER=sa
+      - DB_PASSWORD=SuperStrongPassword123!
       - DB_NAME=core360
+      - DB_PORT=1433
     depends_on:
-      - db
+      - sqlserver
     deploy:
       resources:
         limits:
@@ -30,21 +33,22 @@ services:
           cpus: '0.50'
           memory: 1024M
 
-  db:
-    image: mysql:8.0
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=root_password
-      - MYSQL_DATABASE=core360
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=SuperStrongPassword123!
+      - MSSQL_PID=Express
     ports:
-      - "3306:3306"
+      - "1433:1433"
     volumes:
-      - db_data:/var/lib/mysql
+      - sqlserver_data:/var/opt/mssql
     deploy:
       resources:
         limits:
-          cpus: '0.50'
-          memory: 512M
+          cpus: '1.00'
+          memory: 2048M
 
 volumes:
-  db_data:
+  sqlserver_data:

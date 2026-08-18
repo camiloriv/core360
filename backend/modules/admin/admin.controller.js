@@ -1,4 +1,4 @@
-const db = require("../../database/connection");
+const db = require("../../database/knex");
 
 /**
  * POST /admin/reset-meeting-data
@@ -14,83 +14,73 @@ const db = require("../../database/connection");
  *   - Resetea estado_seguimiento de empresas a 'pendiente'
  */
 exports.resetMeetingData = async (req, res) => {
-    const connection = await db.getConnection();
     const results = {};
 
     try {
-        await connection.beginTransaction();
+        await db.transaction(async (trx) => {
+            // 1. Limpiar minutas (nueva tabla)
+            try {
+                results.minutas_eliminadas = await trx('minutas').del();
+            } catch (e) {
+                results.minutas_eliminadas = 0; // tabla puede no existir aún
+            }
 
-        // 1. Limpiar minutas (nueva tabla)
-        try {
-            const [delMinutas] = await connection.query("DELETE FROM minutas");
-            results.minutas_eliminadas = delMinutas.affectedRows;
-        } catch (e) {
-            results.minutas_eliminadas = 0; // tabla puede no existir aún
-        }
+            // 2. Limpiar teams_eventos (nueva tabla)
+            try {
+                results.teams_eventos_eliminados = await trx('teams_eventos').del();
+            } catch (e) {
+                results.teams_eventos_eliminados = 0;
+            }
 
-        // 2. Limpiar teams_eventos (nueva tabla)
-        try {
-            const [delTeams] = await connection.query("DELETE FROM teams_eventos");
-            results.teams_eventos_eliminados = delTeams.affectedRows;
-        } catch (e) {
-            results.teams_eventos_eliminados = 0;
-        }
+            // 3. Limpiar tabla legacy 'reuniones' (si existe)
+            try {
+                results.reuniones_legacy_eliminadas = await trx('reuniones').del();
+            } catch (e) {
+                results.reuniones_legacy_eliminadas = 0;
+            }
 
-        // 3. Limpiar tabla legacy 'reuniones' (si existe)
-        try {
-            const [delReu] = await connection.query("DELETE FROM reuniones");
-            results.reuniones_legacy_eliminadas = delReu.affectedRows;
-        } catch (e) {
-            results.reuniones_legacy_eliminadas = 0;
-        }
+            // 4. Limpiar tabla legacy 'reuniones_huerfanas' (si existe)
+            try {
+                results.huerfanas_legacy_eliminadas = await trx('reuniones_huerfanas').del();
+            } catch (e) {
+                results.huerfanas_legacy_eliminadas = 0;
+            }
 
-        // 4. Limpiar tabla legacy 'reuniones_huerfanas' (si existe)
-        try {
-            const [delHuerfanas] = await connection.query("DELETE FROM reuniones_huerfanas");
-            results.huerfanas_legacy_eliminadas = delHuerfanas.affectedRows;
-        } catch (e) {
-            results.huerfanas_legacy_eliminadas = 0;
-        }
+            // 5. Limpiar empresa_seguimiento_log
+            try {
+                results.logs_seguimiento_eliminados = await trx('empresa_seguimiento_log').del();
+            } catch (e) {
+                results.logs_seguimiento_eliminados = 0;
+            }
 
-        // 5. Limpiar empresa_seguimiento_log
-        const [delLog] = await connection.query("DELETE FROM empresa_seguimiento_log");
-        results.logs_seguimiento_eliminados = delLog.affectedRows;
+            // 6. Limpiar encuestas y respuestas relacionadas a reuniones
+            try {
+                results.encuesta_respuestas_eliminadas = await trx('encuesta_respuestas').del();
+            } catch (e) {
+                results.encuesta_respuestas_eliminadas = 0;
+            }
+            try {
+                results.encuestas_eliminadas = await trx('encuestas').del();
+            } catch (e) {
+                results.encuestas_eliminadas = 0;
+            }
 
-        // 6. Limpiar encuestas y respuestas relacionadas a reuniones
-        try {
-            const [delRespuestas] = await connection.query("DELETE FROM encuesta_respuestas");
-            results.encuesta_respuestas_eliminadas = delRespuestas.affectedRows;
-        } catch (e) {
-            results.encuesta_respuestas_eliminadas = 0;
-        }
-        try {
-            const [delEncuestas] = await connection.query("DELETE FROM encuestas");
-            results.encuestas_eliminadas = delEncuestas.affectedRows;
-        } catch (e) {
-            results.encuestas_eliminadas = 0;
-        }
+            // 7. Limpiar sync_log
+            try {
+                await trx('sync_log').del();
+                results.sync_log_limpiado = true;
+            } catch (e) {
+                results.sync_log_limpiado = false;
+            }
 
-        // 7. Limpiar sync_log
-        try {
-            await connection.query("DELETE FROM sync_log");
-            results.sync_log_limpiado = true;
-        } catch (e) {
-            results.sync_log_limpiado = false;
-        }
+            // 8. Resetear sync_delta_token para forzar sync completo desde Teams
+            results.delta_tokens_reseteados = await trx('usuarios')
+                .update({ sync_delta_token: null, ultima_sincronizacion: null });
 
-        // 8. Resetear sync_delta_token para forzar sync completo desde Teams
-        const [resetTokens] = await connection.query(
-            "UPDATE usuarios SET sync_delta_token = NULL, ultima_sincronizacion = NULL"
-        );
-        results.delta_tokens_reseteados = resetTokens.affectedRows;
-
-        // 9. Resetear estado de empresas a 'pendiente'
-        const [resetEmpresas] = await connection.query(
-            "UPDATE empresas SET estado_seguimiento = 'pendiente', fecha_concretada = NULL, fecha_solicitada = NULL"
-        );
-        results.empresas_reseteadas = resetEmpresas.affectedRows;
-
-        await connection.commit();
+            // 9. Resetear estado de empresas a 'pendiente'
+            results.empresas_reseteadas = await trx('empresas')
+                .update({ estado_seguimiento: 'pendiente', fecha_concretada: null, fecha_solicitada: null });
+        });
 
         console.log("[RESET MEETING DATA] Limpieza completada:", results);
         res.json({
@@ -100,11 +90,8 @@ exports.resetMeetingData = async (req, res) => {
         });
 
     } catch (err) {
-        await connection.rollback();
         console.error("[RESET MEETING DATA] Error:", err);
         res.status(500).json({ error: "Error durante la limpieza: " + err.message });
-    } finally {
-        connection.release();
     }
 };
 
@@ -121,12 +108,12 @@ exports.resetPasswords = async (req, res) => {
     try {
         const bcrypt = require('bcrypt');
         const hashed = await bcrypt.hash('123', 10);
-        const [result] = await db.query('UPDATE usuarios SET contrasena = ?', [hashed]);
+        const afectadas = await db('usuarios').update({ contrasena: hashed });
 
         res.json({
             success: true,
             message: `Contraseñas reseteadas a '123' exitosamente.`,
-            usuariosAfectados: result.affectedRows
+            usuariosAfectados: afectadas
         });
     } catch (err) {
         console.error("[RESET PASSWORDS] Error:", err);
@@ -145,67 +132,83 @@ exports.diagnostico = async (req, res) => {
         const result = {};
 
         result.usuario = { id: userId, permisos: userRol };
-        result.arquitectura = "v2 — teams_eventos + minutas";
+        result.arquitectura = "v2 — teams_eventos + minutas (Knex)";
 
         // === NUEVA ARQUITECTURA ===
         try {
-            const [totalTE] = await db.query('SELECT COUNT(*) AS total FROM teams_eventos');
-            result.teams_eventos_total = totalTE[0].total;
+            const totalTE = await db('teams_eventos').count('* as total').first();
+            result.teams_eventos_total = totalTE?.total || 0;
 
-            const [tePorEstado] = await db.query('SELECT estado, COUNT(*) AS total FROM teams_eventos GROUP BY estado ORDER BY total DESC');
-            result.teams_eventos_por_estado = tePorEstado;
+            result.teams_eventos_por_estado = await db('teams_eventos')
+                .select('estado')
+                .count('* as total')
+                .groupBy('estado')
+                .orderBy('total', 'desc');
 
-            const [sinEmpresa] = await db.query('SELECT COUNT(*) AS total FROM teams_eventos WHERE empresa_id IS NULL');
-            result.teams_eventos_sin_empresa = sinEmpresa[0].total;
+            const sinEmpresa = await db('teams_eventos')
+                .whereNull('empresa_id')
+                .count('* as total').first();
+            result.teams_eventos_sin_empresa = sinEmpresa?.total || 0;
         } catch (e) {
             result.teams_eventos_total = 'tabla no existe aún';
         }
 
         try {
-            const [totalM] = await db.query('SELECT COUNT(*) AS total FROM minutas');
-            result.minutas_total = totalM[0].total;
+            const totalM = await db('minutas').count('* as total').first();
+            result.minutas_total = totalM?.total || 0;
 
-            const [mPorEstado] = await db.query('SELECT estado_envio, COUNT(*) AS total FROM minutas GROUP BY estado_envio ORDER BY total DESC');
-            result.minutas_por_estado = mPorEstado;
+            result.minutas_por_estado = await db('minutas')
+                .select('estado_envio')
+                .count('* as total')
+                .groupBy('estado_envio')
+                .orderBy('total', 'desc');
         } catch (e) {
             result.minutas_total = 'tabla no existe aún';
         }
 
         // === SYNC STATUS ===
         try {
-            const [syncRows] = await db.query('SELECT tipo, ejecutado_at, resultado FROM sync_log ORDER BY id DESC LIMIT 5');
-            result.sync_log_reciente = syncRows;
+            result.sync_log_reciente = await db('sync_log')
+                .select('tipo', 'ejecutado_at', 'resultado')
+                .orderBy('id', 'desc')
+                .limit(5);
         } catch (e) {
             result.sync_log_reciente = [];
         }
 
-        const [usersSync] = await db.query('SELECT id, correo, ultima_sincronizacion, CASE WHEN sync_delta_token IS NOT NULL THEN "con token" ELSE "sin token" END AS token_status FROM usuarios WHERE correo IS NOT NULL');
-        result.usuarios_sync_status = usersSync;
+        result.usuarios_sync_status = await db.raw(`
+            SELECT id, correo, ultima_sincronizacion, 
+            CASE WHEN sync_delta_token IS NOT NULL THEN 'con token' ELSE 'sin token' END AS token_status 
+            FROM usuarios WHERE correo IS NOT NULL
+        `);
 
         // === EMPRESAS ===
-        const [totalEmpresas] = await db.query('SELECT COUNT(*) AS total FROM empresas');
-        result.empresas_total = totalEmpresas[0].total;
+        const totalEmpresas = await db('empresas').count('* as total').first();
+        result.empresas_total = totalEmpresas?.total || 0;
 
-        const [empPorEstado] = await db.query('SELECT estado_seguimiento, COUNT(*) AS total FROM empresas GROUP BY estado_seguimiento ORDER BY total DESC');
-        result.empresas_por_estado = empPorEstado;
+        result.empresas_por_estado = await db('empresas')
+            .select('estado_seguimiento')
+            .count('* as total')
+            .groupBy('estado_seguimiento')
+            .orderBy('total', 'desc');
 
         // === DOMINIOS Y CONTACTOS ===
-        const [totalDominios] = await db.query('SELECT COUNT(*) AS total FROM empresa_dominios');
-        const [totalContactos] = await db.query('SELECT COUNT(*) AS total FROM empresa_contactos');
-        result.dominios_aprendidos = totalDominios[0].total;
-        result.contactos_aprendidos = totalContactos[0].total;
+        const totalDominios = await db('empresa_dominios').count('* as total').first();
+        const totalContactos = await db('empresa_contactos').count('* as total').first();
+        result.dominios_aprendidos = totalDominios?.total || 0;
+        result.contactos_aprendidos = totalContactos?.total || 0;
 
         // === LEGACY ===
         try {
-            const [totalReuLegacy] = await db.query('SELECT COUNT(*) AS total FROM reuniones');
-            result.reuniones_legacy = totalReuLegacy[0].total;
+            const totalReuLegacy = await db('reuniones').count('* as total').first();
+            result.reuniones_legacy = totalReuLegacy?.total || 0;
         } catch (e) {
             result.reuniones_legacy = 'tabla eliminada';
         }
 
         try {
-            const [totalHLegacy] = await db.query('SELECT COUNT(*) AS total FROM reuniones_huerfanas');
-            result.huerfanas_legacy = totalHLegacy[0].total;
+            const totalHLegacy = await db('reuniones_huerfanas').count('* as total').first();
+            result.huerfanas_legacy = totalHLegacy?.total || 0;
         } catch (e) {
             result.huerfanas_legacy = 'tabla eliminada';
         }

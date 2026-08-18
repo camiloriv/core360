@@ -1,4 +1,4 @@
-const db = require("../../database/connection");
+const db = require("../../database/knex");
 
 /**
  * Registra una entrada en el audit log.
@@ -39,7 +39,7 @@ const registrarAudit = async ({
             es_delegada
         };
 
-        await db.query(`
+        await db.raw(`
             INSERT INTO audit_log (
                 accion, entidad, entidad_id,
                 usuario_id, usuario_nombre,

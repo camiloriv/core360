@@ -1,41 +1,10 @@
-const db = require("../../database/connection");
+const nuevosNegociosRepository = require("../../database/repositories/nuevos_negocios.repository");
 const XLSX = require("xlsx");
 
-// =============================================
-// Helper: Actualizar Jefatura de la Empresa
-// =============================================
 const updateEmpresaJefatura = async (jefa_cartera, rut, razon_social) => {
-  if (jefa_cartera && jefa_cartera !== 'No Asignado') {
-    try {
-      const [[jefa]] = await db.query("SELECT id FROM usuarios WHERE nombre = ?", [jefa_cartera]);
-      if (jefa) {
-        let query = "SELECT id FROM empresas WHERE ";
-        let params = [];
-        if (rut) {
-          query += "REPLACE(REPLACE(rut, '.', ''), '-', '') = REPLACE(REPLACE(?, '.', ''), '-', '') LIMIT 1";
-          params.push(rut);
-        } else if (razon_social) {
-          query += "razon_social = ? LIMIT 1";
-          params.push(razon_social);
-        } else {
-          return;
-        }
-        
-        const [[empresa]] = await db.query(query, params);
-        if (empresa) {
-          await db.query("UPDATE empresas SET jefatura_id = ? WHERE id = ?", [jefa.id, empresa.id]);
-          console.log(`✅ Empresa ${empresa.id} actualizada con Jefatura ${jefa.id} (${jefa_cartera})`);
-        }
-      }
-    } catch (error) {
-      console.error("Error al actualizar jefatura de la empresa:", error);
-    }
-  }
+  await nuevosNegociosRepository.updateEmpresaJefatura(jefa_cartera, rut, razon_social);
 };
 
-// =============================================
-// GET /nuevos-negocios — Listar con filtros
-// =============================================
 const listar = async (req, res) => {
   try {
     const {
@@ -50,50 +19,8 @@ const listar = async (req, res) => {
       limit = 200,
     } = req.query;
 
-    let where = "WHERE 1=1";
-    const params = [];
-
-    if (estado_contacto) {
-      where += " AND n.estado_contacto = ?";
-      params.push(estado_contacto);
-    }
-    if (estado) {
-      where += " AND n.estado = ?";
-      params.push(estado);
-    }
-    if (zona) {
-      where += " AND n.zona = ?";
-      params.push(zona);
-    }
-    if (jefa_cartera) {
-      where += " AND n.jefa_cartera = ?";
-      params.push(jefa_cartera);
-    }
-    if (indicador) {
-      where += " AND n.indicador = ?";
-      params.push(indicador);
-    }
-    if (otic_actual) {
-      where += " AND n.otic_actual = ?";
-      params.push(otic_actual);
-    }
-    if (busqueda) {
-      where += " AND (n.holding LIKE ? OR n.razon_social LIKE ? OR n.contacto LIKE ? OR n.correo LIKE ? OR n.rut LIKE ?)";
-      const b = `%${busqueda}%`;
-      params.push(b, b, b, b, b);
-    }
-
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const [rows] = await db.query(
-      `SELECT n.* FROM nuevos_negocios n ${where} ORDER BY n.estado_contacto ASC, n.holding ASC LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
-    );
-
-    const [[{ total }]] = await db.query(
-      `SELECT COUNT(*) as total FROM nuevos_negocios n ${where}`,
-      params
-    );
+    const filtros = { estado_contacto, estado, zona, jefa_cartera, indicador, otic_actual, busqueda };
+    const { rows, total } = await nuevosNegociosRepository.listar(filtros, page, limit);
 
     res.json({ data: rows, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (error) {
@@ -102,34 +29,9 @@ const listar = async (req, res) => {
   }
 };
 
-// =============================================
-// GET /nuevos-negocios/stats — KPIs
-// =============================================
 const stats = async (req, res) => {
   try {
-    const [estadoContacto] = await db.query(`
-      SELECT estado_contacto, COUNT(*) as count,
-        SUM(monto_1_porciento) as monto_proyectado,
-        SUM(aporte_ingresado) as aporte_ingresado
-      FROM nuevos_negocios
-      GROUP BY estado_contacto
-    `);
-
-    const [estadoDetalle] = await db.query(`
-      SELECT estado, COUNT(*) as count
-      FROM nuevos_negocios
-      GROUP BY estado
-    `);
-
-    const [[totales]] = await db.query(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(monto_1_porciento) as monto_proyectado_total,
-        SUM(aporte_ingresado) as aporte_ingresado_total,
-        SUM(monto_administracion) as monto_administracion_total
-      FROM nuevos_negocios
-    `);
-
+    const { estadoContacto, estadoDetalle, totales } = await nuevosNegociosRepository.getStats();
     res.json({
       por_estado_contacto: estadoContacto,
       por_estado: estadoDetalle,
@@ -141,16 +43,10 @@ const stats = async (req, res) => {
   }
 };
 
-// =============================================
-// GET /nuevos-negocios/historial/:id
-// =============================================
 const historial = async (req, res) => {
   try {
     const { id } = req.params;
-    const [rows] = await db.query(
-      `SELECT * FROM nuevos_negocios_historial WHERE negocio_id = ? ORDER BY created_at DESC`,
-      [id]
-    );
+    const rows = await nuevosNegociosRepository.getHistorial(id);
     res.json(rows);
   } catch (error) {
     console.error("Error obteniendo historial:", error);
@@ -158,13 +54,10 @@ const historial = async (req, res) => {
   }
 };
 
-// =============================================
-// GET /nuevos-negocios/:id — Detalle
-// =============================================
 const detalle = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[row]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    const row = await nuevosNegociosRepository.getDetalle(id);
     if (!row) return res.status(404).json({ error: "No encontrado" });
     res.json(row);
   } catch (error) {
@@ -173,9 +66,6 @@ const detalle = async (req, res) => {
   }
 };
 
-// =============================================
-// POST /nuevos-negocios — Crear
-// =============================================
 const crear = async (req, res) => {
   try {
     const {
@@ -186,39 +76,38 @@ const crear = async (req, res) => {
       contacto_2, correo, cargo, celular_telefono, comentarios, fecha_reunion,
     } = req.body;
 
-    const [result] = await db.query(
-      `INSERT INTO nuevos_negocios (
-        holding, estado_contacto, rut, razon_social, evento, indicador,
-        asistio_evento, zona, monto_1_porciento, tasa_administracion,
-        monto_administracion, otic_actual, mes_envio_propuesta, jefa_cartera,
-        estado, aporte_ingresado, fecha_autoriza_propuesta, contacto,
-        contacto_2, correo, cargo, celular_telefono, comentarios, fecha_reunion
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        holding || null, estado_contacto || 'PROSPECTO', rut || null,
-        razon_social || null, evento || null, indicador || null,
-        asistio_evento || 'No', zona || null,
-        parseFloat(monto_1_porciento) || 0, parseFloat(tasa_administracion) || 0,
-        parseFloat(monto_administracion) || 0, otic_actual || null,
-        mes_envio_propuesta || null, jefa_cartera || null,
-        estado || 'Prospecto', parseFloat(aporte_ingresado) || 0,
-        fecha_autoriza_propuesta || null, contacto || null,
-        contacto_2 || null, correo || null, cargo || null,
-        celular_telefono || null, comentarios || null, fecha_reunion || null,
-      ]
-    );
+    const data = {
+      holding: holding || null, 
+      estado_contacto: estado_contacto || 'PROSPECTO', 
+      rut: rut || null,
+      razon_social: razon_social || null, 
+      evento: evento || null, 
+      indicador: indicador || null,
+      asistio_evento: asistio_evento || 'No', 
+      zona: zona || null,
+      monto_1_porciento: parseFloat(monto_1_porciento) || 0, 
+      tasa_administracion: parseFloat(tasa_administracion) || 0,
+      monto_administracion: parseFloat(monto_administracion) || 0, 
+      otic_actual: otic_actual || null,
+      mes_envio_propuesta: mes_envio_propuesta || null, 
+      jefa_cartera: jefa_cartera || null,
+      estado: estado || 'Prospecto', 
+      aporte_ingresado: parseFloat(aporte_ingresado) || 0,
+      fecha_autoriza_propuesta: fecha_autoriza_propuesta || null, 
+      contacto: contacto || null,
+      contacto_2: contacto_2 || null, 
+      correo: correo || null, 
+      cargo: cargo || null,
+      celular_telefono: celular_telefono || null, 
+      comentarios: comentarios || null, 
+      fecha_reunion: fecha_reunion || null,
+    };
 
-    // Log de creación
     const usuario = req.user ? req.user.nombre || req.user.email : "Sistema";
-    await db.query(
-      `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-       VALUES (?, 'creacion', NULL, ?, ?)`,
-      [result.insertId, `Registro creado: ${holding || razon_social || 'Sin nombre'}`, usuario]
-    );
+    const logMessage = `Registro creado: ${holding || razon_social || 'Sin nombre'}`;
 
-    const [[newRow]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [result.insertId]);
+    const newRow = await nuevosNegociosRepository.insertNegocio(data, logMessage, usuario);
 
-    // Traspasar la jefatura a la empresa automáticamente
     await updateEmpresaJefatura(newRow.jefa_cartera, newRow.rut, newRow.razon_social);
 
     res.status(201).json(newRow);
@@ -228,13 +117,10 @@ const crear = async (req, res) => {
   }
 };
 
-// =============================================
-// PUT /nuevos-negocios/:id — Actualizar
-// =============================================
 const actualizar = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    const existing = await nuevosNegociosRepository.getDetalle(id);
     if (!existing) return res.status(404).json({ error: "No encontrado" });
 
     const {
@@ -247,7 +133,6 @@ const actualizar = async (req, res) => {
 
     const usuario = req.user ? req.user.nombre || req.user.email : "Sistema";
 
-    // Log cambios de estado
     const camposTrackeados = [
       { campo: 'estado_contacto', nuevo: estado_contacto, anterior: existing.estado_contacto },
       { campo: 'estado', nuevo: estado, anterior: existing.estado },
@@ -256,49 +141,41 @@ const actualizar = async (req, res) => {
 
     for (const c of camposTrackeados) {
       if (c.nuevo !== undefined && c.nuevo !== c.anterior) {
-        await db.query(
-          `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-           VALUES (?, ?, ?, ?, ?)`,
-          [id, c.campo, c.anterior || '', c.nuevo || '', usuario]
-        );
+        await nuevosNegociosRepository.insertHistorial(id, c.campo, c.anterior, c.nuevo, usuario);
       }
     }
 
-    await db.query(
-      `UPDATE nuevos_negocios SET
-        holding = ?, estado_contacto = ?, rut = ?, razon_social = ?, evento = ?,
-        indicador = ?, asistio_evento = ?, zona = ?, monto_1_porciento = ?,
-        tasa_administracion = ?, monto_administracion = ?, otic_actual = ?,
-        mes_envio_propuesta = ?, jefa_cartera = ?, estado = ?, aporte_ingresado = ?,
-        fecha_autoriza_propuesta = ?, contacto = ?, contacto_2 = ?, correo = ?,
-        cargo = ?, celular_telefono = ?, comentarios = ?, fecha_reunion = ?
-      WHERE id = ?`,
-      [
-        holding ?? existing.holding, estado_contacto ?? existing.estado_contacto,
-        rut ?? existing.rut, razon_social ?? existing.razon_social,
-        evento ?? existing.evento, indicador ?? existing.indicador,
-        asistio_evento ?? existing.asistio_evento, zona ?? existing.zona,
-        parseFloat(monto_1_porciento) || existing.monto_1_porciento,
-        parseFloat(tasa_administracion) || existing.tasa_administracion,
-        parseFloat(monto_administracion) || existing.monto_administracion,
-        otic_actual ?? existing.otic_actual,
-        mes_envio_propuesta ?? existing.mes_envio_propuesta,
-        jefa_cartera ?? existing.jefa_cartera,
-        estado ?? existing.estado,
-        parseFloat(aporte_ingresado) || existing.aporte_ingresado,
-        fecha_autoriza_propuesta ?? existing.fecha_autoriza_propuesta,
-        contacto ?? existing.contacto, contacto_2 ?? existing.contacto_2,
-        correo ?? existing.correo, cargo ?? existing.cargo,
-        celular_telefono ?? existing.celular_telefono,
-        comentarios ?? existing.comentarios,
-        fecha_reunion || existing.fecha_reunion,
-        id,
-      ]
-    );
+    const updateData = {
+      holding: holding ?? existing.holding, 
+      estado_contacto: estado_contacto ?? existing.estado_contacto,
+      rut: rut ?? existing.rut, 
+      razon_social: razon_social ?? existing.razon_social,
+      evento: evento ?? existing.evento, 
+      indicador: indicador ?? existing.indicador,
+      asistio_evento: asistio_evento ?? existing.asistio_evento, 
+      zona: zona ?? existing.zona,
+      monto_1_porciento: parseFloat(monto_1_porciento) || existing.monto_1_porciento,
+      tasa_administracion: parseFloat(tasa_administracion) || existing.tasa_administracion,
+      monto_administracion: parseFloat(monto_administracion) || existing.monto_administracion,
+      otic_actual: otic_actual ?? existing.otic_actual,
+      mes_envio_propuesta: mes_envio_propuesta ?? existing.mes_envio_propuesta,
+      jefa_cartera: jefa_cartera ?? existing.jefa_cartera,
+      estado: estado ?? existing.estado,
+      aporte_ingresado: parseFloat(aporte_ingresado) || existing.aporte_ingresado,
+      fecha_autoriza_propuesta: fecha_autoriza_propuesta ?? existing.fecha_autoriza_propuesta,
+      contacto: contacto ?? existing.contacto, 
+      contacto_2: contacto_2 ?? existing.contacto_2,
+      correo: correo ?? existing.correo, 
+      cargo: cargo ?? existing.cargo,
+      celular_telefono: celular_telefono ?? existing.celular_telefono,
+      comentarios: comentarios ?? existing.comentarios,
+      fecha_reunion: fecha_reunion || existing.fecha_reunion,
+    };
 
-    const [[updated]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    await nuevosNegociosRepository.updateNegocio(id, updateData);
 
-    // Traspasar la jefatura a la empresa automáticamente si fue modificada
+    const updated = await nuevosNegociosRepository.getDetalle(id);
+
     if (jefa_cartera !== undefined && jefa_cartera !== existing.jefa_cartera) {
       await updateEmpresaJefatura(updated.jefa_cartera, updated.rut, updated.razon_social);
     }
@@ -310,37 +187,26 @@ const actualizar = async (req, res) => {
   }
 };
 
-// =============================================
-// PATCH /nuevos-negocios/:id/estado — Cambio rápido de estado
-// =============================================
 const cambiarEstado = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado_contacto, estado } = req.body;
     const usuario = req.user ? req.user.nombre || req.user.email : "Sistema";
 
-    const [[existing]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    const existing = await nuevosNegociosRepository.getDetalle(id);
     if (!existing) return res.status(404).json({ error: "No encontrado" });
 
     if (estado_contacto && estado_contacto !== existing.estado_contacto) {
-      await db.query(
-        `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-         VALUES (?, 'estado_contacto', ?, ?, ?)`,
-        [id, existing.estado_contacto, estado_contacto, usuario]
-      );
-      await db.query("UPDATE nuevos_negocios SET estado_contacto = ? WHERE id = ?", [estado_contacto, id]);
+      await nuevosNegociosRepository.insertHistorial(id, 'estado_contacto', existing.estado_contacto, estado_contacto, usuario);
+      await nuevosNegociosRepository.updateNegocio(id, { estado_contacto });
     }
 
     if (estado && estado !== existing.estado) {
-      await db.query(
-        `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-         VALUES (?, 'estado', ?, ?, ?)`,
-        [id, existing.estado, estado, usuario]
-      );
-      await db.query("UPDATE nuevos_negocios SET estado = ? WHERE id = ?", [estado, id]);
+      await nuevosNegociosRepository.insertHistorial(id, 'estado', existing.estado, estado, usuario);
+      await nuevosNegociosRepository.updateNegocio(id, { estado });
     }
 
-    const [[updated]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    const updated = await nuevosNegociosRepository.getDetalle(id);
     res.json(updated);
   } catch (error) {
     console.error("Error cambiando estado:", error);
@@ -348,16 +214,13 @@ const cambiarEstado = async (req, res) => {
   }
 };
 
-// =============================================
-// DELETE /nuevos-negocios/:id — Eliminar
-// =============================================
 const eliminar = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.query("SELECT * FROM nuevos_negocios WHERE id = ?", [id]);
+    const existing = await nuevosNegociosRepository.getDetalle(id);
     if (!existing) return res.status(404).json({ error: "No encontrado" });
 
-    await db.query("DELETE FROM nuevos_negocios WHERE id = ?", [id]);
+    await nuevosNegociosRepository.deleteNegocio(id);
     res.json({ message: "Registro eliminado correctamente" });
   } catch (error) {
     console.error("Error eliminando negocio:", error);
@@ -365,33 +228,14 @@ const eliminar = async (req, res) => {
   }
 };
 
-// =============================================
-// GET /nuevos-negocios/export/excel — Descargar Excel
-// =============================================
 const exportExcel = async (req, res) => {
   try {
     const { estado_contacto, estado, zona, jefa_cartera, indicador, busqueda } = req.query;
 
-    let where = "WHERE 1=1";
-    const params = [];
+    const rows = await nuevosNegociosRepository.getAllForExport({
+      estado_contacto, estado, zona, jefa_cartera, indicador, busqueda
+    });
 
-    if (estado_contacto) { where += " AND estado_contacto = ?"; params.push(estado_contacto); }
-    if (estado) { where += " AND estado = ?"; params.push(estado); }
-    if (zona) { where += " AND zona = ?"; params.push(zona); }
-    if (jefa_cartera) { where += " AND jefa_cartera = ?"; params.push(jefa_cartera); }
-    if (indicador) { where += " AND indicador = ?"; params.push(indicador); }
-    if (busqueda) {
-      where += " AND (holding LIKE ? OR razon_social LIKE ? OR contacto LIKE ? OR correo LIKE ?)";
-      const b = `%${busqueda}%`;
-      params.push(b, b, b, b);
-    }
-
-    const [rows] = await db.query(
-      `SELECT * FROM nuevos_negocios ${where} ORDER BY estado_contacto ASC, holding ASC`,
-      params
-    );
-
-    // Crear workbook con la misma estructura del Excel original
     const wb = XLSX.utils.book_new();
 
     const wsData = [
@@ -440,34 +284,12 @@ const exportExcel = async (req, res) => {
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Ancho de columnas
     ws["!cols"] = [
-      { wch: 5 },  // N°
-      { wch: 25 }, // HOLDING
-      { wch: 18 }, // Estado Contacto
-      { wch: 14 }, // RUT
-      { wch: 35 }, // Razón Social
-      { wch: 18 }, // EVENTO
-      { wch: 30 }, // Indicador
-      { wch: 12 }, // Evento
-      { wch: 12 }, // Zona
-      { wch: 18 }, // Monto 1%
-      { wch: 15 }, // Tasa
-      { wch: 18 }, // Monto Adm
-      { wch: 18 }, // OTIC
-      { wch: 18 }, // Mes
-      { wch: 22 }, // Jefa
-      { wch: 30 }, // Estado
-      { wch: 18 }, // Aporte
-      { wch: 18 }, // Diferencia
-      { wch: 20 }, // Fecha autoriza
-      { wch: 25 }, // Contacto
-      { wch: 25 }, // Contacto 2
-      { wch: 35 }, // Correo
-      { wch: 30 }, // Cargo
-      { wch: 18 }, // Celular
-      { wch: 40 }, // Comentarios
-      { wch: 15 }, // Fecha Reunión
+      { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 35 }, { wch: 18 },
+      { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 18 },
+      { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 18 }, { wch: 18 },
+      { wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 35 }, { wch: 30 }, { wch: 18 },
+      { wch: 40 }, { wch: 15 },
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Seguimiento 2026");
@@ -483,35 +305,16 @@ const exportExcel = async (req, res) => {
   }
 };
 
-// =============================================
-// GET /nuevos-negocios/opciones — Valores para dropdowns
-// =============================================
 const opciones = async (req, res) => {
   try {
-    const [estadosContacto] = await db.query("SELECT DISTINCT estado_contacto FROM nuevos_negocios WHERE estado_contacto IS NOT NULL AND estado_contacto != '' ORDER BY estado_contacto");
-    const [estados] = await db.query("SELECT DISTINCT estado FROM nuevos_negocios WHERE estado IS NOT NULL AND estado != '' ORDER BY estado");
-    const [zonas] = await db.query("SELECT DISTINCT zona FROM nuevos_negocios WHERE zona IS NOT NULL AND zona != '' ORDER BY zona");
-    const [jefas] = await db.query("SELECT DISTINCT jefa_cartera FROM nuevos_negocios WHERE jefa_cartera IS NOT NULL AND jefa_cartera != '' ORDER BY jefa_cartera");
-    const [indicadores] = await db.query("SELECT DISTINCT indicador FROM nuevos_negocios WHERE indicador IS NOT NULL AND indicador != '' ORDER BY indicador");
-    const [otics] = await db.query("SELECT DISTINCT otic_actual FROM nuevos_negocios WHERE otic_actual IS NOT NULL AND otic_actual != '' ORDER BY otic_actual");
-
-    res.json({
-      estados_contacto: estadosContacto.map(r => r.estado_contacto),
-      estados: estados.map(r => r.estado),
-      zonas: zonas.map(r => r.zona),
-      jefas_cartera: jefas.map(r => r.jefa_cartera),
-      indicadores: indicadores.map(r => r.indicador),
-      otics: otics.map(r => r.otic_actual),
-    });
+    const data = await nuevosNegociosRepository.getOpciones();
+    res.json(data);
   } catch (error) {
     console.error("Error obteniendo opciones:", error);
     res.status(500).json({ error: "Error al obtener opciones" });
   }
 };
 
-// =============================================
-// POST /nuevos-negocios/import — Carga Masiva
-// =============================================
 const importarMasivo = async (req, res) => {
   try {
     if (!req.file) {
@@ -530,7 +333,6 @@ const importarMasivo = async (req, res) => {
       return res.status(400).json({ error: "El archivo Excel está vacío" });
     }
 
-    // Buscar cabecera
     let headerRowIndex = -1;
     for (let i = 0; i < Math.min(20, rawRows.length); i++) {
       const row = rawRows[i].map(c => String(c).trim().toUpperCase());
@@ -602,7 +404,6 @@ const importarMasivo = async (req, res) => {
       const razon_social = getValByHeader(row, ["razón social", "razon social"]);
       const holding = getValByHeader(row, ["holding"]);
 
-      // Si no hay RUT ni Razón Social ni Holding, ignoramos la fila
       if (!rut && !razon_social && !holding) {
         ignorados++;
         continue;
@@ -633,76 +434,49 @@ const importarMasivo = async (req, res) => {
       const rutLimpio = cleanRut(rut);
       let existingId = null;
 
-      // Buscar por RUT si existe
       if (rutLimpio) {
-        const [[foundRut]] = await db.query(
-          "SELECT id FROM nuevos_negocios WHERE REPLACE(REPLACE(rut, '.', ''), '-', '') = REPLACE(REPLACE(?, '.', ''), '-', '') LIMIT 1",
-          [rutLimpio]
-        );
+        const foundRut = await nuevosNegociosRepository.findNegocioByRut(rutLimpio);
         if (foundRut) existingId = foundRut.id;
       }
 
-      // Si no se encontró por RUT, buscar por Razón Social
       if (!existingId && razon_social) {
-        const [[foundName]] = await db.query(
-          "SELECT id FROM nuevos_negocios WHERE razon_social = ? LIMIT 1",
-          [String(razon_social).trim()]
-        );
+        const foundName = await nuevosNegociosRepository.findNegocioByRazonSocial(String(razon_social).trim());
         if (foundName) existingId = foundName.id;
       }
 
+      const upsertData = {
+        holding: holding || null, 
+        estado_contacto, 
+        rut: rutLimpio || null, 
+        razon_social: razon_social || null, 
+        evento: evento || null, 
+        indicador: indicador || null,
+        asistio_evento, 
+        zona: zona || null, 
+        monto_1_porciento, 
+        tasa_administracion,
+        monto_administracion, 
+        otic_actual: otic_actual || null, 
+        mes_envio_propuesta: mes_envio_propuesta || null, 
+        jefa_cartera: jefa_cartera || null,
+        estado, 
+        aporte_ingresado, 
+        fecha_autoriza_propuesta: fecha_autoriza_propuesta || null, 
+        contacto: contacto || null,
+        contacto_2: contacto_2 || null, 
+        correo: correo || null, 
+        cargo: cargo || null, 
+        celular_telefono: celular_telefono || null, 
+        comentarios: comentarios || null, 
+        fecha_reunion
+      };
+
       if (existingId) {
-        // Actualizar registro existente
-        await db.query(
-          `UPDATE nuevos_negocios SET
-            holding = ?, estado_contacto = ?, rut = ?, razon_social = ?, evento = ?, indicador = ?,
-            asistio_evento = ?, zona = ?, monto_1_porciento = ?, tasa_administracion = ?,
-            monto_administracion = ?, otic_actual = ?, mes_envio_propuesta = ?, jefa_cartera = ?,
-            estado = ?, aporte_ingresado = ?, fecha_autoriza_propuesta = ?, contacto = ?,
-            contacto_2 = ?, correo = ?, cargo = ?, celular_telefono = ?, comentarios = ?, fecha_reunion = ?
-           WHERE id = ?`,
-          [
-            holding || null, estado_contacto, rutLimpio || null, razon_social || null, evento || null, indicador || null,
-            asistio_evento, zona || null, monto_1_porciento, tasa_administracion,
-            monto_administracion, otic_actual || null, mes_envio_propuesta || null, jefa_cartera || null,
-            estado, aporte_ingresado, fecha_autoriza_propuesta || null, contacto || null,
-            contacto_2 || null, correo || null, cargo || null, celular_telefono || null, comentarios || null, fecha_reunion,
-            existingId
-          ]
-        );
-
-        await db.query(
-          `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-           VALUES (?, 'carga_masiva', 'Existente', 'Registro actualizado mediante importación masiva', ?)`,
-          [existingId, usuario]
-        );
-
+        await nuevosNegociosRepository.updateNegocio(existingId, upsertData);
+        await nuevosNegociosRepository.insertHistorial(existingId, 'carga_masiva', 'Existente', 'Registro actualizado mediante importación masiva', usuario);
         actualizados++;
       } else {
-        // Crear registro nuevo
-        const [result] = await db.query(
-          `INSERT INTO nuevos_negocios (
-            holding, estado_contacto, rut, razon_social, evento, indicador,
-            asistio_evento, zona, monto_1_porciento, tasa_administracion,
-            monto_administracion, otic_actual, mes_envio_propuesta, jefa_cartera,
-            estado, aporte_ingresado, fecha_autoriza_propuesta, contacto,
-            contacto_2, correo, cargo, celular_telefono, comentarios, fecha_reunion
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            holding || null, estado_contacto, rutLimpio || null, razon_social || null, evento || null, indicador || null,
-            asistio_evento, zona || null, monto_1_porciento, tasa_administracion,
-            monto_administracion, otic_actual || null, mes_envio_propuesta || null, jefa_cartera || null,
-            estado, aporte_ingresado, fecha_autoriza_propuesta || null, contacto || null,
-            contacto_2 || null, correo || null, cargo || null, celular_telefono || null, comentarios || null, fecha_reunion
-          ]
-        );
-
-        await db.query(
-          `INSERT INTO nuevos_negocios_historial (negocio_id, campo_modificado, valor_anterior, valor_nuevo, usuario)
-           VALUES (?, 'carga_masiva', NULL, 'Registro creado mediante importación masiva', ?)`,
-          [result.insertId, usuario]
-        );
-
+        const newRow = await nuevosNegociosRepository.insertNegocio(upsertData, 'Registro creado mediante importación masiva', usuario);
         creados++;
       }
     }

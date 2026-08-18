@@ -1,48 +1,13 @@
-const db = require("../../database/connection");
+const usuariosRepository = require("../../database/repositories/usuarios.repository");
 const bcrypt = require('bcrypt');
 
 exports.obtenerUsuarios = async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT u.id, u.nombre, u.correo, u.permisos, u.cargos, u.jefatura_id, u.gerencia_id, u.zona_id, u.vistas_permitidas, u.permite_traspaso,
-             j.nombre as jefatura_nombre, 
-             COALESCE(
-               (SELECT GROUP_CONCAT(g2.nombre SEPARATOR ', ')
-                FROM usuario_gerencias ug
-                JOIN usuarios g2 ON ug.gerencia_id = g2.id
-                WHERE ug.usuario_id = u.id),
-               g.nombre
-             ) as gerencia_nombre,
-             (
-               SELECT GROUP_CONCAT(ug.gerencia_id)
-               FROM usuario_gerencias ug
-               WHERE ug.usuario_id = u.id
-             ) as gerencia_ids,
-              CASE
-                WHEN u.permisos = 'gerencia' THEN (
-                  SELECT GROUP_CONCAT(DISTINCT z2.nombre SEPARATOR ', ')
-                  FROM usuarios j2
-                  JOIN zonas z2 ON j2.zona_id = z2.id
-                  WHERE j2.id IN (
-                    SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = u.id
-                    UNION
-                    SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
-                      SELECT ug.usuario_id FROM usuario_gerencias ug 
-                      JOIN usuarios usr ON ug.usuario_id = usr.id 
-                      WHERE ug.gerencia_id = u.id AND usr.permisos = 'gerencia'
-                    )
-                  )
-                )
-               WHEN u.permisos = 'ejecutiva' THEN zj.nombre
-               ELSE z.nombre
-             END as zona_nombre
-      FROM usuarios u 
-      LEFT JOIN usuarios j ON u.jefatura_id = j.id
-      LEFT JOIN usuarios g ON u.gerencia_id = g.id
-      LEFT JOIN zonas z ON u.zona_id = z.id
-      LEFT JOIN zonas zj ON j.zona_id = zj.id
-      ORDER BY u.nombre ASC
-    `);
+    let rows = await usuariosRepository.getUsuarios();
+    // Handle SQL server vs MySQL knex.raw return formats
+    if (Array.isArray(rows) && Array.isArray(rows[0])) {
+      rows = rows[0];
+    }
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -57,8 +22,8 @@ exports.crearUsuario = async (req, res) => {
   }
   
   try {
-    const [existentes] = await db.query("SELECT id FROM usuarios WHERE correo = ? OR nombre = ?", [correo, nombre]);
-    if (existentes.length > 0) {
+    const counts = await usuariosRepository.countUsuariosByCorreoOrNombre(correo, nombre);
+    if (counts > 0) {
       return res.status(400).json({ error: "Ya existe un usuario con este correo o nombre" });
     }
 
@@ -74,17 +39,24 @@ exports.crearUsuario = async (req, res) => {
 
     const hashedContrasena = await bcrypt.hash(contrasena, 10);
 
-    const [result] = await db.query(
-      "INSERT INTO usuarios (nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, zona_id, vistas_permitidas, requiere_cambio_clave, permite_traspaso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
-      [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0]
-    );
-
-    const newUserId = result.insertId;
+    const newUserId = await usuariosRepository.insertUsuario({
+      nombre, 
+      correo, 
+      contrasena: hashedContrasena, 
+      permisos, 
+      cargos: cargos || null, 
+      jefatura_id: jefatura_id || null, 
+      gerencia_id: fallbackGerenciaId, 
+      zona_id: zona_id || null, 
+      vistas_permitidas: serializedVistas, 
+      requiere_cambio_clave: 1, 
+      permite_traspaso: permite_traspaso ? 1 : 0
+    });
 
     if ((permisos === 'jefatura' || permisos === 'gerencia') && Array.isArray(gerencia_ids)) {
       for (const gid of gerencia_ids) {
         if (gid) {
-          await db.query("INSERT IGNORE INTO usuario_gerencias (usuario_id, gerencia_id) VALUES (?, ?)", [newUserId, gid]);
+          await usuariosRepository.insertUsuarioGerencias(newUserId, gid);
         }
       }
     }
@@ -101,8 +73,8 @@ exports.actualizarUsuario = async (req, res) => {
   const { nombre, correo, contrasena, permisos, cargos, jefatura_id, gerencia_id, gerencia_ids, zona_id, vistas_permitidas, permite_traspaso } = req.body;
   
   try {
-    const [existentes] = await db.query("SELECT id FROM usuarios WHERE (correo = ? OR nombre = ?) AND id != ?", [correo, nombre, id]);
-    if (existentes.length > 0) {
+    const counts = await usuariosRepository.countUsuariosByCorreoOrNombre(correo, nombre, id);
+    if (counts > 0) {
       return res.status(400).json({ error: "Ya existe otro usuario con este correo o nombre" });
     }
 
@@ -116,30 +88,36 @@ exports.actualizarUsuario = async (req, res) => {
       ? (typeof vistas_permitidas === "string" ? vistas_permitidas : JSON.stringify(vistas_permitidas)) 
       : null;
 
+    const updateData = {
+      nombre, 
+      correo, 
+      permisos, 
+      cargos: cargos || null, 
+      jefatura_id: jefatura_id || null, 
+      gerencia_id: fallbackGerenciaId, 
+      zona_id: zona_id || null, 
+      vistas_permitidas: serializedVistas, 
+      permite_traspaso: permite_traspaso ? 1 : 0
+    };
+
     if (contrasena) {
-      const hashedContrasena = await bcrypt.hash(contrasena, 10);
-      await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, contrasena = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, requiere_cambio_clave = 1, permite_traspaso = ? WHERE id = ?",
-        [nombre, correo, hashedContrasena, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0, id]
-      );
-    } else {
-      await db.query(
-        "UPDATE usuarios SET nombre = ?, correo = ?, permisos = ?, cargos = ?, jefatura_id = ?, gerencia_id = ?, zona_id = ?, vistas_permitidas = ?, permite_traspaso = ? WHERE id = ?",
-        [nombre, correo, permisos, cargos || null, jefatura_id || null, fallbackGerenciaId, zona_id || null, serializedVistas, permite_traspaso ? 1 : 0, id]
-      );
+      updateData.contrasena = await bcrypt.hash(contrasena, 10);
+      updateData.requiere_cambio_clave = 1;
     }
 
+    await usuariosRepository.updateUsuario(id, updateData);
+
     if (permisos === 'jefatura' || permisos === 'gerencia') {
-      await db.query("DELETE FROM usuario_gerencias WHERE usuario_id = ?", [id]);
+      await usuariosRepository.deleteUsuarioGerencias(id);
       if (Array.isArray(gerencia_ids)) {
         for (const gid of gerencia_ids) {
           if (gid) {
-            await db.query("INSERT IGNORE INTO usuario_gerencias (usuario_id, gerencia_id) VALUES (?, ?)", [id, gid]);
+            await usuariosRepository.insertUsuarioGerencias(id, gid);
           }
         }
       }
     } else {
-      await db.query("DELETE FROM usuario_gerencias WHERE usuario_id = ?", [id]);
+      await usuariosRepository.deleteUsuarioGerencias(id);
     }
 
     res.json({ msg: "Usuario actualizado" });
@@ -152,7 +130,7 @@ exports.actualizarUsuario = async (req, res) => {
 exports.eliminarUsuario = async (req, res) => {
   const { id } = req.params;
   try {
-    await db.query("DELETE FROM usuarios WHERE id = ?", [id]);
+    await usuariosRepository.deleteUsuario(id);
     res.json({ msg: "Usuario eliminado" });
   } catch (err) {
     console.error(err);
@@ -167,23 +145,18 @@ exports.cambiarContrasena = async (req, res) => {
   }
 
   try {
-    // Buscar usuario por ID
-    const [rows] = await db.query("SELECT contrasena FROM usuarios WHERE id = ?", [usuario_id]);
-    if (rows.length === 0) {
+    const usuario = await usuariosRepository.getUsuarioById(usuario_id);
+    if (!usuario) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    const usuario = rows[0];
-
-    // Validar contraseña actual
     const isValidPassword = await bcrypt.compare(contrasena_actual, usuario.contrasena);
     if (!isValidPassword) {
       return res.status(400).json({ error: "La contraseña actual es incorrecta" });
     }
 
-    // Actualizar contraseña
     const hashedNuevaContrasena = await bcrypt.hash(nueva_contrasena, 10);
-    await db.query("UPDATE usuarios SET contrasena = ?, requiere_cambio_clave = 0 WHERE id = ?", [hashedNuevaContrasena, usuario_id]);
+    await usuariosRepository.updateContrasena(usuario_id, hashedNuevaContrasena);
     
     res.json({ msg: "Contraseña actualizada exitosamente" });
   } catch (err) {
@@ -201,22 +174,20 @@ exports.actualizarPreferencias = async (req, res) => {
   }
 
   try {
-    // Leer preferencias actuales y combinar (merge) con las nuevas
-    const [rows] = await db.query("SELECT preferencias FROM usuarios WHERE id = ?", [id]);
-    if (rows.length === 0) {
+    const prefResult = await usuariosRepository.getPreferencias(id);
+    if (!prefResult) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
     let current = {};
     try {
-      current = typeof rows[0].preferencias === 'string'
-        ? JSON.parse(rows[0].preferencias)
-        : (rows[0].preferencias || {});
+      current = typeof prefResult.preferencias === 'string'
+        ? JSON.parse(prefResult.preferencias)
+        : (prefResult.preferencias || {});
     } catch { current = {}; }
 
     const merged = { ...current, ...preferencias };
-
-    await db.query("UPDATE usuarios SET preferencias = ? WHERE id = ?", [JSON.stringify(merged), id]);
+    await usuariosRepository.updatePreferencias(id, JSON.stringify(merged));
 
     res.json({ msg: "Preferencias actualizadas", preferencias: merged });
   } catch (err) {

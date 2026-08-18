@@ -88,3 +88,9 @@
   - [x] Resetear perfiles ejecutivos al cambiar de empresa en perfiles administrativos (`admin`/`gerencia`) para sincronizar sus defaults de copia.
   - [x] Corregir bug en hook `useSubmitReunion` que vaciaba la lista de empresas al registrar minutas, y agregar recarga autom√°tica (`fetchEmpresas`) tras √©xito.
   - [x] Compilar y verificar el bundle con `npm run build` de forma limpia y exitosa.
+
+ -   [ x ]   D e t e n e r   y   d e s h a b i l i t a r   s e r v i c i o s   i n n e c e s a r i o s   e n   R a i l w a y   ( M y S Q L ,   F r o n t e n d ) 
+ -   [ x ]   R e a l i z a r   m i g r a c i Û n   d e l   e s q u e m a   d e s d e   M y S Q L   h a c i a   S Q L   S e r v e r   ( m i g r a t e : l a t e s t ) 
+ -   [ x ]   E j e c u t a r   s c r i p t   d e   m i g r a c i Û n   d e   d a t o s   p a r a   t r a s l a d a r   l a   i n f o r m a c i Û n   e x i s t e n t e 
+ -   [ x ]   V a l i d a r   q u e   l a   m i g r a c i Û n   s e   h a y a   c o m p l e t a d o   c o r r e c t a m e n t e   ( c l a v e s   f o r · n e a s   e   i d e n t i d a d e s   l i m p i a s )  
+ 

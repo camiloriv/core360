@@ -1,5 +1,5 @@
 require("dotenv").config();
-const db = require("../../database/connection");
+const agendamientoRepository = require("../../database/repositories/agendamiento.repository");
 
 // ============================================================
 // GRAPH API: Token management
@@ -56,16 +56,13 @@ const resolveDisplayName = async (email, dbName = '') => {
     email = email.trim().toLowerCase();
 
     try {
-        const [userRows] = await db.query("SELECT nombre FROM usuarios WHERE LOWER(correo) = ?", [email]);
-        if (userRows.length > 0 && userRows[0].nombre) return userRows[0].nombre;
+        const userNombre = await agendamientoRepository.getUsuarioNombreByCorreo(email);
+        if (userNombre && userNombre.nombre) return userNombre.nombre;
     } catch (e) { /* ignore */ }
 
     try {
-        const [contactRows] = await db.query(
-            "SELECT nombre FROM empresa_contactos WHERE LOWER(correo) = ? AND nombre IS NOT NULL AND nombre != '' LIMIT 1",
-            [email]
-        );
-        if (contactRows.length > 0 && contactRows[0].nombre) return contactRows[0].nombre;
+        const contactNombre = await agendamientoRepository.getContactoNombreByCorreo(email);
+        if (contactNombre && contactNombre.nombre) return contactNombre.nombre;
     } catch (e) { /* ignore */ }
 
     if (dbName && !dbName.includes('@')) return dbName;
@@ -144,67 +141,47 @@ const crearReunionTeams = async (req, res) => {
 
         const data = await response.json();
 
-        // Registrar en teams_eventos (fuente de la verdad)
+        // Registrar en teams_eventos
         const allAttendees = attendees.map(a => ({ email: a.emailAddress.address, name: a.emailAddress.name || '' }));
         const asistentesJson = JSON.stringify(allAttendees);
-
         const empresaIdVal = empresa_id ? parseInt(empresa_id) : null;
 
-        await db.query(`
-            INSERT INTO teams_eventos 
-                (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, es_online, asistentes, join_url, ultima_sync)
-            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'agendada', ?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE
-                empresa_id = VALUES(empresa_id),
-                asunto = VALUES(asunto),
-                fecha = VALUES(fecha),
-                hora = VALUES(hora),
-                hora_fin = VALUES(hora_fin),
-                estado = 'agendada',
-                es_online = VALUES(es_online),
-                asistentes = VALUES(asistentes),
-                join_url = VALUES(join_url),
-                ultima_sync = NOW()
-        `, [
-            data.id, req.usuario.id, empresaIdVal, finalSubject,
-            fecha, hora, horaFin,
-            isPresencial ? 0 : 1,
-            asistentesJson,
-            data.onlineMeeting?.joinUrl || null
-        ]);
+        await agendamientoRepository.upsertTeamsEventoQuery({
+            event_id: data.id,
+            usuario_id: req.usuario.id,
+            empresa_id: empresaIdVal,
+            asunto: finalSubject,
+            fecha,
+            hora,
+            hora_fin: horaFin,
+            es_online: isPresencial ? 0 : 1,
+            asistentes: asistentesJson,
+            join_url: data.onlineMeeting?.joinUrl || null
+        });
 
-        // Aprendizaje de contactos: registrar si el dominio coincide con la empresa
         if (empresa_id && destinatarios) {
             const correos = destinatarios.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-            
-            // Obtener los dominios registrados para esta empresa
-            const [dominiosEmpresa] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
-            const dominiosList = dominiosEmpresa.map(d => d.dominio.toLowerCase().trim());
+            const dominiosDocs = await agendamientoRepository.getEmpresaDominiosByEmpresaId(empresa_id);
+            const dominiosList = dominiosDocs.map(d => d.dominio.toLowerCase().trim());
 
             for (const email of correos) {
                 if (email.includes('@')) {
                     const dom = '@' + email.split('@')[1];
-                    // Si el dominio coincide con alguno de la empresa, agregar el contacto
                     if (dominiosList.includes(dom)) {
-                        const [existing] = await db.query("SELECT id FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                        if (existing.length === 0) {
-                            await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, NULL)", [empresa_id, email]);
+                        const existing = await agendamientoRepository.getEmpresaContactoByCorreo(empresa_id, email);
+                        if (!existing) {
+                            await agendamientoRepository.insertEmpresaContacto(empresa_id, email, null);
                         }
                     }
                 }
             }
         }
 
-        // Registrar en empresa_seguimiento_log si tiene empresa
         if (empresa_id) {
-            await db.query(
-                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
-                [empresa_id, fecha, req.usuario.id, data.id, finalSubject]
-            );
-            await db.query(
-                "UPDATE empresas SET estado_seguimiento = 'agendada', fecha_concretada = ? WHERE id = ?",
-                [fecha, empresa_id]
-            );
+            await agendamientoRepository.insertEmpresaSeguimientoLog({
+                empresa_id, estado: 'agendada', fecha, usuario_id: req.usuario.id, reunion_id: data.id, asunto: finalSubject
+            });
+            await agendamientoRepository.updateEmpresaSeguimiento(empresa_id, 'agendada', fecha);
         }
 
         return res.status(200).json({
@@ -245,51 +222,37 @@ const anularReunionTeams = async (req, res) => {
             throw new Error(`Graph API Error: ${errorText}`);
         }
 
-        // Marcar como cancelada en teams_eventos
-        await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventId]);
+        await agendamientoRepository.updateTeamsEventoEstado(eventId, 'cancelada');
 
-        // También marcar la minuta relacionada como no_aplica (si hay una borrador)
-        const [teEvt] = await db.query("SELECT id FROM teams_eventos WHERE event_id = ?", [eventId]);
-        if (teEvt.length > 0) {
-            await db.query(
-                "UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'",
-                [teEvt[0].id]
-            );
+        const teEvt = await agendamientoRepository.getTeamsEventoByEventId(eventId);
+        if (teEvt) {
+            await agendamientoRepository.updateMinutasEstadoEnvio(teEvt.id, 'borrador', 'no_aplica');
         }
 
-        // Determinar empresa_id y fecha desde teams_eventos si no vino en body
         let empId = empresa_id;
         let eventFecha = null;
-        if (teEvt.length > 0) {
-            const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
-            if (teData.length > 0) {
-                if (!empId) empId = teData[0].empresa_id;
-                eventFecha = teData[0].fecha;
-            }
+        if (teEvt) {
+            if (!empId) empId = teEvt.empresa_id;
+            eventFecha = teEvt.fecha;
         }
 
         if (empId) {
-            const [prevLog] = await db.query(
-                "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
-                [eventId]
-            );
-            const asuntoOriginal = prevLog.length > 0 ? prevLog[0].asunto : null;
+            const prevLog = await agendamientoRepository.getEmpresaSeguimientoLogByReunionAsunto(eventId);
+            const asuntoOriginal = prevLog ? prevLog.asunto : null;
             let asuntoCancelacion = asuntoOriginal ? `Cancelada: ${asuntoOriginal}` : "Reunión cancelada en Teams";
             
             if (motivo && motivo.trim().length > 0) {
                 asuntoCancelacion += ` - Motivo: ${motivo.trim()}`;
             }
 
-            // Usar la fecha original del evento si está disponible, sino la actual
             const fechaVal = eventFecha 
                 ? new Date(eventFecha).toISOString().split('T')[0] 
                 : new Date().toISOString().split('T')[0];
 
-            await db.query(
-                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, ?)",
-                [empId, fechaVal, req.usuario.id, eventId, asuntoCancelacion]
-            );
-            await db.query("UPDATE empresas SET estado_seguimiento = 'pendiente' WHERE id = ?", [empId]);
+            await agendamientoRepository.insertEmpresaSeguimientoLog({
+                empresa_id: empId, estado: 'cancelada', fecha: fechaVal, usuario_id: req.usuario.id, reunion_id: eventId, asunto: asuntoCancelacion
+            });
+            await agendamientoRepository.updateEmpresaSeguimiento(empId, 'pendiente');
         }
 
         return res.status(200).json({ success: true, message: "Reunión anulada." });
@@ -309,38 +272,31 @@ const marcarReagendada = async (req, res) => {
             return res.status(400).json({ error: "Faltan parámetros." });
         }
 
-        // Determinar empresa_id y fecha desde teams_eventos
-        const [teData] = await db.query("SELECT empresa_id, fecha FROM teams_eventos WHERE event_id = ?", [eventId]);
-        if (teData.length === 0 || !teData[0].empresa_id) {
+        const teData = await agendamientoRepository.getTeamsEventoByEventId(eventId);
+        if (!teData || !teData.empresa_id) {
             return res.status(400).json({ error: "No se puede registrar motivo en una reunión sin empresa vinculada." });
         }
         
-        const empId = teData[0].empresa_id;
-        const eventFecha = teData[0].fecha;
+        const empId = teData.empresa_id;
+        const eventFecha = teData.fecha;
 
-        const [prevLog] = await db.query(
-            "SELECT asunto FROM empresa_seguimiento_log WHERE reunion_id = ? AND asunto IS NOT NULL LIMIT 1",
-            [eventId]
-        );
-        const asuntoOriginal = prevLog.length > 0 ? prevLog[0].asunto : null;
+        const prevLog = await agendamientoRepository.getEmpresaSeguimientoLogByReunionAsunto(eventId);
+        const asuntoOriginal = prevLog ? prevLog.asunto : null;
         let asuntoReagendada = asuntoOriginal ? `Reagendada: ${asuntoOriginal}` : "Reunión reagendada";
         
         if (motivo && motivo.trim().length > 0) {
             asuntoReagendada += ` - Motivo: ${motivo.trim()}`;
         }
 
-        // Usar la fecha original del evento si está disponible, sino la actual
         const fechaVal = eventFecha 
             ? new Date(eventFecha).toISOString().split('T')[0] 
             : new Date().toISOString().split('T')[0];
 
-        await db.query(
-            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
-            [empId, fechaVal, req.usuario.id, eventId, asuntoReagendada]
-        );
+        await agendamientoRepository.insertEmpresaSeguimientoLog({
+            empresa_id: empId, estado: 'reagendada', fecha: fechaVal, usuario_id: req.usuario.id, reunion_id: eventId, asunto: asuntoReagendada
+        });
         
-        // Mantener el estado de seguimiento pendiente
-        await db.query("UPDATE empresas SET estado_seguimiento = 'pendiente' WHERE id = ?", [empId]);
+        await agendamientoRepository.updateEmpresaSeguimiento(empId, 'pendiente');
 
         return res.status(200).json({ success: true, message: "Motivo registrado con éxito." });
     } catch (error) {
@@ -385,12 +341,7 @@ const obtenerEventosCalendario = async (req, res) => {
         let dbEventsMap = {};
         if (eventIds.length > 0) {
             try {
-                const [dbRows] = await db.query(`
-                    SELECT te.id AS db_id, te.event_id, te.empresa_id, emp.nombre AS empresa_nombre, te.estado
-                    FROM teams_eventos te
-                    LEFT JOIN empresas emp ON te.empresa_id = emp.id
-                    WHERE te.event_id IN (?)
-                `, [eventIds]);
+                const dbRows = await agendamientoRepository.getTeamsEventosByIds(eventIds);
                 dbRows.forEach(row => {
                     dbEventsMap[row.event_id] = row;
                 });
@@ -439,7 +390,6 @@ const obtenerEventosCalendario = async (req, res) => {
 
 // ============================================================
 // POST /agendamiento/sync-past — Sincronización con Microsoft Graph
-// Escribe en teams_eventos (nueva fuente de la verdad)
 // ============================================================
 const syncEventosPasados = async (req, res) => {
     try {
@@ -453,7 +403,6 @@ const syncEventosPasados = async (req, res) => {
         const now = new Date();
         const end = new Date(now.getFullYear() + 1, 0, 1).toISOString();
 
-        // Calcular fecha y hora actual en Santiago (para isEventPast sin bug de timezone)
         const chileDateParts = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit'
         }).formatToParts(now);
@@ -464,26 +413,16 @@ const syncEventosPasados = async (req, res) => {
 
         const accessToken = await getGraphToken();
 
-        // ============================================================
-        // DELTA QUERIES: leer token guardado del usuario
-        // Si tiene token → solo cambios desde la última sync (rápido)
-        // Si no tiene token → primera sync completa (obtiene token inicial)
-        // ============================================================
-        const [userRow] = await db.query(
-            "SELECT sync_delta_token FROM usuarios WHERE id = ? LIMIT 1",
-            [usuarioId]
-        );
-        const savedDeltaToken = userRow[0]?.sync_delta_token || null;
+        const userRow = await agendamientoRepository.getUsuarioSyncToken(usuarioId);
+        const savedDeltaToken = userRow?.sync_delta_token || null;
 
         let currentEndpoint;
         if (savedDeltaToken) {
-            // Sync delta: solo eventos nuevos/modificados/eliminados desde la última sync
             currentEndpoint = savedDeltaToken;
-            console.log(`🔄 Delta sync para ${usuarioCorreo} (token existente)`);
+            console.log(`🔄 Delta sync para ${usuarioCorreo}`);
         } else {
-            // Primera sync: descarga completa del rango y obtiene token inicial
             currentEndpoint = `https://graph.microsoft.com/v1.0/users/${usuarioCorreo}/calendarView/delta?startDateTime=2026-01-01T00:00:00.000Z&endDateTime=${end}`;
-            console.log(`📥 Primera sync completa para ${usuarioCorreo} (sin token delta)`);
+            console.log(`📥 Primera sync completa para ${usuarioCorreo}`);
         }
 
         let allRawEvents = [];
@@ -501,10 +440,8 @@ const syncEventosPasados = async (req, res) => {
             if (!response.ok) {
                 const errText = await response.text();
                 console.error(`Error Graph API (${response.status}):`, errText);
-                // Si el token delta expiró (410 Gone), limpiar token y pedir re-sync
                 if (response.status === 410) {
-                    await db.query("UPDATE usuarios SET sync_delta_token = NULL WHERE id = ?", [usuarioId]);
-                    console.warn(`⚠️ Delta token expirado para ${usuarioCorreo}. Se reseteó para próxima sync completa.`);
+                    await agendamientoRepository.updateUsuarioSyncToken(usuarioId, null);
                 }
                 if (!res.headersSent) {
                     return res.status(200).json({ success: true, message: "No se pudo sincronizar.", procesados: 0 });
@@ -515,33 +452,24 @@ const syncEventosPasados = async (req, res) => {
             const data = await response.json();
             if (data.value && data.value.length > 0) allRawEvents.push(...data.value);
 
-            // La última página trae deltaLink (no nextLink)
             if (data['@odata.deltaLink']) {
                 deltaLink = data['@odata.deltaLink'];
             }
             currentEndpoint = data['@odata.nextLink'] || null;
         }
 
-        // Guardar el nuevo delta token y actualizar ultima_sincronizacion
         if (deltaLink) {
-            await db.query(
-                "UPDATE usuarios SET sync_delta_token = ?, ultima_sincronizacion = NOW() WHERE id = ?",
-                [deltaLink, usuarioId]
-            );
+            await agendamientoRepository.updateUsuarioSyncToken(usuarioId, deltaLink);
         } else {
-            await db.query("UPDATE usuarios SET ultima_sincronizacion = NOW() WHERE id = ?", [usuarioId]);
+            // Update ultima_sincronizacion only
+            await agendamientoRepository.updateUsuarioSyncToken(usuarioId, savedDeltaToken);
         }
 
-        // Cargar dominios conocidos para matching
-        const [dominiosDocs] = await db.query("SELECT empresa_id, dominio FROM empresa_dominios");
+        const dominiosDocs = await agendamientoRepository.getEmpresaDominiosAll();
+        const proformaEmp = await agendamientoRepository.getProformaInternaEmpresa();
+        const proformaEmpId = proformaEmp ? proformaEmp.id : null;
 
-        // Obtener ID de PROFORMA INTERNA
-        const [proformaEmp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA' LIMIT 1");
-        const proformaEmpId = proformaEmp.length > 0 ? proformaEmp[0].id : null;
-
-        // Obtener todos los correos del sistema UNA SOLA VEZ (fuera del loop)
-        // NOTA: la tabla 'usuarios' no tiene columna 'estado', se filtra solo por correo no nulo
-        const [systemUsersRows] = await db.query("SELECT correo FROM usuarios WHERE correo IS NOT NULL");
+        const systemUsersRows = await agendamientoRepository.getSystemEmails();
         const systemEmails = new Set(systemUsersRows.map(u => u.correo.toLowerCase().trim()));
 
         const todayStr = now.toISOString().split('T')[0];
@@ -551,18 +479,15 @@ const syncEventosPasados = async (req, res) => {
             try {
                 const eventKey = event.id;
 
-                // === EVENTO ELIMINADO (delta @removed) ===
                 if (event['@removed']) {
-                    await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventKey]);
-                    // Marcar minuta borrador relacionada como no_aplica
-                    const [te] = await db.query("SELECT id, empresa_id FROM teams_eventos WHERE event_id = ?", [eventKey]);
-                    if (te.length > 0) {
-                        await db.query("UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [te[0].id]);
-                        if (te[0].empresa_id) {
-                            await db.query(
-                                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'cancelada', ?, ?, ?, 'Eliminada desde Outlook')",
-                                [te[0].empresa_id, todayStr, usuarioId, eventKey]
-                            );
+                    await agendamientoRepository.updateTeamsEventoEstado(eventKey, 'cancelada');
+                    const te = await agendamientoRepository.getTeamsEventoByEventId(eventKey);
+                    if (te) {
+                        await agendamientoRepository.updateMinutasEstadoEnvio(te.id, 'borrador', 'no_aplica');
+                        if (te.empresa_id) {
+                            await agendamientoRepository.insertEmpresaSeguimientoLog({
+                                empresa_id: te.empresa_id, estado: 'cancelada', fecha: todayStr, usuario_id: usuarioId, reunion_id: eventKey, asunto: 'Eliminada desde Outlook'
+                            });
                         }
                     }
                     procesados++;
@@ -572,77 +497,49 @@ const syncEventosPasados = async (req, res) => {
                 const fecha = formatDate(event.start.dateTime);
                 const hora = formatTime(event.start.dateTime);
                 const horaFin = formatTime(event.end.dateTime);
-                // isEventPast: comparar usando fecha/hora en Santiago (sin bug de +Z que trata hora local como UTC)
                 const isEventPast = fecha < todayStrSantiago || (fecha === todayStrSantiago && horaFin <= currentTimeSantiago);
                 const isCancelled = event.isCancelled || false;
 
-                // Forzar límite: ignorar cualquier evento antes del 1 de enero de 2026
                 if (new Date(event.start.dateTime) < new Date("2026-01-01T00:00:00")) {
                     continue;
                 }
 
                 if (isCancelled) {
-                    await db.query("UPDATE teams_eventos SET estado = 'cancelada' WHERE event_id = ?", [eventKey]);
-                    const [te] = await db.query("SELECT id, empresa_id FROM teams_eventos WHERE event_id = ?", [eventKey]);
-                    if (te.length > 0) {
-                        await db.query("UPDATE minutas SET estado_envio = 'no_aplica' WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [te[0].id]);
+                    await agendamientoRepository.updateTeamsEventoEstado(eventKey, 'cancelada');
+                    const te = await agendamientoRepository.getTeamsEventoByEventId(eventKey);
+                    if (te) {
+                        await agendamientoRepository.updateMinutasEstadoEnvio(te.id, 'borrador', 'no_aplica');
                     }
                     continue;
                 }
 
-                // Determinar tipo de evento
                 const subjectLower = (event.subject || '').toLowerCase();
                 const locationName = (event.location && event.location.displayName) ? event.location.displayName.toLowerCase() : '';
                 const isPresencial = subjectLower.includes('presencial') || locationName.includes('presencial');
-                const hasOnlineLink = event.isOnlineMeeting || (event.onlineMeeting && event.onlineMeeting.joinUrl);
 
-                // SE ELIMINÓ EL FILTRO RESTRICTIVO:
-                // Ahora se procesan todas las reuniones de Outlook, no solo las que tienen link de Teams.
-                // El filtro real se hace más abajo (si no tiene asistentes externos se marca como 'excluida')
-
-                // Resolver asistentes
                 const attendees = event.attendees || [];
                 const parsedAttendees = await Promise.all(attendees.map(async (a) => {
                     const email = (a.emailAddress.address || '').toLowerCase().trim();
                     if (!email) return null;
                     const name = await resolveDisplayName(email, a.emailAddress.name || '');
-                    return { 
-                        name, 
-                        email, 
-                        response: a.status?.response || 'none',
-                        type: a.type || 'required' 
-                    };
+                    return { name, email, response: a.status?.response || 'none', type: a.type || 'required' };
                 }));
                 const filteredAttendees = parsedAttendees.filter(Boolean);
                 const emails = filteredAttendees.map(a => a.email);
                 
-                // Resolver organizador
                 const organizerEmail = (event.organizer?.emailAddress?.address || '').toLowerCase().trim();
                 const organizerName = event.organizer?.emailAddress?.name || '';
                 const organizador = organizerEmail ? { name: organizerName, email: organizerEmail } : null;
 
-                // Extraer preview del cuerpo: solo texto plano, sin HTML, máx 800 chars para ahorrar espacio en disco
                 let bodyPreview = (event.body && event.body.content) ? event.body.content : (event.bodyPreview || '');
-                // Eliminar etiquetas HTML y líneas en blanco
                 bodyPreview = bodyPreview.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                // Truncar a 800 caracteres (suficiente para el asunto/motivo de la reunión)
-                if (bodyPreview.length > 800) {
-                    bodyPreview = bodyPreview.substring(0, 800);
-                }
+                if (bodyPreview.length > 800) bodyPreview = bodyPreview.substring(0, 800);
 
                 if (emails.length === 0) {
-                    // Sin asistentes → ignorar
-                    await upsertTeamsEvento({
-                        event, fecha, hora, horaFin, usuarioId,
-                        empresa_id: null, estado: 'excluida',
-                        filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview
-                    });
+                    await upsertTeamsEvento({ event, fecha, hora, horaFin, usuarioId, empresa_id: null, estado: 'excluida', filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview });
                     continue;
                 }
 
-
-
-                // === MATCHING POR DOMINIO ===
                 const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
                 const externalDomains = new Set();
 
@@ -662,16 +559,13 @@ const syncEventosPasados = async (req, res) => {
                     if (match) matchedEmpresaId = match.empresa_id;
                 }
 
-                // También intentar matching por correo exacto
                 if (!matchedEmpresaId) {
                     for (const email of emails) {
                         if (!email.endsWith('@proforma.cl')) {
-                            const [contactMatch] = await db.query(
-                                "SELECT empresa_id FROM empresa_contactos WHERE correo = ? LIMIT 1",
-                                [email]
-                            );
-                            if (contactMatch.length > 0) {
-                                matchedEmpresaId = contactMatch[0].empresa_id;
+                            // Find any contact with this email globally
+                            const contactMatch = await agendamientoRepository.knex('empresa_contactos').select('empresa_id').where('correo', email).first();
+                            if (contactMatch) {
+                                matchedEmpresaId = contactMatch.empresa_id;
                                 break;
                             }
                         }
@@ -682,7 +576,6 @@ const syncEventosPasados = async (req, res) => {
                 const allEmailsForProformaCheck = [...emails];
                 if (organizerEmail) allEmailsForProformaCheck.push(organizerEmail);
 
-                // systemEmails ya fue cargado antes del loop (evita query por cada evento)
                 const isPurelyProforma = allEmailsForProformaCheck.length > 0 && allEmailsForProformaCheck.every(email => 
                     PROFORMA_DOMAINS.some(d => email.toLowerCase().endsWith(d)) || systemEmails.has(email.toLowerCase())
                 );
@@ -693,27 +586,15 @@ const syncEventosPasados = async (req, res) => {
 
                 const estado = isEventPast ? 'pasada' : 'agendada';
 
-                await upsertTeamsEvento({
-                    event, fecha, hora, horaFin, usuarioId,
-                    empresa_id: matchedEmpresaId, estado,
-                    filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview
-                });
+                await upsertTeamsEvento({ event, fecha, hora, horaFin, usuarioId, empresa_id: matchedEmpresaId, estado, filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview });
 
-                // Si tiene empresa y es agendada, registrar en log
                 if (matchedEmpresaId && !isEventPast) {
-                    const [existing] = await db.query(
-                        "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
-                        [event.id]
-                    );
-                    if (existing.length === 0) {
-                        await db.query(
-                            "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
-                            [matchedEmpresaId, fecha, usuarioId, event.id, event.subject || 'Sin asunto']
-                        );
-                        await db.query(
-                            "UPDATE empresas SET estado_seguimiento = 'agendada', fecha_concretada = ? WHERE id = ?",
-                            [fecha, matchedEmpresaId]
-                        );
+                    const existingLog = await agendamientoRepository.getEmpresaSeguimientoLogAgendada(event.id);
+                    if (!existingLog) {
+                        await agendamientoRepository.insertEmpresaSeguimientoLog({
+                            empresa_id: matchedEmpresaId, estado: 'agendada', fecha, usuario_id: usuarioId, reunion_id: event.id, asunto: event.subject || 'Sin asunto'
+                        });
+                        await agendamientoRepository.updateEmpresaSeguimiento(matchedEmpresaId, 'agendada', fecha);
                     }
                 }
 
@@ -734,152 +615,81 @@ const syncEventosPasados = async (req, res) => {
     }
 };
 
-/**
- * Función auxiliar: upsert en teams_eventos
- * Crea o actualiza el registro de un evento de Teams
- */
 const upsertTeamsEvento = async ({ event, fecha, hora, horaFin, usuarioId, empresa_id, estado, filteredAttendees, isPresencial, isEventPast, organizador, bodyPreview }) => {
     const asistentesJson = JSON.stringify(filteredAttendees);
     const organizadorJson = organizador ? JSON.stringify(organizador) : null;
     const joinUrl = event.onlineMeeting?.joinUrl || null;
     const es_online = isPresencial ? 0 : 1;
 
-    // Verificar si ya existe (por ical_uid para evitar duplicados entre usuarios, o por event_id)
-    let existing = [];
-    if (event.iCalUId) {
-        [existing] = await db.query("SELECT id, estado, event_id FROM teams_eventos WHERE ical_uid = ? LIMIT 1", [event.iCalUId]);
-    }
-    if (existing.length === 0) {
-        [existing] = await db.query("SELECT id, estado, event_id FROM teams_eventos WHERE event_id = ? LIMIT 1", [event.id]);
-    }
+    const existing = await agendamientoRepository.getTeamsEventoByIcalOrEventId(event.iCalUId, event.id);
 
-    if (existing.length > 0) {
-        // Ya existe → actualizar fecha/hora/estado si cambió
-        const existingEstado = existing[0].estado;
-        // No revertir una cancelación manual
+    if (existing) {
+        const existingEstado = existing.estado;
         const nuevoEstado = (existingEstado === 'cancelada') ? 'cancelada' : estado;
 
-        // Detectar reagendamiento: si la fecha cambió y tiene empresa
-        const [prevData] = await db.query("SELECT fecha, empresa_id, asunto FROM teams_eventos WHERE id = ?", [existing[0].id]);
-        if (prevData.length > 0 && prevData[0].fecha) {
-            const oldFecha = new Date(prevData[0].fecha).toISOString().split('T')[0];
+        const prevData = await agendamientoRepository.getTeamsEventoByEventId(existing.event_id);
+        if (prevData && prevData.fecha) {
+            const oldFecha = new Date(prevData.fecha).toISOString().split('T')[0];
             const newFecha = fecha;
-            if (oldFecha !== newFecha && prevData[0].empresa_id) {
-                await db.query(
-                    "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'reagendada', ?, ?, ?, ?)",
-                    [prevData[0].empresa_id, newFecha, usuarioId, event.id, `Reagendada: ${prevData[0].asunto || 'Sin asunto'} (antes: ${oldFecha})`]
-                );
+            if (oldFecha !== newFecha && prevData.empresa_id) {
+                await agendamientoRepository.insertEmpresaSeguimientoLog({
+                    empresa_id: prevData.empresa_id, estado: 'reagendada', fecha: newFecha, usuario_id: usuarioId, reunion_id: event.id, asunto: `Reagendada: ${prevData.asunto || 'Sin asunto'} (antes: ${oldFecha})`
+                });
             }
         }
 
-        await db.query(`
-            UPDATE teams_eventos 
-            SET fecha = ?, hora = ?, hora_fin = ?, asistentes = ?, join_url = ?, es_online = ?, ultima_sync = NOW(), estado = ?, organizador = ?, body_preview = ?
-            WHERE id = ?
-        `, [fecha, hora, horaFin, asistentesJson, joinUrl, es_online, nuevoEstado, organizadorJson, bodyPreview, existing[0].id]);
+        await agendamientoRepository.updateTeamsEventoFull(existing.id, {
+            fecha, hora, hora_fin: horaFin, asistentes: asistentesJson, join_url: joinUrl, es_online, estado: nuevoEstado, organizador: organizadorJson, body_preview: bodyPreview
+        });
 
-        // Detectar reunión concretada: pasó de agendada a pasada
         if (existingEstado === 'agendada' && nuevoEstado === 'pasada') {
-            const resolvedEmpresaId = prevData?.[0]?.empresa_id || empresa_id;
+            const resolvedEmpresaId = prevData?.empresa_id || empresa_id;
             if (resolvedEmpresaId) {
-                const [existingConcretada] = await db.query(
-                    "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'concretada'",
-                    [event.id]
-                );
-                if (existingConcretada.length === 0) {
-                    await db.query(
-                        "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'concretada', ?, ?, ?, ?)",
-                        [resolvedEmpresaId, fecha, usuarioId, existing[0].event_id, prevData?.[0]?.asunto || event.subject || 'Reunión concretada']
-                    );
-                    await db.query(
-                        "UPDATE empresas SET estado_seguimiento = 'gestionada', fecha_concretada = COALESCE(fecha_concretada, ?) WHERE id = ?",
-                        [fecha, resolvedEmpresaId]
-                    );
+                const existingConcretada = await agendamientoRepository.getEmpresaSeguimientoLogConcretada(event.id);
+                if (!existingConcretada) {
+                    await agendamientoRepository.insertEmpresaSeguimientoLog({
+                        empresa_id: resolvedEmpresaId, estado: 'concretada', fecha, usuario_id: usuarioId, reunion_id: existing.event_id, asunto: prevData?.asunto || event.subject || 'Reunión concretada'
+                    });
+                    await agendamientoRepository.updateEmpresaFechaConcretada(resolvedEmpresaId, fecha);
                 }
             }
         }
     } else {
-        // No existe → crear
-        await db.query(`
-            INSERT INTO teams_eventos 
-            (event_id, ical_uid, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, asistentes, join_url, es_online, ultima_sync, organizador, body_preview)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
-        `, [
-            event.id,
-            event.iCalUId || null,
-            usuarioId,
+        await agendamientoRepository.insertTeamsEventoFull({
+            event_id: event.id,
+            ical_uid: event.iCalUId || null,
+            usuario_id: usuarioId,
             empresa_id,
-            event.subject || 'Sin asunto',
+            asunto: event.subject || 'Sin asunto',
             fecha,
             hora,
-            horaFin,
+            hora_fin: horaFin,
             estado,
-            asistentesJson,
-            joinUrl,
+            asistentes: asistentesJson,
+            join_url: joinUrl,
             es_online,
-            organizadorJson,
-            bodyPreview
-        ]);
+            organizador: organizadorJson,
+            body_preview: bodyPreview
+        });
     }
 };
 
-// ============================================================
-// GET /agendamiento/sync-status
-// ============================================================
 const getSyncStatus = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
-        const [rows] = await db.query("SELECT ultima_sincronizacion FROM usuarios WHERE id = ?", [usuarioId]);
-        res.status(200).json({ ultima_sincronizacion: rows[0]?.ultima_sincronizacion || null });
+        const row = await agendamientoRepository.getUltimaSincronizacion(usuarioId);
+        res.status(200).json({ ultima_sincronizacion: row?.ultima_sincronizacion || null });
     } catch (error) {
         console.error("Error en getSyncStatus:", error);
         res.status(500).json({ error: "Error interno." });
     }
 };
 
-// ============================================================
-// GET /agendamiento/teams-eventos — Listar eventos de Teams del usuario
-// (para la vista de vinculación de empresa)
-// ============================================================
 const getTeamsEventos = async (req, res) => {
     try {
         const usuarioId = req.usuario.id;
         const rol = req.usuario.permisos;
-
-        let whereExtra = "";
-        let params = [usuarioId];
-
-        if (rol === 'ejecutiva') {
-            // Solo sus propios eventos, donde es invitado, o de su jefatura
-            whereExtra = "AND (te.usuario_id = ? OR te.asistentes LIKE (SELECT CONCAT('%', correo, '%') FROM usuarios WHERE id = ?) OR te.usuario_id = (SELECT jefatura_id FROM usuarios WHERE id = ?))";
-            params.push(usuarioId, usuarioId);
-        } else if (rol === 'jefatura') {
-            whereExtra = `AND (te.usuario_id = ? OR te.usuario_id IN (SELECT id FROM usuarios WHERE jefatura_id = ?))`;
-            params.push(usuarioId);
-        } else {
-            // admin, gerencia → todos
-            whereExtra = "AND 1=1";
-            params = [];
-        }
-
-        const [rows] = await db.query(`
-            SELECT 
-                te.id, te.event_id, te.asunto, te.fecha, te.hora, te.hora_fin,
-                te.estado, te.es_online, te.asistentes, te.join_url, te.ultima_sync,
-                te.organizador, te.body_preview,
-                te.empresa_id,
-                emp.nombre AS empresa_nombre,
-                u.nombre AS usuario_nombre,
-                m.id AS minuta_id, m.id_minuta, m.estado_envio AS minuta_estado
-            FROM teams_eventos te
-            LEFT JOIN empresas emp ON te.empresa_id = emp.id
-            LEFT JOIN usuarios u ON te.usuario_id = u.id
-            LEFT JOIN minutas m ON m.teams_evento_id = te.id
-            WHERE te.estado NOT IN ('cancelada', 'excluida')
-            ${whereExtra}
-            ORDER BY te.fecha DESC, te.hora DESC
-        `, params);
-
+        const rows = await agendamientoRepository.getTeamsEventosList(usuarioId, rol);
         res.json(rows);
     } catch (error) {
         console.error("Error en getTeamsEventos:", error);
@@ -887,9 +697,6 @@ const getTeamsEventos = async (req, res) => {
     }
 };
 
-// ============================================================
-// POST /agendamiento/teams-eventos/:id/vincular — Vincular empresa a evento
-// ============================================================
 const vincularEmpresaAEvento = async (req, res) => {
     try {
         const { id } = req.params;
@@ -897,16 +704,11 @@ const vincularEmpresaAEvento = async (req, res) => {
 
         if (!empresa_id) return res.status(400).json({ error: "empresa_id es requerido." });
 
-        // Obtener el evento
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
-        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+        const evento = await agendamientoRepository.getTeamsEventoByIdOrEventId(id);
+        if (!evento) return res.status(404).json({ error: "Evento no encontrado." });
 
-        const evento = rows[0];
+        await agendamientoRepository.updateTeamsEventoEmpresaId(evento.id, empresa_id);
 
-        // Actualizar empresa en teams_eventos
-        await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, evento.id]);
-
-        // Aprender dominios y contactos
         let attendeesList = [];
         if (evento.asistentes) {
             if (typeof evento.asistentes === 'object') {
@@ -925,42 +727,30 @@ const vincularEmpresaAEvento = async (req, res) => {
             if (email && email.includes('@')) {
                 const dom = '@' + email.split('@')[1];
                 
-                // Evitar guardar correos internos de Proforma
                 if (dom !== '@proforma.cl' && dom !== '@oticproforma.cl') {
-                    // Guardar el contacto siempre (independiente de si su dominio es genérico o no)
-                    const [existing] = await db.query("SELECT id, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo = ?", [empresa_id, email]);
-                    if (existing.length === 0) {
-                        await db.query("INSERT INTO empresa_contactos (empresa_id, correo, nombre) VALUES (?, ?, ?)", [empresa_id, email, name]);
-                    } else if (name && !existing[0].nombre) {
-                        await db.query("UPDATE empresa_contactos SET nombre = ? WHERE id = ?", [name, existing[0].id]);
+                    const existing = await agendamientoRepository.getEmpresaContactoByCorreo(empresa_id, email);
+                    if (!existing) {
+                        await agendamientoRepository.insertEmpresaContacto(empresa_id, email, name);
+                    } else if (name && !existing.nombre) {
+                        await agendamientoRepository.updateEmpresaContactoNombre(existing.id, name);
                     }
 
-                    // Guardar el dominio de la empresa solo si no es genérico
                     if (!dominiosGenericos.includes(dom.substring(1))) {
                         const shouldSaveDomain = !dominios || dominios.includes(dom);
                         if (shouldSaveDomain) {
-                            await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dom]);
+                            await agendamientoRepository.insertEmpresaDominioIgnore(empresa_id, dom);
                         }
                     }
                 }
             }
         }
 
-        // Auto-vincular otros eventos pendientes (retro-match)
-        const [dominiosDocs] = await db.query("SELECT dominio FROM empresa_dominios WHERE empresa_id = ?", [empresa_id]);
-        const [contactosDocs] = await db.query("SELECT correo FROM empresa_contactos WHERE empresa_id = ?", [empresa_id]);
+        const dominiosDocs = await agendamientoRepository.getEmpresaDominiosByEmpresaId(empresa_id);
+        const contactosDocs = await agendamientoRepository.getEmpresaContactosByEmpresaId(empresa_id);
         const knownDomains = new Set(dominiosDocs.map(d => d.dominio));
         const knownEmails = new Set(contactosDocs.map(c => c.correo));
 
-        const [sinEmpresa] = await db.query(`
-            SELECT te.* 
-            FROM teams_eventos te
-            LEFT JOIN minutas m ON m.teams_evento_id = te.id
-            WHERE te.empresa_id IS NULL 
-              AND te.estado NOT IN ('cancelada', 'excluida') 
-              AND m.id IS NULL 
-              AND te.id != ?
-        `, [evento.id]);
+        const sinEmpresa = await agendamientoRepository.getEventosSinEmpresaParaVincular(evento.id);
 
         let autoVinculados = 0;
         for (const evt of sinEmpresa) {
@@ -983,41 +773,28 @@ const vincularEmpresaAEvento = async (req, res) => {
                 if (email.includes('@')) {
                     const dom = '@' + email.split('@')[1];
                     
-                    // Si no es un correo interno de Proforma
                     if (dom !== '@proforma.cl' && dom !== '@oticproforma.cl') {
-                        // Coincidencia exacta por contacto/email registrado
-                        if (knownEmails.has(email)) {
-                            matched = true;
-                        }
+                        if (knownEmails.has(email)) matched = true;
 
-                        // Agregar a dominios externos y validar dominio corporativo registrado
                         if (!dominiosGenericos.includes(dom.substring(1))) {
                             externalDomains.add(dom);
-                            if (knownDomains.has(dom)) {
-                                matched = true;
-                            }
+                            if (knownDomains.has(dom)) matched = true;
                         }
                     }
                 }
             }
 
-            // Auto-vincular si coincide dominio o email, y hay como máximo 1 dominio corporativo externo (evita reuniones masivas)
             if (matched && externalDomains.size <= 1) {
-                await db.query("UPDATE teams_eventos SET empresa_id = ? WHERE id = ?", [empresa_id, evt.id]);
+                await agendamientoRepository.updateTeamsEventoEmpresaId(evt.id, empresa_id);
                 autoVinculados++;
             }
         }
 
-        // Registrar en empresa_seguimiento_log
-        const [existingLog] = await db.query(
-            "SELECT id FROM empresa_seguimiento_log WHERE reunion_id = ? AND estado = 'agendada'",
-            [evento.event_id]
-        );
-        if (existingLog.length === 0) {
-            await db.query(
-                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'agendada', ?, ?, ?, ?)",
-                [empresa_id, evento.fecha, req.usuario.id, evento.event_id, evento.asunto]
-            );
+        const existingLog = await agendamientoRepository.getEmpresaSeguimientoLogAgendada(evento.event_id);
+        if (!existingLog) {
+            await agendamientoRepository.insertEmpresaSeguimientoLog({
+                empresa_id, estado: 'agendada', fecha: evento.fecha, usuario_id: req.usuario.id, reunion_id: evento.event_id, asunto: evento.asunto
+            });
         }
 
         let message = "Evento vinculado exitosamente.";
@@ -1030,35 +807,25 @@ const vincularEmpresaAEvento = async (req, res) => {
     }
 };
 
-// ============================================================
-// POST /agendamiento/teams-eventos/:id/desvincular — Quitar empresa de un evento
-// ============================================================
 const desvincularEmpresaDeEvento = async (req, res) => {
     try {
         const { id } = req.params;
         const { dominios } = req.body;
 
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
-        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+        const evento = await agendamientoRepository.getTeamsEventoByIdOrEventId(id);
+        if (!evento) return res.status(404).json({ error: "Evento no encontrado." });
 
-        const evento = rows[0];
         const empresa_id = evento.empresa_id;
 
-        // Eliminar dominios si se indicaron
         if (dominios && Array.isArray(dominios) && empresa_id) {
             for (const dom of dominios) {
-                await db.query("DELETE FROM empresa_dominios WHERE empresa_id = ? AND dominio = ?", [empresa_id, dom]);
+                await agendamientoRepository.deleteEmpresaDominio(empresa_id, dom);
             }
         }
 
-        // Si hay una minuta borrador vinculada, eliminarla
-        await db.query("DELETE FROM minutas WHERE teams_evento_id = ? AND estado_envio = 'borrador'", [evento.id]);
-
-        // Limpiar el historial fantasma de la línea de tiempo
-        await db.query("DELETE FROM empresa_seguimiento_log WHERE reunion_id = ? AND empresa_id = ?", [evento.event_id, empresa_id]);
-
-        // Quitar empresa del evento
-        await db.query("UPDATE teams_eventos SET empresa_id = NULL WHERE id = ?", [evento.id]);
+        await agendamientoRepository.deleteMinutaBorradorByEvento(evento.id);
+        await agendamientoRepository.deleteEmpresaSeguimientoLog(evento.event_id, empresa_id);
+        await agendamientoRepository.updateTeamsEventoEmpresaId(evento.id, null);
 
         res.json({ success: true, message: "Empresa desvinculada del evento." });
     } catch (error) {
@@ -1067,47 +834,32 @@ const desvincularEmpresaDeEvento = async (req, res) => {
     }
 };
 
-// ============================================================
-// GET /agendamiento/debug (mantener para compatibilidad)
-// ============================================================
 const debugProforma = async (req, res) => {
     try {
-        const [emp] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA'");
-        const [users] = await db.query("SELECT id, correo, sync_delta_token, ultima_sincronizacion FROM usuarios LIMIT 5");
-        const [teEvts] = await db.query("SELECT id, event_id, asunto, fecha, hora, estado, empresa_id FROM teams_eventos ORDER BY fecha DESC LIMIT 30");
+        const data = await agendamientoRepository.getDebugData();
         res.json({
-            proforma_interna: emp,
-            users,
-            teams_eventos: teEvts
+            proforma_interna: data.emp,
+            users: data.users,
+            teams_eventos: data.teEvts
         });
     } catch (e) {
         res.json({ error: e.message });
     }
 };
 
-// ============================================================
-// POST /agendamiento/teams-eventos/:id/marcar-excluida
-// Marca una reunion como excluida (efecto global, sin empresa)
-// ============================================================
 const marcarExcluida = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Obtener datos del evento antes de actualizar
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
-        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+        const evento = await agendamientoRepository.getTeamsEventoByIdOrEventId(id);
+        if (!evento) return res.status(404).json({ error: "Evento no encontrado." });
 
-        const evento = rows[0];
+        await agendamientoRepository.updateTeamsEventoEstado(evento.id, 'excluida');
 
-        // Actualizar a excluida (sin filtrar por usuario → efecto global)
-        await db.query("UPDATE teams_eventos SET estado = 'excluida' WHERE id = ?", [evento.id]);
-
-        // Si tenía empresa, registrar en log
         if (evento.empresa_id) {
-            await db.query(
-                "INSERT INTO empresa_seguimiento_log (empresa_id, estado, fecha, usuario_id, reunion_id, asunto) VALUES (?, 'no_aplica', ?, ?, ?, ?)",
-                [evento.empresa_id, evento.fecha, req.usuario.id, evento.event_id, evento.asunto || 'Reunión excluida']
-            );
+            await agendamientoRepository.insertEmpresaSeguimientoLog({
+                empresa_id: evento.empresa_id, estado: 'no_aplica', fecha: evento.fecha, usuario_id: req.usuario.id, reunion_id: evento.event_id, asunto: evento.asunto || 'Reunión excluida'
+            });
         }
 
         res.json({ success: true, message: "Reunión marcada como excluida." });
@@ -1117,29 +869,20 @@ const marcarExcluida = async (req, res) => {
     }
 };
 
-// ============================================================
-// POST /agendamiento/teams-eventos/:id/marcar-proforma
-// Asigna la empresa PROFORMA INTERNA al evento (efecto global)
-// ============================================================
 const marcarProforma = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Obtener ID de PROFORMA INTERNA
-        const [proformaRows] = await db.query("SELECT id FROM empresas WHERE nombre = 'PROFORMA INTERNA' LIMIT 1");
-        if (proformaRows.length === 0) {
+        const proformaRows = await agendamientoRepository.getProformaInternaEmpresa();
+        if (!proformaRows) {
             return res.status(500).json({ error: "No se encontró la empresa PROFORMA INTERNA en la BD." });
         }
-        const proformaId = proformaRows[0].id;
+        const proformaId = proformaRows.id;
 
-        // Verificar que el evento existe
-        const [rows] = await db.query("SELECT * FROM teams_eventos WHERE id = ? OR event_id = ?", [id, id]);
-        if (rows.length === 0) return res.status(404).json({ error: "Evento no encontrado." });
+        const evento = await agendamientoRepository.getTeamsEventoByIdOrEventId(id);
+        if (!evento) return res.status(404).json({ error: "Evento no encontrado." });
 
-        const evento = rows[0];
-
-        // Actualizar empresa_id a PROFORMA INTERNA (sin filtrar por usuario → efecto global)
-        await db.query("UPDATE teams_eventos SET empresa_id = ?, estado = 'pasada' WHERE id = ?", [proformaId, evento.id]);
+        await agendamientoRepository.updateTeamsEventoFull(evento.id, { empresa_id: proformaId, estado: 'pasada' });
 
         res.json({ success: true, message: "Reunión asignada a Proforma Interna.", proforma_id: proformaId });
     } catch (error) {

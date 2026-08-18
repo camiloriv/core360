@@ -1,5 +1,5 @@
 const cron = require("node-cron");
-const db = require("../../database/connection");
+const db = require("../../database/knex");
 const { enviarCorreo, enviarCorreoEncuesta } = require("../email/email.service");
 const encuestaService = require("../../modules/encuestas/encuestas.service");
 const agendamientoController = require("../../modules/agendamiento/agendamiento.controller");
@@ -25,10 +25,10 @@ const checkAndSendScheduledEmails = async () => {
             LEFT JOIN usuarios j ON e.jefatura_id = j.id
             WHERE m.programar_encuesta = 1 
             AND m.encuesta_estado_envio = 'pendiente' 
-            AND m.encuesta_programada_para <= NOW()
+            AND m.encuesta_programada_para <= GETDATE()
         `;
 
-        const [pendingEncuestas] = await db.query(sqlEncuestas);
+        const pendingEncuestas = await db.raw(sqlEncuestas);
 
         for (const data of pendingEncuestas) {
             try {
@@ -38,7 +38,7 @@ const checkAndSendScheduledEmails = async () => {
                                data.ejecutiva_correo?.toLowerCase().includes("prueba");
 
                 if (data.zona_nombre && data.zona_nombre.toLowerCase().includes("matriz") && !isTest) {
-                    const [gerenteRows] = await db.query("SELECT correo FROM usuarios WHERE nombre = 'Lilian Ortega' LIMIT 1");
+                    const gerenteRows = await db.raw("SELECT TOP 1 correo FROM usuarios WHERE nombre = 'Lilian Ortega'");
                     const lilianCorreo = gerenteRows[0]?.correo || "lortega@proforma.cl";
                     bccArray.push(lilianCorreo);
                 }
@@ -53,12 +53,12 @@ const checkAndSendScheduledEmails = async () => {
                 });
 
                 await enviarCorreoEncuesta(data.encuesta_destinatario || data.enviado_a, resEncuesta.url, bcc);
-                await db.query("UPDATE minutas SET encuesta_estado_envio = 'enviado' WHERE id = ?", [data.id]);
+                await db.raw("UPDATE minutas SET encuesta_estado_envio = 'enviado' WHERE id = ?", [data.id]);
 
                 console.log(`✅ Encuesta ${data.encuesta_tipo} para ${data.empresa_nombre} enviada.`);
             } catch (error) {
                 console.error(`❌ Error encuesta ${data.id_minuta}:`, error);
-                await db.query("UPDATE minutas SET encuesta_estado_envio = 'error' WHERE id = ?", [data.id]);
+                await db.raw("UPDATE minutas SET encuesta_estado_envio = 'error' WHERE id = ?", [data.id]);
             }
         }
     } catch (error) {
@@ -76,8 +76,8 @@ const runDailySync = async () => {
     try {
         // Evitar doble ejecución: verificar si ya corrió hoy
         const today = new Date().toISOString().split('T')[0];
-        const [lastSync] = await db.query(
-            "SELECT id FROM sync_log WHERE tipo = 'diaria' AND DATE(ejecutado_at) = ? LIMIT 1",
+        const lastSync = await db.raw(
+            "SELECT TOP 1 id FROM sync_log WHERE tipo = 'diaria' AND CAST(ejecutado_at AS DATE) = ?",
             [today]
         );
 
@@ -87,15 +87,15 @@ const runDailySync = async () => {
         }
 
         // Registrar inicio en sync_log
-        const [insertResult] = await db.query(
-            "INSERT INTO sync_log (tipo, ejecutado_at, resultado) VALUES ('diaria', NOW(), 'en_progreso')"
+        const insertResult = await db.raw(
+            "INSERT INTO sync_log (tipo, ejecutado_at, resultado) OUTPUT inserted.id VALUES ('diaria', GETDATE(), 'en_progreso')"
         );
-        const syncLogId = insertResult.insertId;
+        const syncLogId = insertResult[0]?.id;
 
         let totalProcesados = 0;
         let errores = 0;
 
-        const [usuarios] = await db.query(
+        const usuarios = await db.raw(
             "SELECT id, correo FROM usuarios WHERE correo IS NOT NULL AND correo != ''"
         );
 
@@ -125,7 +125,7 @@ const runDailySync = async () => {
         }
 
         // Actualizar resultado en sync_log
-        await db.query(
+        await db.raw(
             "UPDATE sync_log SET resultado = ? WHERE id = ?",
             [`completada: ${totalProcesados} procesados, ${errores} errores`, syncLogId]
         );
@@ -134,8 +134,8 @@ const runDailySync = async () => {
     } catch (error) {
         console.error("🔥 Error en runDailySync:", error);
         try {
-            await db.query(
-                "INSERT INTO sync_log (tipo, ejecutado_at, resultado) VALUES ('diaria_error', NOW(), ?)",
+            await db.raw(
+                "INSERT INTO sync_log (tipo, ejecutado_at, resultado) VALUES ('diaria_error', GETDATE(), ?)",
                 [error.message]
             );
         } catch (e) { /* ignore */ }
@@ -162,14 +162,14 @@ const actualizarEstadosPasados = async () => {
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
         }).format(now);
 
-        const [result] = await db.query(`
+        const result = await db.raw(`
             UPDATE teams_eventos
             SET estado = 'pasada'
             WHERE estado = 'agendada'
               AND (fecha < ? OR (fecha = ? AND (hora_fin IS NULL OR hora_fin <= ?)))
         `, [currentDateChile, currentDateChile, currentTimeChile]);
 
-        if (result.affectedRows > 0) {
+        if (true) {
             console.log(`🕐 Estado actualizado: ${result.affectedRows} reunión(es) marcada(s) como 'pasada'.`);
         }
     } catch (error) {

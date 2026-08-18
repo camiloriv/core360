@@ -1,16 +1,14 @@
-const db = require("../../database/connection");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const authRepository = require('../../database/repositories/auth.repository');
 
 exports.login = async (req, res) => {
   const { correo, contrasena } = req.body;
   if (!correo || !contrasena) return res.status(400).json({ error: "Correo y contraseña requeridos" });
 
   try {
-    const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
-    if (rows.length === 0) return res.status(401).json({ error: "Credenciales incorrectas" });
-
-    const usuario = rows[0];
+    const usuario = await authRepository.findUsuarioByCorreo(correo);
+    if (!usuario) return res.status(401).json({ error: "Credenciales incorrectas" });
 
     const validPassword = await bcrypt.compare(contrasena, usuario.contrasena);
     if (!validPassword) return res.status(401).json({ error: "Credenciales incorrectas" });
@@ -60,20 +58,18 @@ exports.forgotPassword = async (req, res) => {
   if (!correo) return res.status(400).json({ error: "Correo requerido" });
 
   try {
-    const [rows] = await db.query("SELECT * FROM usuarios WHERE correo = ?", [correo]);
-    if (rows.length === 0) {
+    const usuario = await authRepository.findUsuarioByCorreo(correo);
+    if (!usuario) {
       // Para evitar enumeración de usuarios, siempre decimos que se envió
       return res.json({ message: "Si el correo está registrado, se han enviado las instrucciones." });
     }
-
-    const usuario = rows[0];
 
     // Generar clave temporal
     const tempPassword = Math.random().toString(36).slice(-8); // 8 caracteres aleatorios
     const hashedTemp = await bcrypt.hash(tempPassword, 10);
 
     // Actualizar usuario
-    await db.query("UPDATE usuarios SET contrasena = ?, requiere_cambio_clave = 1 WHERE id = ?", [hashedTemp, usuario.id]);
+    await authRepository.updateContrasena(usuario.id, hashedTemp, true);
 
     // Enviar correo
     const mailer = require("../../config/mailer");

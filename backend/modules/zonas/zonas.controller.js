@@ -1,9 +1,9 @@
-const db = require("../../database/connection");
+const zonasRepository = require("../../database/repositories/zonas.repository");
 
 exports.obtenerZonas = async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM zonas ORDER BY id ASC");
-    res.json(rows);
+    const zonas = await zonasRepository.findAll();
+    res.json(zonas);
   } catch (err) {
     console.error("Error obteniendo zonas:", err);
     res.status(500).json({ error: "Error en la base de datos al obtener zonas" });

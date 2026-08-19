@@ -1,4 +1,4 @@
-const db = require("../../database/knex");
+const { sql, poolPromise } = require("../../database/mssql");
 
 /**
  * Registra una entrada en el audit log.
@@ -39,22 +39,34 @@ const registrarAudit = async ({
             es_delegada
         };
 
-        await db.raw(`
-            INSERT INTO audit_log (
-                accion, entidad, entidad_id,
-                usuario_id, usuario_nombre,
-                ejecutiva_id, ejecutiva_nombre,
-                empresa_id, empresa_nombre,
-                detalles, ip_address
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-            accion, entidad, entidad_id,
-            usuario_id, usuario_nombre,
-            ejecutiva_id, ejecutiva_nombre,
-            empresa_id, empresa_nombre,
-            JSON.stringify(detailsWithFlag),
-            ip_address
-        ]);
+        const pool = await poolPromise;
+        await pool.request()
+            .input('accion', sql.VarChar, accion)
+            .input('entidad', sql.VarChar, entidad)
+            .input('entidad_id', sql.VarChar, entidad_id)
+            .input('usuario_id', sql.Int, usuario_id)
+            .input('usuario_nombre', sql.VarChar, usuario_nombre)
+            .input('ejecutiva_id', sql.Int, ejecutiva_id)
+            .input('ejecutiva_nombre', sql.VarChar, ejecutiva_nombre)
+            .input('empresa_id', sql.Int, empresa_id)
+            .input('empresa_nombre', sql.VarChar, empresa_nombre)
+            .input('detalles', sql.NVarChar, JSON.stringify(detailsWithFlag))
+            .input('ip_address', sql.VarChar, ip_address)
+            .query(`
+                INSERT INTO audit_log (
+                    accion, entidad, entidad_id,
+                    usuario_id, usuario_nombre,
+                    ejecutiva_id, ejecutiva_nombre,
+                    empresa_id, empresa_nombre,
+                    detalles, ip_address
+                ) VALUES (
+                    @accion, @entidad, @entidad_id,
+                    @usuario_id, @usuario_nombre,
+                    @ejecutiva_id, @ejecutiva_nombre,
+                    @empresa_id, @empresa_nombre,
+                    @detalles, @ip_address
+                )
+            `);
     } catch (error) {
         // Fire-and-forget: solo loguear, nunca bloquear
         console.error("[AUDIT] Error registrando audit log:", error.message);

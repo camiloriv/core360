@@ -1,5 +1,6 @@
 const encuestasRepository = require("../../database/repositories/encuestas.repository");
 const { v4: uuidv4 } = require("uuid");
+const { sql, poolPromise } = require("../../database/mssql");
 
 const obtenerTemplates = async () => {
   return await encuestasRepository.obtenerTemplatesActivos();
@@ -26,7 +27,7 @@ const crearEncuesta = async ({ ejecutiva_id, empresa_id, tipo_encuesta, reunion_
   return {
     id: result,
     token,
-    url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/encuesta/${token}`,
+    url: `\${process.env.FRONTEND_URL || 'http://localhost:5173'}/encuesta/\${token}`,
   };
 };
 
@@ -72,39 +73,42 @@ const obtenerEncuestaPorToken = async (token) => {
 const guardarRespuesta = async ({ encuesta_id, respuestas_json }) => {
   if (!encuesta_id) throw new Error("encuesta_id requerido");
 
-  // Using knex transactions from repository
-  const { knex } = encuestasRepository;
+  const pool = await poolPromise;
+  const transaction = new sql.Transaction(pool);
   
   try {
-    await knex.transaction(async (trx) => {
-      await encuestasRepository.marcarEncuestaCompletada(encuesta_id, trx);
+    await transaction.begin();
 
-      for (const [pregunta_id, valor] of Object.entries(respuestas_json)) {
-        let valor_texto = null;
-        let valor_numerico = null;
+    await encuestasRepository.marcarEncuestaCompletada(encuesta_id, transaction);
 
-        if (typeof valor === "number") {
-          valor_numerico = valor;
-        } else if (Array.isArray(valor)) {
-          valor_texto = valor.join(", ");
-        } else if (typeof valor === "string") {
-          const num = parseFloat(valor);
-          if (!isNaN(num) && /^\d+$/.test(valor)) {
-            valor_numerico = num;
-          }
-          valor_texto = valor;
+    for (const [pregunta_id, valor] of Object.entries(respuestas_json)) {
+      let valor_texto = null;
+      let valor_numerico = null;
+
+      if (typeof valor === "number") {
+        valor_numerico = valor;
+      } else if (Array.isArray(valor)) {
+        valor_texto = valor.join(", ");
+      } else if (typeof valor === "string") {
+        const num = parseFloat(valor);
+        if (!isNaN(num) && /^\\d+$/.test(valor)) {
+          valor_numerico = num;
         }
-
-        await encuestasRepository.insertRespuesta({
-          encuesta_id,
-          pregunta_id,
-          valor_texto,
-          valor_numerico
-        }, trx);
+        valor_texto = valor;
       }
-    });
+
+      await encuestasRepository.insertRespuesta({
+        encuesta_id,
+        pregunta_id,
+        valor_texto,
+        valor_numerico
+      }, transaction);
+    }
+
+    await transaction.commit();
     console.log("✅ Respuesta guardada y normalizada:", encuesta_id);
   } catch (err) {
+    await transaction.rollback();
     console.error("❌ Error guardando respuesta:", err);
     throw err;
   }

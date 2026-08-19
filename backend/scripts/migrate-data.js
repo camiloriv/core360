@@ -147,6 +147,7 @@ async function runMigration() {
 
     let validUserIds = [];
     let validEmpresaIds = [];
+    let userRelationsToRestore = [];
 
     for (const table of tablesToMigrate) {
       console.log(`\n⏳ Migrando tabla: ${table.name}...`);
@@ -204,7 +205,15 @@ async function runMigration() {
 
         // Data sanitization to bypass strict FK constraints
         if (table.name === 'usuarios') {
+          let relations = { id: row.id };
+          if (row.jefatura_id !== null && row.jefatura_id !== undefined) relations.jefatura_id = row.jefatura_id;
+          if (row.gerencia_id !== null && row.gerencia_id !== undefined) relations.gerencia_id = row.gerencia_id;
+          
+          if (relations.jefatura_id || relations.gerencia_id) {
+             userRelationsToRestore.push(relations);
+          }
           newRow.jefatura_id = null;
+          newRow.gerencia_id = null;
         } else {
           const defaultUserId = validUserIds[0] || 1;
           if (newRow.hasOwnProperty('jefatura_id') && (!newRow.jefatura_id || !validUserIds.includes(newRow.jefatura_id))) newRow.jefatura_id = defaultUserId;
@@ -258,6 +267,20 @@ async function runMigration() {
         console.error(`❌ Error crítico insertando en ${table.name}:`, err.message);
         throw err; // Re-lanzar para detener la migración general si falla una tabla crítica
       });
+    }
+
+    if (userRelationsToRestore.length > 0) {
+      console.log(`\n⏳ Restaurando relaciones (jefatura/gerencia) para ${userRelationsToRestore.length} usuarios...`);
+      for (const mapping of userRelationsToRestore) {
+        const updateData = {};
+        if (mapping.jefatura_id) updateData.jefatura_id = mapping.jefatura_id;
+        if (mapping.gerencia_id) updateData.gerencia_id = mapping.gerencia_id;
+        
+        if (Object.keys(updateData).length > 0) {
+          await dbSql('usuarios').where({ id: mapping.id }).update(updateData);
+        }
+      }
+      console.log(`✅ Restauración de relaciones de usuarios completada.`);
     }
 
     console.log('\n🎉 ¡Migración de datos completada exitosamente!');

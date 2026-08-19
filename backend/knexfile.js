@@ -26,10 +26,10 @@ module.exports = {
       propagateCreateError: false
     },
     migrations: {
-      directory: './database/migrations'
+      directory: __dirname + '/database/migrations'
     },
     seeds: {
-      directory: './database/seeds'
+      directory: __dirname + '/database/seeds'
     }
   }
 };

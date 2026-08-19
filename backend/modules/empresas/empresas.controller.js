@@ -309,15 +309,8 @@ exports.traspasoExcel = async (req, res) => {
     return res.status(400).json({ error: "Datos de traspaso inválidos" });
   }
   
-  const { knex } = empresasRepository;
-  
   try {
-    await knex.transaction(async (trx) => {
-      for (const t of traspasos) {
-        const { empresa_id, target_jefatura_id } = t;
-        await trx('empresas').where('id', empresa_id).update({ jefatura_id: target_jefatura_id || null });
-      }
-    });
+    await empresasRepository.traspasoExcel(traspasos);
     res.json({ msg: "Traspaso por Excel completado con éxito" });
   } catch (err) {
     console.error(err);
@@ -384,144 +377,8 @@ exports.actualizarVinculaciones = async (req, res) => {
   const { id } = req.params;
   const { jefatura_id, dominios, contactos, nombre, zona_id } = req.body;
 
-  const { knex } = empresasRepository;
-
   try {
-    await knex.transaction(async (trx) => {
-      const currentEmp = await trx('empresas').select('nombre', 'zona_id').where('id', id).first();
-      if (!currentEmp) {
-        throw new Error("Empresa no encontrada");
-      }
-      
-      const finalNombre = nombre || currentEmp.nombre;
-      const finalZonaId = zona_id !== undefined ? zona_id : currentEmp.zona_id;
-
-      await trx('empresas').where('id', id).update({
-        nombre: finalNombre,
-        jefatura_id: jefatura_id || null,
-        zona_id: finalZonaId || null
-      });
-
-      if (Array.isArray(dominios)) {
-        const cleanDominios = dominios
-          .map(d => d.trim().toLowerCase())
-          .filter(d => d.length > 0)
-          .map(d => d.startsWith('@') ? d : '@' + d);
-
-        const existingDoms = await trx('empresa_dominios').select('dominio').where('empresa_id', id);
-        const existingDomSet = new Set(existingDoms.map(d => d.dominio));
-        const cleanDomSet = new Set(cleanDominios);
-
-        for (const dom of existingDomSet) {
-          if (!cleanDomSet.has(dom)) {
-            await trx('empresa_dominios').where({ empresa_id: id, dominio: dom }).del();
-          }
-        }
-
-        for (const dom of cleanDomSet) {
-          if (!existingDomSet.has(dom)) {
-            await trx('empresa_dominios').insert({ empresa_id: id, dominio: dom });
-          }
-        }
-      }
-
-      if (Array.isArray(contactos)) {
-        const cleanContactos = contactos
-          .map(c => ({
-            id: c.id,
-            nombre: c.nombre ? c.nombre.trim() : null,
-            correo: c.correo ? c.correo.trim().toLowerCase() : ''
-          }))
-          .filter(c => c.correo.includes('@'));
-
-        const existingConts = await trx('empresa_contactos').select('id', 'correo').where('empresa_id', id);
-        const existingContMap = new Map(existingConts.map(c => [c.id, c.correo]));
-        const newContIds = new Set(cleanContactos.map(c => c.id).filter(Boolean));
-
-        for (const [extId, extCorreo] of existingContMap.entries()) {
-          if (!newContIds.has(extId)) {
-            await trx('empresa_contactos').where('id', extId).del();
-          }
-        }
-
-        for (const c of cleanContactos) {
-          if (c.id && existingContMap.has(c.id)) {
-            await trx('empresa_contactos').where('id', c.id).update({ nombre: c.nombre, correo: c.correo });
-          } else {
-            // Check existence to simulate ON DUPLICATE KEY UPDATE safely
-            const exists = await trx('empresa_contactos').where('correo', c.correo).first();
-            if (exists) {
-              await trx('empresa_contactos').where('id', exists.id).update({ nombre: c.nombre, empresa_id: id });
-            } else {
-              await trx('empresa_contactos').insert({ empresa_id: id, correo: c.correo, nombre: c.nombre });
-            }
-          }
-        }
-      }
-
-      const allowedDomains = new Set();
-      const allowedEmails = new Set();
-
-      if (Array.isArray(dominios)) {
-        dominios
-          .map(d => d.trim().toLowerCase())
-          .filter(d => d.length > 0)
-          .forEach(d => allowedDomains.add(d.startsWith('@') ? d : '@' + d));
-      }
-      if (Array.isArray(contactos)) {
-        contactos
-          .map(c => c.correo ? c.correo.trim().toLowerCase() : '')
-          .filter(email => email.includes('@'))
-          .forEach(email => allowedEmails.add(email));
-      }
-
-      if (allowedDomains.size > 0 || allowedEmails.size > 0) {
-        const meetings = await trx('teams_eventos')
-          .select('id', 'asistentes')
-          .whereNull('empresa_id')
-          .whereNotIn('estado', ['cancelada', 'excluida']);
-
-        const proformaDomains = ['@proforma.cl', '@oticproforma.cl'];
-
-        for (const meeting of meetings) {
-          let attendeesList = [];
-          try {
-            attendeesList = typeof meeting.asistentes === 'string' ? JSON.parse(meeting.asistentes) : (meeting.asistentes || []);
-          } catch (e) {
-            continue;
-          }
-
-          if (!Array.isArray(attendeesList) || attendeesList.length === 0) continue;
-
-          let hasTargetCompanyAttendee = false;
-          let hasInvalidExternalAttendee = false;
-
-          for (const att of attendeesList) {
-            const email = (att.email || '').trim().toLowerCase();
-            if (!email) continue;
-
-            const isProforma = proformaDomains.some(d => email.endsWith(d));
-            if (isProforma) continue;
-
-            const emailDomain = '@' + email.split('@')[1];
-            const matchesDomain = allowedDomains.has(emailDomain);
-            const matchesEmail = allowedEmails.has(email);
-
-            if (matchesDomain || matchesEmail) {
-              hasTargetCompanyAttendee = true;
-            } else {
-              hasInvalidExternalAttendee = true;
-              break;
-            }
-          }
-
-          if (hasTargetCompanyAttendee && !hasInvalidExternalAttendee) {
-            await trx('teams_eventos').where('id', meeting.id).update({ empresa_id: id });
-          }
-        }
-      }
-    });
-
+    await empresasRepository.actualizarVinculaciones(id, jefatura_id, dominios, contactos, nombre, zona_id);
     res.json({ success: true, message: "Vinculaciones actualizadas con éxito" });
   } catch (err) {
     if (err.message === "Empresa no encontrada") {

@@ -68,7 +68,7 @@ async function main() {
                     "UPDATE empresas SET jefatura_id = ?, zona_id = ? WHERE id = ?",
                     [jefatura_id, zona_id, exists[0].id]
                 );
-                // console.log(\`✅ Empresa actualizada: \${empresaName}\`);
+                // console.log(`✅ Empresa actualizada: \${empresaName}`);
                 insertadas++;
             } else {
                 // Si no existe, la insertamos
@@ -76,7 +76,7 @@ async function main() {
                     "INSERT INTO empresas (nombre, jefatura_id, zona_id) VALUES (?, ?, ?)",
                     [empresaName, jefatura_id, zona_id]
                 );
-                // console.log(\`✅ Empresa creada: \${empresaName}\`);
+                // console.log(`✅ Empresa creada: \${empresaName}`);
                 insertadas++;
             }
 

@@ -1,161 +1,195 @@
-const knex = require('../knex');
+const { sql, poolPromise } = require('../mssql');
 
 const obtenerTemplatesActivos = async () => {
-  return await knex('encuesta_templates')
-    .select('id', 'nombre', 'version')
-    .where('activo', 1);
+  const pool = await poolPromise;
+  const result = await pool.request().query('SELECT id, nombre, version FROM encuesta_templates WHERE activo = 1');
+  return result.recordset;
 };
 
 const getTemplateIdByName = async (tipo_encuesta) => {
-  return await knex('encuesta_templates')
-    .select('id')
-    .where('nombre', tipo_encuesta)
-    .andWhere('activo', 1)
-    .first();
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('tipo_encuesta', sql.VarChar, tipo_encuesta)
+    .query('SELECT TOP 1 id FROM encuesta_templates WHERE nombre = @tipo_encuesta AND activo = 1');
+  return result.recordset[0];
 };
 
 const insertEncuesta = async (data) => {
-  const [id] = await knex('encuestas').insert(data).returning('id');
-  return id?.id || id; // Handle depending on if SQL Server returns object or array of ids
+  const pool = await poolPromise;
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  let q = `INSERT INTO encuestas (${keys.join(', ')}) OUTPUT INSERTED.id VALUES (${keys.map((_, i) => `@p${i}`).join(', ')})`;
+  const req = pool.request();
+  values.forEach((v, i) => req.input(`p${i}`, v));
+  const result = await req.query(q);
+  return result.recordset[0]?.id;
 };
 
 const getEncuestaConContexto = async (token) => {
-  return await knex('encuestas as e')
-    .select(
-      'e.id',
-      'e.template_id',
-      'emp.nombre as empresa',
-      'ej.nombre as ejecutiva',
-      't.nombre as template',
-      knex.raw("CASE WHEN e.estado = 'completada' THEN 1 ELSE 0 END as completada")
-    )
-    .leftJoin('empresas as emp', 'emp.id', 'e.empresa_id')
-    .leftJoin('usuarios as ej', 'ej.id', 'e.ejecutiva_id')
-    .leftJoin('encuesta_templates as t', 't.id', 'e.template_id')
-    .where('e.token', token)
-    .andWhere('e.activo', 1)
-    .first();
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('token', sql.VarChar, token)
+    .query(`
+      SELECT TOP 1
+        e.id,
+        e.template_id,
+        emp.nombre as empresa,
+        ej.nombre as ejecutiva,
+        t.nombre as template,
+        CASE WHEN e.estado = 'completada' THEN 1 ELSE 0 END as completada
+      FROM encuestas e
+      LEFT JOIN empresas emp ON emp.id = e.empresa_id
+      LEFT JOIN usuarios ej ON ej.id = e.ejecutiva_id
+      LEFT JOIN encuesta_templates t ON t.id = e.template_id
+      WHERE e.token = @token AND e.activo = 1
+    `);
+  return result.recordset[0];
 };
 
 const getPreguntasPorTemplate = async (template_id) => {
-  return await knex('encuesta_template_preguntas as tp')
-    .select(
-      'p.id',
-      'p.texto',
-      'p.tipo',
-      'p.opciones_json',
-      'tp.requerida',
-      'p.escala'
-    )
-    .join('encuesta_catalogo_preguntas as p', 'tp.pregunta_id', 'p.id')
-    .where('tp.template_id', template_id)
-    .orderBy('tp.orden');
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('template_id', sql.Int, template_id)
+    .query(`
+      SELECT p.id, p.texto, p.tipo, p.opciones_json, tp.requerida, p.escala
+      FROM encuesta_template_preguntas tp
+      JOIN encuesta_catalogo_preguntas p ON tp.pregunta_id = p.id
+      WHERE tp.template_id = @template_id
+      ORDER BY tp.orden ASC
+    `);
+  return result.recordset;
 };
 
-const marcarEncuestaCompletada = async (encuesta_id, trx) => {
-  const query = knex('encuestas')
-    .where('id', encuesta_id)
-    .update({
-      estado: 'completada',
-      fecha_respuesta: knex.fn.now()
-    });
-  if (trx) return await query.transacting(trx);
-  return await query;
+const marcarEncuestaCompletada = async (encuesta_id, trx = null) => {
+  const pool = await poolPromise;
+  const req = trx ? new sql.Request(trx) : pool.request();
+  const result = await req
+    .input('encuesta_id', sql.Int, encuesta_id)
+    .query("UPDATE encuestas SET estado = 'completada', fecha_respuesta = GETDATE() WHERE id = @encuesta_id");
+  return result.rowsAffected[0];
 };
 
-const insertRespuesta = async (data, trx) => {
-  const query = knex('encuesta_respuestas').insert(data);
-  if (trx) return await query.transacting(trx);
-  return await query;
+const insertRespuesta = async (data, trx = null) => {
+  const pool = await poolPromise;
+  const req = trx ? new sql.Request(trx) : pool.request();
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  let q = `INSERT INTO encuesta_respuestas (${keys.join(', ')}) VALUES (${keys.map((_, i) => `@p${i}`).join(', ')})`;
+  values.forEach((v, i) => req.input(`p${i}`, v));
+  const result = await req.query(q);
+  return result.rowsAffected[0];
 };
 
 const getTodasLasRespuestas = async (usuario_id, rol) => {
-  let query = knex('encuestas as e')
-    .select(
-      'e.id',
-      'e.token',
-      'e.estado',
-      'e.activo',
-      'e.enviado_a',
-      'e.reunion_id',
-      'e.fecha_creacion',
-      'e.fecha_respuesta',
-      't.nombre as titulo',
-      'emp.nombre as empresa',
-      'e.empresa_id',
-      'e.ejecutiva_id',
-      'emp.jefatura_id as jefatura_id',
-      'ej.nombre as ejecutiva',
-      'j.nombre as jefatura'
-    )
-    .join('encuesta_templates as t', 'e.template_id', 't.id')
-    .leftJoin('empresas as emp', 'e.empresa_id', 'emp.id')
-    .leftJoin('usuarios as ej', 'e.ejecutiva_id', 'ej.id')
-    .leftJoin('usuarios as j', 'emp.jefatura_id', 'j.id')
-    .orderBy('e.fecha_creacion', 'desc');
+  const pool = await poolPromise;
+  let q = `
+    SELECT 
+      e.id, e.token, e.estado, e.activo, e.enviado_a, e.reunion_id,
+      e.fecha_creacion, e.fecha_respuesta,
+      t.nombre as titulo,
+      emp.nombre as empresa, e.empresa_id, e.ejecutiva_id,
+      emp.jefatura_id as jefatura_id,
+      ej.nombre as ejecutiva,
+      j.nombre as jefatura
+    FROM encuestas e
+    JOIN encuesta_templates t ON e.template_id = t.id
+    LEFT JOIN empresas emp ON e.empresa_id = emp.id
+    LEFT JOIN usuarios ej ON e.ejecutiva_id = ej.id
+    LEFT JOIN usuarios j ON emp.jefatura_id = j.id
+    WHERE 1=1
+  `;
+  const req = pool.request();
 
   if (rol === 'ejecutiva') {
-    query.where(function() {
-      this.where('emp.jefatura_id', knex.raw('(SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)', [usuario_id]))
-          .orWhereIn('emp.jefatura_id', knex('usuario_gerencias').select('gerencia_id').where('usuario_id', knex.raw('(SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = ?)', [usuario_id])))
-          .orWhere('e.ejecutiva_id', usuario_id);
-    });
+    q += `
+      AND (
+        emp.jefatura_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = @usuario_id)
+        OR emp.jefatura_id IN (SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = (SELECT COALESCE(jefatura_id, id) FROM usuarios WHERE id = @usuario_id))
+        OR e.ejecutiva_id = @usuario_id
+      )
+    `;
+    req.input('usuario_id', sql.Int, usuario_id);
   } else if (rol === 'jefatura') {
-    query.where(function() {
-      this.where('emp.jefatura_id', usuario_id)
-          .orWhereIn('emp.jefatura_id', knex('usuario_gerencias').select('gerencia_id').where('usuario_id', usuario_id));
-    });
+    q += `
+      AND (
+        emp.jefatura_id = @usuario_id
+        OR emp.jefatura_id IN (SELECT gerencia_id FROM usuario_gerencias WHERE usuario_id = @usuario_id)
+      )
+    `;
+    req.input('usuario_id', sql.Int, usuario_id);
   } else if (rol === 'gerencia') {
-    query.where(function() {
-      this.whereIn('j.id', function() {
-        this.select('usuario_id').from('usuario_gerencias').where('gerencia_id', usuario_id)
-        .union(function() {
-          this.select('ug2.usuario_id').from('usuario_gerencias as ug2')
-          .whereIn('ug2.gerencia_id', function() {
-            this.select('ug.usuario_id').from('usuario_gerencias as ug')
-            .join('usuarios as u', 'ug.usuario_id', 'u.id')
-            .where('ug.gerencia_id', usuario_id).andWhere('u.permisos', 'gerencia');
-          });
-        });
-      })
-      .orWhere('emp.jefatura_id', usuario_id);
-    });
+    q += `
+      AND (
+        j.id IN (
+          SELECT usuario_id FROM usuario_gerencias WHERE gerencia_id = @usuario_id
+          UNION
+          SELECT ug2.usuario_id FROM usuario_gerencias ug2 WHERE ug2.gerencia_id IN (
+            SELECT ug.usuario_id FROM usuario_gerencias ug
+            JOIN usuarios u ON ug.usuario_id = u.id
+            WHERE ug.gerencia_id = @usuario_id AND u.permisos = 'gerencia'
+          )
+        )
+        OR emp.jefatura_id = @usuario_id
+      )
+    `;
+    req.input('usuario_id', sql.Int, usuario_id);
   }
 
-  return await query;
+  q += " ORDER BY e.fecha_creacion DESC";
+  const result = await req.query(q);
+  return result.recordset;
 };
 
 const updateEstadoEncuesta = async (id, activo) => {
-  return await knex('encuestas').where('id', id).update({ activo: activo ? 1 : 0 });
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('id', sql.Int, id)
+    .input('activo', sql.Int, activo ? 1 : 0)
+    .query('UPDATE encuestas SET activo = @activo WHERE id = @id');
+  return result.rowsAffected[0];
 };
 
 const updateEnviadoA = async (id, email) => {
-  return await knex('encuestas').where('id', id).update({ enviado_a: email });
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('id', sql.Int, id)
+    .input('email', sql.VarChar, email)
+    .query('UPDATE encuestas SET enviado_a = @email WHERE id = @id');
+  return result.rowsAffected[0];
 };
 
 const countTotalEnvios = async () => {
-  const result = await knex('encuestas').count('* as total').first();
-  return result.total;
+  const pool = await poolPromise;
+  const result = await pool.request().query('SELECT COUNT(*) as total FROM encuestas');
+  return result.recordset[0].total;
 };
 
 const getCatalogoPreguntas = async () => {
-  return await knex('encuesta_catalogo_preguntas as q')
-    .select('q.id', 'q.texto', 'q.tipo', 'd.nombre as dimension')
-    .leftJoin('encuesta_dimensiones as d', 'q.dimension_id', 'd.id')
-    .whereRaw('COALESCE(q.activo, 1) != 2');
+  const pool = await poolPromise;
+  const result = await pool.request().query(`
+    SELECT q.id, q.texto, q.tipo, d.nombre as dimension
+    FROM encuesta_catalogo_preguntas q
+    LEFT JOIN encuesta_dimensiones d ON q.dimension_id = d.id
+    WHERE COALESCE(q.activo, 1) != 2
+  `);
+  return result.recordset;
 };
 
 const getCorreosBcc = async (id) => {
-  return await knex('encuestas as enc')
-    .select('e.correo as ejecutiva_correo', 'j.correo as jefatura_correo')
-    .join('usuarios as e', 'enc.ejecutiva_id', 'e.id')
-    .leftJoin('usuarios as j', 'e.jefatura_id', 'j.id')
-    .where('enc.id', id)
-    .first();
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('id', sql.Int, id)
+    .query(`
+      SELECT e.correo as ejecutiva_correo, j.correo as jefatura_correo
+      FROM encuestas enc
+      JOIN usuarios e ON enc.ejecutiva_id = e.id
+      LEFT JOIN usuarios j ON e.jefatura_id = j.id
+      WHERE enc.id = @id
+    `);
+  return result.recordset[0];
 };
 
 module.exports = {
-  knex,
   obtenerTemplatesActivos,
   getTemplateIdByName,
   insertEncuesta,

@@ -19,9 +19,9 @@ const getUsuarios = async () => {
            ) as gerencia_ids,
             CASE
               WHEN u.permisos = 'gerencia' THEN (
-                SELECT STRING_AGG(z2.nombre, ', ')
+                SELECT STRING_AGG(dz.zona_nombre, ', ')
                 FROM (
-                  SELECT DISTINCT z2.nombre
+                  SELECT DISTINCT z2.nombre as zona_nombre
                   FROM usuarios j2
                   JOIN zonas z2 ON j2.zona_id = z2.id
                   WHERE j2.id IN (
@@ -33,7 +33,7 @@ const getUsuarios = async () => {
                       WHERE ug.gerencia_id = u.id AND usr.permisos = 'gerencia'
                     )
                   )
-                ) as DistinctZonas
+                ) as dz
               )
              WHEN u.permisos = 'ejecutiva' THEN zj.nombre
              ELSE z.nombre
@@ -47,6 +47,7 @@ const getUsuarios = async () => {
   `);
   return result.recordset;
 };
+
 
 const countUsuariosByCorreoOrNombre = async (correo, nombre, excludeId = null) => {
   const pool = await poolPromise;

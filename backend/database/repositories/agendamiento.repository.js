@@ -36,13 +36,13 @@ const upsertTeamsEventoQuery = async (data) => {
       UPDATE teams_eventos SET
         empresa_id = @empresa_id, asunto = @asunto, fecha = @fecha, hora = @hora,
         hora_fin = @hora_fin, estado = 'agendada', es_online = @es_online,
-        asistentes = @asistentes, join_url = @join_url, ultima_sync = GETDATE()
+        asistentes = @asistentes, join_url = @join_url, ultima_sync = GETUTCDATE()
       WHERE event_id = @event_id
     END
     ELSE
     BEGIN
       INSERT INTO teams_eventos (event_id, usuario_id, empresa_id, asunto, fecha, hora, hora_fin, estado, es_online, asistentes, join_url, ultima_sync)
-      VALUES (@event_id, @usuario_id, @empresa_id, @asunto, @fecha, @hora, @hora_fin, 'agendada', @es_online, @asistentes, @join_url, GETDATE())
+      VALUES (@event_id, @usuario_id, @empresa_id, @asunto, @fecha, @hora, @hora_fin, 'agendada', @es_online, @asistentes, @join_url, GETUTCDATE())
     END
   `);
 };
@@ -165,7 +165,7 @@ const updateUsuarioSyncToken = async (usuarioId, token) => {
   const result = await pool.request()
     .input('id', sql.Int, usuarioId)
     .input('token', sql.VarChar, token)
-    .query("UPDATE usuarios SET sync_delta_token = @token, ultima_sincronizacion = GETDATE() WHERE id = @id");
+    .query("UPDATE usuarios SET sync_delta_token = @token, ultima_sincronizacion = GETUTCDATE() WHERE id = @id");
   return result.rowsAffected[0];
 };
 
@@ -205,7 +205,7 @@ const insertTeamsEventoFull = async (data) => {
   const pool = await poolPromise;
   const keys = Object.keys(data);
   const values = Object.values(data);
-  let q = `INSERT INTO teams_eventos (${keys.join(', ')}, ultima_sync) VALUES (${keys.map((_, i) => `@p${i}`).join(', ')}, GETDATE())`;
+  let q = `INSERT INTO teams_eventos (${keys.join(', ')}, ultima_sync) VALUES (${keys.map((_, i) => `@p${i}`).join(', ')}, GETUTCDATE())`;
   const req = pool.request();
   values.forEach((v, i) => req.input(`p${i}`, v));
   const result = await req.query(q);
@@ -216,7 +216,7 @@ const updateTeamsEventoFull = async (id, data) => {
   const pool = await poolPromise;
   const keys = Object.keys(data);
   if (keys.length === 0) return 0;
-  let q = `UPDATE teams_eventos SET ${keys.map((k, i) => `${k} = @p${i}`).join(', ')}, ultima_sync = GETDATE() WHERE id = @id`;
+  let q = `UPDATE teams_eventos SET ${keys.map((k, i) => `${k} = @p${i}`).join(', ')}, ultima_sync = GETUTCDATE() WHERE id = @id`;
   const req = pool.request().input('id', sql.Int, id);
   Object.values(data).forEach((v, i) => req.input(`p${i}`, v));
   const result = await req.query(q);
@@ -400,6 +400,14 @@ const updateEmpresaFechaConcretada = async (id, fecha) => {
   return result.rowsAffected[0];
 };
 
+const findContactEmpresaByEmail = async (email) => {
+  const pool = await poolPromise;
+  const result = await pool.request()
+    .input('correo', sql.VarChar, email)
+    .query("SELECT TOP 1 empresa_id FROM empresa_contactos WHERE correo = @correo");
+  return result.recordset[0] || null;
+};
+
 module.exports = {
   getUsuarioNombreByCorreo,
   getContactoNombreByCorreo,
@@ -436,5 +444,6 @@ module.exports = {
   deleteEmpresaSeguimientoLog,
   getDebugData,
   getEmpresaSeguimientoLogConcretada,
-  updateEmpresaFechaConcretada
+  updateEmpresaFechaConcretada,
+  findContactEmpresaByEmail
 };

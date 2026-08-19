@@ -64,9 +64,9 @@ const BASE_REUNION_SQL = `
         END                             AS estado_envio,
 
         te.estado                       AS te_estado,
-        (COALESCE(te.empresa_id, 0) = 0 AND te.estado != 'excluida') AS is_huerfana,
-        (m.id IS NOT NULL)              AS tiene_minuta,
-        (COALESCE(te.empresa_id, 0) != 0)     AS tiene_empresa
+        CASE WHEN COALESCE(te.empresa_id, 0) = 0 AND te.estado != 'excluida' THEN 1 ELSE 0 END AS is_huerfana,
+        CASE WHEN m.id IS NOT NULL THEN 1 ELSE 0 END AS tiene_minuta,
+        CASE WHEN COALESCE(te.empresa_id, 0) != 0 THEN 1 ELSE 0 END AS tiene_empresa
 
     FROM teams_eventos te
     LEFT JOIN empresas emp ON te.empresa_id = emp.id
@@ -128,7 +128,7 @@ const BASE_MINUTA_STANDALONE_SQL = `
         'borrador'                      AS te_estado,
         0                               AS is_huerfana,
         1                               AS tiene_minuta,
-        (COALESCE(m.empresa_id, 0) != 0)      AS tiene_empresa
+        CASE WHEN COALESCE(m.empresa_id, 0) != 0 THEN 1 ELSE 0 END AS tiene_empresa
 
     FROM minutas m
     LEFT JOIN empresas emp ON m.empresa_id = emp.id

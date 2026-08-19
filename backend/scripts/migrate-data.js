@@ -149,6 +149,14 @@ async function runMigration() {
     let validEmpresaIds = [];
     let userRelationsToRestore = [];
 
+    console.log('\n🔓 Deshabilitando temporalmente restricciones de llaves foráneas para poder limpiar tablas...');
+    const allTables = await dbSql('information_schema.tables').select('table_name').where('table_type', 'BASE TABLE');
+    for (const row of allTables) {
+        if (row.table_name !== 'sysdiagrams') {
+            await dbSql.raw(`ALTER TABLE [${row.table_name}] NOCHECK CONSTRAINT ALL`);
+        }
+    }
+
     for (const table of tablesToMigrate) {
       console.log(`\n⏳ Migrando tabla: ${table.name}...`);
       
@@ -221,7 +229,13 @@ async function runMigration() {
           if (newRow.hasOwnProperty('ejecutiva_id') && (!newRow.ejecutiva_id || !validUserIds.includes(newRow.ejecutiva_id))) newRow.ejecutiva_id = defaultUserId;
 
           const defaultEmpresaId = validEmpresaIds[0] || 1;
-          if (newRow.hasOwnProperty('empresa_id') && (!newRow.empresa_id || !validEmpresaIds.includes(newRow.empresa_id))) newRow.empresa_id = defaultEmpresaId;
+          if (newRow.hasOwnProperty('empresa_id')) {
+             if (table.name === 'teams_eventos' && (newRow.empresa_id === null || newRow.empresa_id === '')) {
+                newRow.empresa_id = null; // Let it be null for orphan meetings
+             } else if (!newRow.empresa_id || !validEmpresaIds.includes(newRow.empresa_id)) {
+                newRow.empresa_id = defaultEmpresaId;
+             }
+          }
         }
 
         // Fix missing required columns for minutas
@@ -281,6 +295,13 @@ async function runMigration() {
         }
       }
       console.log(`✅ Restauración de relaciones de usuarios completada.`);
+    }
+
+    console.log('\n🔒 Restaurando restricciones de llaves foráneas...');
+    for (const row of allTables) {
+        if (row.table_name !== 'sysdiagrams') {
+            await dbSql.raw(`ALTER TABLE [${row.table_name}] WITH CHECK CHECK CONSTRAINT ALL`);
+        }
     }
 
     console.log('\n🎉 ¡Migración de datos completada exitosamente!');

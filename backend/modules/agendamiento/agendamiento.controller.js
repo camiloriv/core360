@@ -440,7 +440,8 @@ const syncEventosPasados = async (req, res) => {
             if (!response.ok) {
                 const errText = await response.text();
                 console.error(`Error Graph API (${response.status}):`, errText);
-                if (response.status === 410) {
+                if (response.status === 410 || response.status === 405) {
+                    console.log(`⚠️ Delta token inválido para ${usuarioCorreo}, reseteando para sync completa...`);
                     await agendamientoRepository.updateUsuarioSyncToken(usuarioId, null);
                 }
                 if (!res.headersSent) {
@@ -563,7 +564,7 @@ const syncEventosPasados = async (req, res) => {
                     for (const email of emails) {
                         if (!email.endsWith('@proforma.cl')) {
                             // Find any contact with this email globally
-                            const contactMatch = await agendamientoRepository.knex('empresa_contactos').select('empresa_id').where('correo', email).first();
+                            const contactMatch = await agendamientoRepository.findContactEmpresaByEmail(email);
                             if (contactMatch) {
                                 matchedEmpresaId = contactMatch.empresa_id;
                                 break;

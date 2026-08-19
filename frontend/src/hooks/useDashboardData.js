@@ -1,18 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 
-// Cache global en memoria para evitar llamadas redundantes
+// Cache global en memoria con TTL para evitar llamadas redundantes
+// pero asegurar datos frescos después de 5 minutos
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 let globalCache = null;
+let cacheTimestamp = 0;
 let fetchPromise = null;
+
+const isCacheValid = () => {
+  return globalCache !== null && (Date.now() - cacheTimestamp) < CACHE_TTL_MS;
+};
 
 export const clearDashboardCache = () => {
   globalCache = null;
+  cacheTimestamp = 0;
   fetchPromise = null;
 };
 
 export const useDashboardData = (forceRefresh = false) => {
   const [data, setData] = useState(globalCache || { jefaturas: [], empresas: [], reuniones: [], usuarios: [] });
-  const [loading, setLoading] = useState(!globalCache || forceRefresh);
+  const [loading, setLoading] = useState(!isCacheValid() || forceRefresh);
   const [error, setError] = useState(null);
 
   const userString = localStorage.getItem("usuario") || "null";
@@ -24,8 +32,8 @@ export const useDashboardData = (forceRefresh = false) => {
       return;
     }
 
-    // Si ya tenemos cache y no forzamos refresco, usamos el cache.
-    if (globalCache && !ignoreCache && !forceRefresh) {
+    // Si el cache es válido (no expirado) y no forzamos refresco, usamos el cache.
+    if (isCacheValid() && !ignoreCache && !forceRefresh) {
       setData(globalCache);
       setLoading(false);
       return;
@@ -103,6 +111,7 @@ export const useDashboardData = (forceRefresh = false) => {
         };
 
         globalCache = newData;
+        cacheTimestamp = Date.now();
         return newData;
       } catch (err) {
         console.error("Error en useDashboardData:", err);

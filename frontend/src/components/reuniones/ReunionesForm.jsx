@@ -31,8 +31,7 @@ function ReunionesForm({ onSuccess }) {
   const { empresas, setEmpresas, fetchEmpresas, templates, destinatarios, ejecutivas, tiposReunion } =
     useReunionesData(user, form.empresa_id);
 
-  // Para no-admin: inicializar ejecutiva_id y enviado_por desde el usuario logueado
-  // Excepción: "gerencia" debe seleccionar ejecutiva, así que no autocompletamos su ejecutiva_id ni jefatura_id
+  // Para todos: inicializar ejecutiva_id y enviado_por desde el usuario logueado
   useEffect(() => {
     if (!form.enviado_por_correo) {
       setField("enviado_por_correo", user.correo);
@@ -41,46 +40,33 @@ function ReunionesForm({ onSuccess }) {
       setField("enviado_por_id", user.id);
     }
     
-    if ((user.permisos && user.permisos !== "admin" && user.permisos !== "gerencia" && user.permisos !== "jefatura") && !user.nombre?.toLowerCase().includes("lilian")) {
-      // Ejecutiva: su propia ID como ejecutiva, y su jefatura
-      if (!form.jefatura_id) {
-        setField("jefatura_id", user.jefatura_id || user.id);
-      }
-      if (!form.ejecutiva_id) {
-        setField("ejecutiva_id", user.id);
-      }
-      if (!form.enviado_por) {
-        setField("enviado_por", user.nombre);
-      }
-    } else if ((user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") && !form.enviado_por) {
+    if (!form.ejecutiva_id) {
+      setField("ejecutiva_id", user.id);
+    }
+    if (!form.enviado_por) {
       setField("enviado_por", user.nombre);
+    }
+
+    if (!form.jefatura_id && user.permisos !== "admin" && user.permisos !== "gerencia") {
+        setField("jefatura_id", user.jefatura_id || user.id);
     }
   }, [user.permisos, user.id, user.jefatura_id, user.nombre, user.correo, form.ejecutiva_id, form.jefatura_id, form.enviado_por, form.enviado_por_correo]);
 
-  // Resetear ejecutiva y CC cuando cambia de empresa
+  // Resetear CC cuando cambia de empresa, pero NO resetear la ejecutiva (siempre es el logueado por defecto)
   useEffect(() => {
     setField("correos_cc", "");
     if (user.permisos === "admin" || user.permisos === "gerencia" || user.permisos === "jefatura") {
-      setField("ejecutiva_id", "");
       setField("jefatura_id", "");
     }
-  }, [form.empresa_id]);
+  }, [form.empresa_id, user.permisos]);
 
-  // Auto-asignar jefatura y ejecutiva cuando se cargan los usuarios de la empresa
+  // Auto-asignar jefatura cuando se cargan los usuarios de la empresa
   useEffect(() => {
     if (form.empresa_id && ejecutivas.length > 0 && user.permisos !== "admin") {
       const jefa = ejecutivas.find(u => u.permisos === 'jefatura');
-      if (jefa) setField("jefatura_id", jefa.id);
-
-      // Solo auto-asignar ejecutiva si el usuario logueado ES ejecutiva.
-      // Si es jefatura/gerencia, debe seleccionarla manualmente para no 
-      // pisar la autoría de la minuta con la primera ejecutiva del listado.
-      if (user.permisos === 'ejecutiva') {
-        const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
-        if (ejec) setField("ejecutiva_id", ejec.id);
-      }
+      if (jefa && !form.jefatura_id) setField("jefatura_id", jefa.id);
     }
-  }, [ejecutivas, form.empresa_id, user.permisos]);
+  }, [ejecutivas, form.empresa_id, user.permisos, form.jefatura_id]);
 
   // Si cambia de ejecutiva, recargar el CC correspondiente
   useEffect(() => {

@@ -72,9 +72,13 @@ function ReunionesForm({ onSuccess }) {
       const jefa = ejecutivas.find(u => u.permisos === 'jefatura');
       if (jefa) setField("jefatura_id", jefa.id);
 
-      // Auto-asignar la primera ejecutiva del equipo de la empresa
-      const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
-      if (ejec) setField("ejecutiva_id", ejec.id);
+      // Solo auto-asignar ejecutiva si el usuario logueado ES ejecutiva.
+      // Si es jefatura/gerencia, debe seleccionarla manualmente para no 
+      // pisar la autoría de la minuta con la primera ejecutiva del listado.
+      if (user.permisos === 'ejecutiva') {
+        const ejec = ejecutivas.find(u => u.permisos === 'ejecutiva');
+        if (ejec) setField("ejecutiva_id", ejec.id);
+      }
     }
   }, [ejecutivas, form.empresa_id, user.permisos]);
 

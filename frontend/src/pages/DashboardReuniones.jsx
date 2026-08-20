@@ -912,6 +912,10 @@ export default function DashboardReuniones() {
       const isFuture = meetingDate >= today;
       const isStrictlyFuture = meetingDate > today;
 
+      // Una reunión es "próxima" si es en el futuro y no está enviada ni pasada, 
+      // o si explícitamente su estado de envío es "agendada".
+      const isUpcoming = (isFuture && r.estado_envio !== "enviado" && r.estado_teams !== "pasada") || r.estado_envio === "agendada";
+
       // Tab filters logic
       if (activeTab === "internas" || activeTab === "proforma") {
         if (!isProforma) return false;
@@ -920,12 +924,10 @@ export default function DashboardReuniones() {
       }
       if (activeTab === "clientes") {
         if (isProforma || isExcluida) return false;
-        const isUpcoming = isFuture && r.estado_envio !== "enviado";
         if (isUpcoming || r.estado_envio === "cancelada") return false;
       }
       if (activeTab === "proximas") {
         if (isExcluida) return false;
-        const isUpcoming = (isFuture && r.estado_envio !== "enviado") || r.estado_envio === "agendada";
         if (!isUpcoming) return false;
       }
       if (activeTab === "excluidas") {
@@ -934,7 +936,6 @@ export default function DashboardReuniones() {
       if (activeTab === "todas") {
         // Todas las reuniones pasadas: clientes + proforma + excluidas, sin próximas ni canceladas
         if (r.estado_envio === "cancelada") return false;
-        const isUpcoming = isFuture && r.estado_envio !== "enviado" && r.estado_envio !== "agendada";
         if (isUpcoming) return false;
       }
 

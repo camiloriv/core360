@@ -52,7 +52,11 @@ function inlinearEstilosTabla(html) {
     .replace(/<table([^>]*)>/gi, (match, attrs) => {
       if (attrs.includes('class="email-structure"')) return match;
       if (attrs.includes('style="')) {
-        return `<table${attrs.replace('style="', 'style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc; ')}>`;
+        const newAttrs = attrs.replace(/style="([^"]*)"/i, (m, styleContent) => {
+          const noWidth = styleContent.replace(/(^|[^\w-])width\s*:\s*[^;"]+;?/gi, '$1');
+          return `style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc; ${noWidth}"`;
+        });
+        return `<table${newAttrs}>`;
       }
       return `<table${attrs} style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc;">`;
     })

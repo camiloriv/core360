@@ -613,31 +613,59 @@ exports.crearReunion = async (req, res) => {
             );
         }
 
-        // Auto-aprendizaje de dominios/contactos
-        if (enviado_a) {
-            try {
-                let correos = [];
+        // Auto-aprendizaje de dominios/contactos (para autocompletado global y vinculación)
+        try {
+            const correosRaw = [];
+            
+            // Extraer correos de 'enviado_a'
+            if (enviado_a) {
                 if (typeof enviado_a === 'string') {
-                    correos = enviado_a.startsWith('[') ? JSON.parse(enviado_a) : enviado_a.split(',').map(e => e.trim());
+                    const parsed = enviado_a.startsWith('[') ? JSON.parse(enviado_a) : enviado_a.split(',');
+                    parsed.forEach(e => correosRaw.push(e));
                 } else if (Array.isArray(enviado_a)) {
-                    correos = enviado_a;
+                    enviado_a.forEach(e => correosRaw.push(e));
                 }
+            }
+            
+            // Extraer correos de 'correos_cc'
+            const correos_cc = req.body.correos_cc;
+            if (correos_cc) {
+                if (typeof correos_cc === 'string') {
+                    const parsed = correos_cc.startsWith('[') ? JSON.parse(correos_cc) : correos_cc.split(',');
+                    parsed.forEach(e => correosRaw.push(e));
+                } else if (Array.isArray(correos_cc)) {
+                    correos_cc.forEach(e => correosRaw.push(e));
+                }
+            }
 
-                const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'proforma.cl', 'live.com', 'icloud.com'];
+            const dominiosGenericos = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'live.com', 'icloud.com'];
+            const dominiosProforma = ['proforma.cl', 'agoraspro.cl', 'oticproforma.cl'];
 
-                for (const correo of correos) {
-                    if (correo && correo.includes('@') && empresa_id) {
-                        const dominio = '@' + correo.split('@')[1].toLowerCase();
-                        const domSinArroba = dominio.substring(1);
+            for (let correo of correosRaw) {
+                if (typeof correo !== 'string') continue;
+                correo = correo.trim().toLowerCase();
+                
+                if (correo && correo.includes('@')) {
+                    const domSinArroba = correo.split('@')[1];
+                    const dominio = '@' + domSinArroba;
+                    
+                    // Si es dominio proforma, se guarda en la empresa Proforma (ID 503)
+                    if (dominiosProforma.includes(domSinArroba)) {
+                        await db.query("INSERT IGNORE INTO empresa_contactos (empresa_id, correo) VALUES (503, ?)", [correo]);
+                    } 
+                    // Si es otro dominio, se guarda en la empresa de la minuta (si existe)
+                    else if (empresa_id) {
+                        await db.query("INSERT IGNORE INTO empresa_contactos (empresa_id, correo) VALUES (?, ?)", [empresa_id, correo]);
+                        
+                        // Vincular el dominio a la empresa si no es genérico
                         if (!dominiosGenericos.includes(domSinArroba)) {
                             await db.query("INSERT IGNORE INTO empresa_dominios (empresa_id, dominio) VALUES (?, ?)", [empresa_id, dominio]);
-                            await db.query("INSERT IGNORE INTO empresa_contactos (empresa_id, correo) VALUES (?, ?)", [empresa_id, correo.toLowerCase()]);
                         }
                     }
                 }
-            } catch (errDom) {
-                console.error("Error aprendiendo dominios:", errDom);
             }
+        } catch (errDom) {
+            console.error("Error aprendiendo dominios y contactos:", errDom);
         }
 
         // Enviar correo
@@ -822,9 +850,9 @@ exports.obtenerDestinatarios = async (req, res) => {
     try {
         const uniqueEmails = new Set();
 
-        // 1. Contactos de la empresa
+        // 1. Contactos de la empresa seleccionada y empresa Proforma (ID 503)
         const [contactos] = await db.query(
-            "SELECT correo, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo IS NOT NULL AND correo != ''",
+            "SELECT correo, nombre FROM empresa_contactos WHERE (empresa_id = ? OR empresa_id = 503) AND correo IS NOT NULL AND correo != ''",
             [empresa_id]
         );
         contactos.forEach(c => {
@@ -832,40 +860,13 @@ exports.obtenerDestinatarios = async (req, res) => {
             uniqueEmails.add(display);
         });
 
-        // 2. Todos los usuarios internos (proforma)
+        // 2. Todos los usuarios internos del sistema (proforma)
         const [usuarios] = await db.query(
             "SELECT correo, nombre FROM usuarios WHERE correo IS NOT NULL AND correo != ''"
         );
         usuarios.forEach(u => {
             const display = u.nombre ? `${u.nombre.trim()} <${u.correo.trim().toLowerCase()}>` : u.correo.trim().toLowerCase();
             uniqueEmails.add(display);
-        });
-
-        // 3. Historial global de correos en minutas (enviado_a y correos_cc)
-        const [minutas] = await db.query(
-            "SELECT enviado_a, correos_cc FROM minutas_reuniones ORDER BY id DESC LIMIT 1000"
-        );
-        minutas.forEach(m => {
-            if (m.enviado_a) {
-                let emails = [];
-                try {
-                    emails = m.enviado_a.startsWith('[') ? JSON.parse(m.enviado_a) : m.enviado_a.split(',');
-                } catch(e) { emails = m.enviado_a.split(','); }
-                emails.forEach(e => {
-                    const mail = typeof e === 'string' ? e.trim() : '';
-                    if (mail) uniqueEmails.add(mail);
-                });
-            }
-            if (m.correos_cc) {
-                let emails = [];
-                try {
-                    emails = m.correos_cc.startsWith('[') ? JSON.parse(m.correos_cc) : m.correos_cc.split(',');
-                } catch(e) { emails = m.correos_cc.split(','); }
-                emails.forEach(e => {
-                    const mail = typeof e === 'string' ? e.trim() : '';
-                    if (mail) uniqueEmails.add(mail);
-                });
-            }
         });
 
         // Retornar arreglo ordenado alfabéticamente

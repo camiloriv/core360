@@ -44,6 +44,20 @@ const aplicarRedirect = (to, ccOrBcc, subject, type = "cc") => {
 };
 
 // ============================================================
+// HELPERS FORMATO DE CORREO
+// ============================================================
+function inlinearEstilosTabla(html) {
+  if (!html) return "";
+  return html
+    .replace(/<table(?![^>]*class="email-structure")/gi, 
+      '<table style="border-collapse: collapse; border: 1px solid #cccccc;"')
+    .replace(/<td(?![^>]*style)/gi, 
+      '<td style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle;"')
+    .replace(/<th(?![^>]*style)/gi, 
+      '<th style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold;"');
+}
+
+// ============================================================
 // ENVIAR CORREO DE MINUTA
 // ============================================================
 const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail }) => {
@@ -83,7 +97,7 @@ const enviarCorreo = async ({ to, cc, subject, data, attachments = [], userEmail
       .replace(/{{documentos_adjuntos}}/g, data.documentos_adjuntos || "")
       .replace(/{{texto_previo}}/g, (data.texto_previo ? data.texto_previo : defaultTextoPrevio).replace(/\n/g, '<br>'))
       .replace(/{{link_video_section}}/g, videoHtml)
-      .replace(/{{minuta}}/g, data.minuta || "");
+      .replace(/{{minuta}}/g, inlinearEstilosTabla(data.minuta || ""));
 
     const baseAttachments = [
       { filename: "banner-header.png", path: path.join(__dirname, "../../assets/images/banner-header.png"), cid: "banner-header" },

@@ -63,27 +63,63 @@ const FontSize = Extension.create({
   },
 });
 
+const extraCellAttributes = {
+  backgroundColor: {
+    default: null,
+    parseHTML: element => element.style.backgroundColor || element.getAttribute('bgcolor') || element.getAttribute('data-bg') || null,
+    renderHTML: attributes => {
+      if (!attributes.backgroundColor) return {}
+      return { style: `background-color: ${attributes.backgroundColor}`, 'data-bg': attributes.backgroundColor }
+    },
+  },
+  verticalAlign: {
+    default: 'middle',
+    parseHTML: element => element.style.verticalAlign || 'middle',
+    renderHTML: attributes => {
+      if (!attributes.verticalAlign) return { style: 'vertical-align: middle' }
+      return { style: `vertical-align: ${attributes.verticalAlign}` }
+    },
+  },
+  border: {
+    default: null,
+    parseHTML: element => element.style.border || element.style.borderTop || element.style.borderBottom || element.style.borderLeft || element.style.borderRight || null,
+    renderHTML: attributes => {
+      if (!attributes.border) return {}
+      return { style: `border: ${attributes.border}` }
+    },
+  },
+  width: {
+    default: null,
+    parseHTML: element => element.style.width || element.getAttribute('width') || null,
+    renderHTML: attributes => {
+      if (!attributes.width) return {}
+      return { style: `width: ${attributes.width}` }
+    },
+  },
+  color: {
+    default: null,
+    parseHTML: element => element.style.color || null,
+    renderHTML: attributes => {
+      if (!attributes.color) return {}
+      return { style: `color: ${attributes.color}` }
+    },
+  },
+  fontWeight: {
+    default: null,
+    parseHTML: element => element.style.fontWeight || (element.querySelector('b, strong') ? 'bold' : null) || null,
+    renderHTML: attributes => {
+      if (!attributes.fontWeight) return {}
+      return { style: `font-weight: ${attributes.fontWeight}` }
+    },
+  },
+};
+
 // Extendemos TableCell y TableHeader para soportar el color de fondo de Excel y alineación vertical
 const CustomTableCell = TableCell.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: element => element.style.backgroundColor || element.getAttribute('bgcolor') || element.getAttribute('data-bg') || null,
-        renderHTML: attributes => {
-          if (!attributes.backgroundColor) return {}
-          return { style: `background-color: ${attributes.backgroundColor}`, 'data-bg': attributes.backgroundColor }
-        },
-      },
-      verticalAlign: {
-        default: 'middle',
-        parseHTML: element => element.style.verticalAlign || 'middle',
-        renderHTML: attributes => {
-          if (!attributes.verticalAlign) return { style: 'vertical-align: middle' }
-          return { style: `vertical-align: ${attributes.verticalAlign}` }
-        },
-      },
+      ...extraCellAttributes
     }
   },
 });
@@ -92,22 +128,7 @@ const CustomTableHeader = TableHeader.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: element => element.style.backgroundColor || element.getAttribute('bgcolor') || element.getAttribute('data-bg') || null,
-        renderHTML: attributes => {
-          if (!attributes.backgroundColor) return {}
-          return { style: `background-color: ${attributes.backgroundColor}`, 'data-bg': attributes.backgroundColor }
-        },
-      },
-      verticalAlign: {
-        default: 'middle',
-        parseHTML: element => element.style.verticalAlign || 'middle',
-        renderHTML: attributes => {
-          if (!attributes.verticalAlign) return { style: 'vertical-align: middle' }
-          return { style: `vertical-align: ${attributes.verticalAlign}` }
-        },
-      },
+      ...extraCellAttributes
     }
   },
 });
@@ -722,6 +743,32 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
     ],
     content: initialContent || "",
     editorProps: {
+      transformPastedHTML(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const colWidths = [];
+        doc.querySelectorAll('col').forEach(col => {
+          colWidths.push(col.getAttribute('width') || col.style.width || null);
+        });
+        doc.querySelectorAll('tr').forEach(tr => {
+          Array.from(tr.cells).forEach((cell, i) => {
+            if (colWidths[i] && !cell.style.width) {
+              cell.style.width = colWidths[i].includes('px') || colWidths[i].includes('%') ? colWidths[i] : colWidths[i] + 'px';
+            }
+          });
+        });
+        doc.querySelectorAll('*').forEach(el => {
+          Array.from(el.attributes).forEach(attr => {
+            if (attr.name.startsWith('x:') || attr.name.startsWith('xmlns') || attr.name.startsWith('v:')) {
+              el.removeAttribute(attr.name);
+            }
+          });
+          if (el.className && typeof el.className === 'string' && (el.className.includes('xl') || el.className.includes('mso'))) {
+            el.className = '';
+          }
+        });
+        return doc.body.innerHTML;
+      },
       attributes: {
         spellcheck: 'true',
         autocorrect: 'on',
@@ -813,6 +860,32 @@ function MinutaEditor({ form, setForm, fieldName = "minuta", label = "Editor de 
     content: form[fieldName] || "",
     onUpdate: ({ editor }) => { setForm(fieldName, editor.getHTML()); },
     editorProps: {
+      transformPastedHTML(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const colWidths = [];
+        doc.querySelectorAll('col').forEach(col => {
+          colWidths.push(col.getAttribute('width') || col.style.width || null);
+        });
+        doc.querySelectorAll('tr').forEach(tr => {
+          Array.from(tr.cells).forEach((cell, i) => {
+            if (colWidths[i] && !cell.style.width) {
+              cell.style.width = colWidths[i].includes('px') || colWidths[i].includes('%') ? colWidths[i] : colWidths[i] + 'px';
+            }
+          });
+        });
+        doc.querySelectorAll('*').forEach(el => {
+          Array.from(el.attributes).forEach(attr => {
+            if (attr.name.startsWith('x:') || attr.name.startsWith('xmlns') || attr.name.startsWith('v:')) {
+              el.removeAttribute(attr.name);
+            }
+          });
+          if (el.className && typeof el.className === 'string' && (el.className.includes('xl') || el.className.includes('mso'))) {
+            el.className = '';
+          }
+        });
+        return doc.body.innerHTML;
+      },
       attributes: {
         spellcheck: 'true',
         autocorrect: 'on',

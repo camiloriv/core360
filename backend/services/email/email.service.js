@@ -54,11 +54,11 @@ function inlinearEstilosTabla(html) {
       if (attrs.includes('style="')) {
         const newAttrs = attrs.replace(/style="([^"]*)"/i, (m, styleContent) => {
           const noWidth = styleContent.replace(/(^|[^\w-])width\s*:\s*[^;"]+;?/gi, '$1');
-          return `style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc; ${noWidth}"`;
+          return `style="border-collapse: collapse; border: 1px solid #cccccc; ${noWidth}"`;
         });
         return `<table${newAttrs}>`;
       }
-      return `<table${attrs} style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc;">`;
+      return `<table${attrs} style="border-collapse: collapse; border: 1px solid #cccccc;">`;
     })
     .replace(/<td([^>]*)>(.*?)<\/td>/gis, (match, attrs, content) => {
       let newContent = content.replace(/<p([^>]*)>/gi, (pMatch, pAttrs) => {
@@ -68,7 +68,11 @@ function inlinearEstilosTabla(html) {
         return `<p${pAttrs} style="margin: 0;">`;
       });
       if (attrs.includes('style="')) {
-        return `<td${attrs.replace('style="', 'style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; ')}>${newContent}</td>`;
+        const newAttrs = attrs.replace(/style="([^"]*)"/i, (m, styleContent) => {
+          const noWidth = styleContent.replace(/(^|[^\w-])width\s*:\s*[^;"]+;?/gi, '$1');
+          return `style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; ${noWidth}"`;
+        });
+        return `<td${newAttrs}>${newContent}</td>`;
       }
       return `<td${attrs} style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle;">${newContent}</td>`;
     })
@@ -80,7 +84,11 @@ function inlinearEstilosTabla(html) {
         return `<p${pAttrs} style="margin: 0;">`;
       });
       if (attrs.includes('style="')) {
-        return `<th${attrs.replace('style="', 'style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold; ')}>${newContent}</th>`;
+        const newAttrs = attrs.replace(/style="([^"]*)"/i, (m, styleContent) => {
+          const noWidth = styleContent.replace(/(^|[^\w-])width\s*:\s*[^;"]+;?/gi, '$1');
+          return `style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold; ${noWidth}"`;
+        });
+        return `<th${newAttrs}>${newContent}</th>`;
       }
       return `<th${attrs} style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold;">${newContent}</th>`;
     });

@@ -66,7 +66,7 @@ const FontSize = Extension.create({
 const extraCellAttributes = {
   backgroundColor: {
     default: null,
-    parseHTML: element => element.style.backgroundColor || element.getAttribute('bgcolor') || element.getAttribute('data-bg') || null,
+    parseHTML: element => element.style.backgroundColor || element.style.background || element.getAttribute('bgcolor') || element.getAttribute('data-bg') || null,
     renderHTML: attributes => {
       if (!attributes.backgroundColor) return {}
       return { style: `background-color: ${attributes.backgroundColor}`, 'data-bg': attributes.backgroundColor }
@@ -112,6 +112,60 @@ const extraCellAttributes = {
       return { style: `font-weight: ${attributes.fontWeight}` }
     },
   },
+};
+
+const transformExcelHTML = (html) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // 1. Inlinear estilos CSS definidos en etiquetas <style> de Excel
+  const styleEl = doc.querySelector('style');
+  if (styleEl) {
+    const styleContent = styleEl.innerHTML;
+    const styleRegex = /\.([a-zA-Z0-9_-]+)\s*\{([^}]+)\}/g;
+    let match;
+    const stylesMap = {};
+    while ((match = styleRegex.exec(styleContent)) !== null) {
+      stylesMap[match[1]] = match[2];
+    }
+    doc.querySelectorAll('*').forEach(el => {
+      if (el.className && typeof el.className === 'string') {
+        const classes = el.className.split(/\s+/);
+        classes.forEach(cls => {
+          if (stylesMap[cls]) {
+            el.style.cssText += ';' + stylesMap[cls];
+          }
+        });
+      }
+    });
+  }
+  
+  // 2. Extraer anchos de columnas
+  const colWidths = [];
+  doc.querySelectorAll('col').forEach(col => {
+    let w = col.getAttribute('width') || col.style.width;
+    if (w && !w.includes('px') && !w.includes('%') && !w.includes('pt')) w += 'px';
+    colWidths.push(w || null);
+  });
+  doc.querySelectorAll('tr').forEach(tr => {
+    Array.from(tr.cells).forEach((cell, i) => {
+      if (colWidths[i] && !cell.style.width) cell.style.width = colWidths[i];
+    });
+  });
+
+  // 3. Limpiar basura de Office
+  doc.querySelectorAll('*').forEach(el => {
+    Array.from(el.attributes).forEach(attr => {
+      if (attr.name.startsWith('x:') || attr.name.startsWith('xmlns') || attr.name.startsWith('v:')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+    if (el.className && typeof el.className === 'string' && (el.className.includes('xl') || el.className.includes('mso'))) {
+      el.className = '';
+    }
+  });
+
+  return doc.body.innerHTML;
 };
 
 // Extendemos TableCell y TableHeader para soportar el color de fondo de Excel y alineación vertical
@@ -743,32 +797,7 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
     ],
     content: initialContent || "",
     editorProps: {
-      transformPastedHTML(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const colWidths = [];
-        doc.querySelectorAll('col').forEach(col => {
-          colWidths.push(col.getAttribute('width') || col.style.width || null);
-        });
-        doc.querySelectorAll('tr').forEach(tr => {
-          Array.from(tr.cells).forEach((cell, i) => {
-            if (colWidths[i] && !cell.style.width) {
-              cell.style.width = colWidths[i].includes('px') || colWidths[i].includes('%') ? colWidths[i] : colWidths[i] + 'px';
-            }
-          });
-        });
-        doc.querySelectorAll('*').forEach(el => {
-          Array.from(el.attributes).forEach(attr => {
-            if (attr.name.startsWith('x:') || attr.name.startsWith('xmlns') || attr.name.startsWith('v:')) {
-              el.removeAttribute(attr.name);
-            }
-          });
-          if (el.className && typeof el.className === 'string' && (el.className.includes('xl') || el.className.includes('mso'))) {
-            el.className = '';
-          }
-        });
-        return doc.body.innerHTML;
-      },
+      transformPastedHTML: transformExcelHTML,
       attributes: {
         spellcheck: 'true',
         autocorrect: 'on',
@@ -860,32 +889,7 @@ function MinutaEditor({ form, setForm, fieldName = "minuta", label = "Editor de 
     content: form[fieldName] || "",
     onUpdate: ({ editor }) => { setForm(fieldName, editor.getHTML()); },
     editorProps: {
-      transformPastedHTML(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const colWidths = [];
-        doc.querySelectorAll('col').forEach(col => {
-          colWidths.push(col.getAttribute('width') || col.style.width || null);
-        });
-        doc.querySelectorAll('tr').forEach(tr => {
-          Array.from(tr.cells).forEach((cell, i) => {
-            if (colWidths[i] && !cell.style.width) {
-              cell.style.width = colWidths[i].includes('px') || colWidths[i].includes('%') ? colWidths[i] : colWidths[i] + 'px';
-            }
-          });
-        });
-        doc.querySelectorAll('*').forEach(el => {
-          Array.from(el.attributes).forEach(attr => {
-            if (attr.name.startsWith('x:') || attr.name.startsWith('xmlns') || attr.name.startsWith('v:')) {
-              el.removeAttribute(attr.name);
-            }
-          });
-          if (el.className && typeof el.className === 'string' && (el.className.includes('xl') || el.className.includes('mso'))) {
-            el.className = '';
-          }
-        });
-        return doc.body.innerHTML;
-      },
+      transformPastedHTML: transformExcelHTML,
       attributes: {
         spellcheck: 'true',
         autocorrect: 'on',

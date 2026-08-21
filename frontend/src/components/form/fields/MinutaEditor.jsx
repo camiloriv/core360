@@ -9,7 +9,8 @@ import { Color } from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { FontFamily } from "@tiptap/extension-font-family";
-import { Extension } from "@tiptap/core";
+import { Extension, wrappingInputRule } from "@tiptap/core";
+import { BulletList } from "@tiptap/extension-bullet-list";
 import Swal from "sweetalert2";
 import axios from "axios";
 
@@ -58,6 +59,31 @@ const FontSize = Extension.create({
       },
       unsetFontSize: () => ({ chain }) => {
         return chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run()
+      },
+    }
+  },
+});
+
+const CustomBulletList = BulletList.extend({
+  addInputRules() {
+    return [
+      wrappingInputRule({
+        find: /^\s*([*])\s$/,
+        type: this.type,
+      }),
+    ]
+  },
+});
+
+const TabHandler = Extension.create({
+  name: 'tabHandler',
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        if (this.editor.isActive('listItem')) {
+          return false; 
+        }
+        return this.editor.commands.insertContent('\u00A0\u00A0\u00A0\u00A0');
       },
     }
   },
@@ -784,7 +810,11 @@ const CustomTemplateModal = ({ initialName, initialContent, onSave, onClose }) =
   const [name, setName] = useState(initialName || "");
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+      }),
+      CustomBulletList,
+      TabHandler,
       Table.configure({ resizable: true }),
       TableRow,
       CustomTableHeader,
@@ -875,7 +905,11 @@ function MinutaEditor({ form, setForm, fieldName = "minuta", label = "Editor de 
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+      }),
+      CustomBulletList,
+      TabHandler,
       Table.configure({ resizable: true }),
       TableRow,
       CustomTableHeader,

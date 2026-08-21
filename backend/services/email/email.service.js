@@ -49,12 +49,37 @@ const aplicarRedirect = (to, ccOrBcc, subject, type = "cc") => {
 function inlinearEstilosTabla(html) {
   if (!html) return "";
   return html
-    .replace(/<table(?![^>]*class="email-structure")/gi, 
-      '<table style="border-collapse: collapse; border: 1px solid #cccccc;"')
-    .replace(/<td(?![^>]*style)/gi, 
-      '<td style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle;"')
-    .replace(/<th(?![^>]*style)/gi, 
-      '<th style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold;"');
+    .replace(/<table([^>]*)>/gi, (match, attrs) => {
+      if (attrs.includes('class="email-structure"')) return match;
+      if (attrs.includes('style="')) {
+        return `<table${attrs.replace('style="', 'style="border-collapse: collapse; border: 1px solid #cccccc; ')}>`;
+      }
+      return `<table${attrs} style="border-collapse: collapse; border: 1px solid #cccccc;">`;
+    })
+    .replace(/<td([^>]*)>(.*?)<\/td>/gis, (match, attrs, content) => {
+      let newContent = content.replace(/<p([^>]*)>/gi, (pMatch, pAttrs) => {
+        if (pAttrs.includes('style="')) {
+          return `<p${pAttrs.replace('style="', 'style="margin: 0; ')}>`;
+        }
+        return `<p${pAttrs} style="margin: 0;">`;
+      });
+      if (attrs.includes('style="')) {
+        return `<td${attrs.replace('style="', 'style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; ')}>${newContent}</td>`;
+      }
+      return `<td${attrs} style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle;">${newContent}</td>`;
+    })
+    .replace(/<th([^>]*)>(.*?)<\/th>/gis, (match, attrs, content) => {
+      let newContent = content.replace(/<p([^>]*)>/gi, (pMatch, pAttrs) => {
+        if (pAttrs.includes('style="')) {
+          return `<p${pAttrs.replace('style="', 'style="margin: 0; ')}>`;
+        }
+        return `<p${pAttrs} style="margin: 0;">`;
+      });
+      if (attrs.includes('style="')) {
+        return `<th${attrs.replace('style="', 'style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold; ')}>${newContent}</th>`;
+      }
+      return `<th${attrs} style="border: 1px solid #cccccc; padding: 4px 8px; vertical-align: middle; font-weight: bold;">${newContent}</th>`;
+    });
 }
 
 // ============================================================

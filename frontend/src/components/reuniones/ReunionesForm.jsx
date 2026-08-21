@@ -226,9 +226,16 @@ function ReunionesForm({ onSuccess }) {
 
   const isSinEmpresa = !!(form.id_reunion && !form.empresa_id);
 
+  const [submitAction, setSubmitAction] = useState(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const isDraftSubmit = e.target.elements.es_borrador_checkbox?.checked;
+    const isSoloGuardar = e.nativeEvent.submitter?.name === "solo_guardar";
+    
+    if (isSoloGuardar) setSubmitAction("guardar");
+    else if (isDraftSubmit) setSubmitAction("prueba");
+    else setSubmitAction("enviar");
 
     // 🔹 VALIDACIÓN DETALLADA
     const missingFields = [];
@@ -883,7 +890,7 @@ function ReunionesForm({ onSuccess }) {
             )}
           </div>
         </div>
-        <FormActions loading={loading} esRetroactiva={form.es_retroactiva} />
+        <FormActions loading={loading} esRetroactiva={form.es_retroactiva} submitAction={submitAction} />
       </form>
     </div>
   );

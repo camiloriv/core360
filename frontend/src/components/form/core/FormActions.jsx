@@ -1,4 +1,4 @@
-function FormActions({ loading, esRetroactiva }) {
+function FormActions({ loading, esRetroactiva, submitAction }) {
   if (esRetroactiva) {
     return (
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -17,6 +17,18 @@ function FormActions({ loading, esRetroactiva }) {
     );
   }
 
+  const getGuardarText = () => {
+    if (loading && submitAction === 'guardar') return "Guardando...";
+    return "Guardar Borrador";
+  };
+
+  const getEnviarText = () => {
+    if (!loading) return "Enviar";
+    if (submitAction === 'guardar') return "Guardando...";
+    if (submitAction === 'prueba') return "Guardando y enviando prueba...";
+    return "Enviando...";
+  };
+
   return (
     <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'flex-end', marginTop: '20px' }}>
       
@@ -29,7 +41,7 @@ function FormActions({ loading, esRetroactiva }) {
           style={{ padding: '10px 30px', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px', background: '#e2e8f0', color: '#334155', border: 'none', cursor: 'pointer', height: '44px', margin: 0 }}
           title="Guarda tu progreso sin enviar ningún correo"
         >
-          Guardar Borrador
+          {getGuardarText()}
         </button>
       </div>
 
@@ -41,7 +53,7 @@ function FormActions({ loading, esRetroactiva }) {
           disabled={loading}
           style={{ padding: '10px 30px', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px', height: '44px', width: '100%', margin: 0 }}
         >
-          {loading ? "Enviando..." : "Enviar"}
+          {getEnviarText()}
         </button>
         
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#64748b', fontSize: '12px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>

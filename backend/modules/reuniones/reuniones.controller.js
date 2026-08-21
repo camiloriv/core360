@@ -820,11 +820,51 @@ exports.obtenerDestinatarios = async (req, res) => {
     if (!empresa_id) return res.status(400).json({ error: "empresa_id es requerido" });
 
     try {
-        const [result] = await db.query(
-            "SELECT correo FROM empresa_contactos WHERE empresa_id = ? ORDER BY correo ASC",
+        const uniqueEmails = new Set();
+
+        // 1. Contactos de la empresa
+        const [contactos] = await db.query(
+            "SELECT correo FROM empresa_contactos WHERE empresa_id = ? AND correo IS NOT NULL AND correo != ''",
             [empresa_id]
         );
-        res.json(result.map(r => r.correo));
+        contactos.forEach(c => uniqueEmails.add(c.correo.trim().toLowerCase()));
+
+        // 2. Todos los usuarios internos (proforma)
+        const [usuarios] = await db.query(
+            "SELECT correo FROM usuarios WHERE correo IS NOT NULL AND correo != ''"
+        );
+        usuarios.forEach(u => uniqueEmails.add(u.correo.trim().toLowerCase()));
+
+        // 3. Historial global de correos en minutas (enviado_a y correos_cc)
+        const [minutas] = await db.query(
+            "SELECT enviado_a, correos_cc FROM minutas_reuniones ORDER BY id DESC LIMIT 1000"
+        );
+        minutas.forEach(m => {
+            if (m.enviado_a) {
+                let emails = [];
+                try {
+                    emails = m.enviado_a.startsWith('[') ? JSON.parse(m.enviado_a) : m.enviado_a.split(',');
+                } catch(e) { emails = m.enviado_a.split(','); }
+                emails.forEach(e => {
+                    const mail = typeof e === 'string' ? e.trim().toLowerCase() : '';
+                    if (mail) uniqueEmails.add(mail);
+                });
+            }
+            if (m.correos_cc) {
+                let emails = [];
+                try {
+                    emails = m.correos_cc.startsWith('[') ? JSON.parse(m.correos_cc) : m.correos_cc.split(',');
+                } catch(e) { emails = m.correos_cc.split(','); }
+                emails.forEach(e => {
+                    const mail = typeof e === 'string' ? e.trim().toLowerCase() : '';
+                    if (mail) uniqueEmails.add(mail);
+                });
+            }
+        });
+
+        // Retornar arreglo ordenado alfabéticamente
+        const sortedEmails = Array.from(uniqueEmails).sort();
+        res.json(sortedEmails);
     } catch (err) {
         console.error("Error en obtenerDestinatarios:", err);
         res.status(500).json({ error: "Error en la BD" });

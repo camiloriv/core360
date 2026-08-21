@@ -592,8 +592,9 @@ function ReunionesForm({ onSuccess }) {
             }
             full
           >
-            <input
+            <AutocompleteInput
               value={form.correos_cc || ""}
+              suggestions={destinatarios}
               onChange={(e) => setField("correos_cc", e.target.value)}
               placeholder="Ej: correo1@ejemplo.com, correo2@ejemplo.com"
             />

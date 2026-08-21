@@ -52,9 +52,9 @@ function inlinearEstilosTabla(html) {
     .replace(/<table([^>]*)>/gi, (match, attrs) => {
       if (attrs.includes('class="email-structure"')) return match;
       if (attrs.includes('style="')) {
-        return `<table${attrs.replace('style="', 'style="border-collapse: collapse; border: 1px solid #cccccc; ')}>`;
+        return `<table${attrs.replace('style="', 'style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc; ')}>`;
       }
-      return `<table${attrs} style="border-collapse: collapse; border: 1px solid #cccccc;">`;
+      return `<table${attrs} style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cccccc;">`;
     })
     .replace(/<td([^>]*)>(.*?)<\/td>/gis, (match, attrs, content) => {
       let newContent = content.replace(/<p([^>]*)>/gi, (pMatch, pAttrs) => {

@@ -824,16 +824,22 @@ exports.obtenerDestinatarios = async (req, res) => {
 
         // 1. Contactos de la empresa
         const [contactos] = await db.query(
-            "SELECT correo FROM empresa_contactos WHERE empresa_id = ? AND correo IS NOT NULL AND correo != ''",
+            "SELECT correo, nombre FROM empresa_contactos WHERE empresa_id = ? AND correo IS NOT NULL AND correo != ''",
             [empresa_id]
         );
-        contactos.forEach(c => uniqueEmails.add(c.correo.trim().toLowerCase()));
+        contactos.forEach(c => {
+            const display = c.nombre ? `${c.nombre.trim()} <${c.correo.trim().toLowerCase()}>` : c.correo.trim().toLowerCase();
+            uniqueEmails.add(display);
+        });
 
         // 2. Todos los usuarios internos (proforma)
         const [usuarios] = await db.query(
-            "SELECT correo FROM usuarios WHERE correo IS NOT NULL AND correo != ''"
+            "SELECT correo, nombre FROM usuarios WHERE correo IS NOT NULL AND correo != ''"
         );
-        usuarios.forEach(u => uniqueEmails.add(u.correo.trim().toLowerCase()));
+        usuarios.forEach(u => {
+            const display = u.nombre ? `${u.nombre.trim()} <${u.correo.trim().toLowerCase()}>` : u.correo.trim().toLowerCase();
+            uniqueEmails.add(display);
+        });
 
         // 3. Historial global de correos en minutas (enviado_a y correos_cc)
         const [minutas] = await db.query(
@@ -846,7 +852,7 @@ exports.obtenerDestinatarios = async (req, res) => {
                     emails = m.enviado_a.startsWith('[') ? JSON.parse(m.enviado_a) : m.enviado_a.split(',');
                 } catch(e) { emails = m.enviado_a.split(','); }
                 emails.forEach(e => {
-                    const mail = typeof e === 'string' ? e.trim().toLowerCase() : '';
+                    const mail = typeof e === 'string' ? e.trim() : '';
                     if (mail) uniqueEmails.add(mail);
                 });
             }
@@ -856,7 +862,7 @@ exports.obtenerDestinatarios = async (req, res) => {
                     emails = m.correos_cc.startsWith('[') ? JSON.parse(m.correos_cc) : m.correos_cc.split(',');
                 } catch(e) { emails = m.correos_cc.split(','); }
                 emails.forEach(e => {
-                    const mail = typeof e === 'string' ? e.trim().toLowerCase() : '';
+                    const mail = typeof e === 'string' ? e.trim() : '';
                     if (mail) uniqueEmails.add(mail);
                 });
             }

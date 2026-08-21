@@ -10,9 +10,9 @@ function AutocompleteInput({ value, suggestions = [], onChange, placeholder, req
   }, [value]);
 
   const currentTypingWord = searchTerm.split(',').pop().trim();
-  const filteredSuggestions = suggestions.filter((s) =>
-    s.toLowerCase().includes(currentTypingWord.toLowerCase()) && currentTypingWord !== ""
-  );
+  const filteredSuggestions = suggestions
+    .filter((s) => s.toLowerCase().includes(currentTypingWord.toLowerCase()))
+    .slice(0, 100);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
